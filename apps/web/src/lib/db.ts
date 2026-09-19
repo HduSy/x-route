@@ -2,6 +2,10 @@ import Dexie from 'dexie';
 import { enableMapSet, enablePatches, type Patch } from 'immer';
 import type { GPXFileType } from '@x-route/gpx';
 
+/** Shape actually persisted: plain data plus the runtime `_data` bookkeeping
+ *  field (survives structured clone; used for the file id). */
+export type StoredGPXFile = GPXFileType & { _data: { id?: string } };
+
 enableMapSet();
 enablePatches();
 
@@ -13,7 +17,7 @@ export class Database extends Dexie {
     fileids!: Dexie.Table<string, string>;
     // Plain data shape — structured clone drops the GPXFile prototype anyway;
     // reconstruct instances via `new GPXFile(data)` where methods are needed.
-    files!: Dexie.Table<GPXFileType, string>;
+    files!: Dexie.Table<StoredGPXFile, string>;
     patches!: Dexie.Table<{ patch: Patch[]; inversePatch: Patch[]; index: number }, number>;
     settings!: Dexie.Table<any, string>;
 
