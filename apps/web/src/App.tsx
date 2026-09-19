@@ -1,4 +1,4 @@
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FileList } from '@/components/file-list/FileList';
 import { MapView } from '@/components/map/MapView';
@@ -6,19 +6,34 @@ import { RoutingToolbar } from '@/components/toolbar/RoutingToolbar';
 import { EditToolbar } from '@/components/toolbar/EditToolbar';
 import { ElevationProfile } from '@/components/elevation/ElevationProfile';
 import { triggerFileInput } from '@/lib/file-actions';
+import { useT } from '@/store/i18n-slice';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 
 export default function App() {
+    const { t, lang, toggleLanguage } = useT();
+    useKeyboardShortcuts();
+
     return (
         <div className="flex h-screen flex-col bg-background">
             <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-                <span className="text-lg font-semibold tracking-tight">x-route</span>
-                <span className="text-xs text-muted-foreground">Phase 4 — editing & profile</span>
+                <span className="text-lg font-semibold tracking-tight">{t.appName}</span>
+                <span className="hidden text-xs text-muted-foreground sm:inline">{t.tagline}</span>
                 <div className="flex-1" />
                 <RoutingToolbar />
                 <EditToolbar />
                 <Button variant="outline" size="sm" onClick={triggerFileInput}>
                     <FolderOpen className="size-4" />
-                    Import GPX / ZIP
+                    <span className="hidden sm:inline">{t.importBtn}</span>
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs font-medium"
+                    onClick={toggleLanguage}
+                    title="Switch Language / 切换语言"
+                >
+                    <Languages className="mr-1 size-3.5" />
+                    {lang === 'en' ? '中文' : 'EN'}
                 </Button>
             </header>
 

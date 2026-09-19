@@ -7,12 +7,14 @@ import { deleteFile, exportFile } from '@/lib/file-actions';
 import { db } from '@/lib/db';
 import { cn } from '@/lib/utils';
 import { useSelectionStore } from '@/store/selection-slice';
+import { useT } from '@/store/i18n-slice';
 
 function formatDistance(km: number): string {
     return km >= 100 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
 }
 
 function FileRow({ fileId }: { fileId: string }) {
+    const { t } = useT();
     const data = useLiveQuery(() => db.files.get(fileId), [fileId]);
     const selectedFileId = useSelectionStore((state) => state.selectedFileId);
     const selectFile = useSelectionStore((state) => state.selectFile);
@@ -22,12 +24,12 @@ function FileRow({ fileId }: { fileId: string }) {
         const file = new GPXFile(data as GPXFileType);
         const { global } = file.getStatistics();
         return {
-            name: file.metadata?.name?.trim() || 'Untitled',
+            name: file.metadata?.name?.trim() || t.untitled,
             distance: global.distance.total,
             elevationGain: Math.round(global.elevation.gain),
             points: global.length,
         };
-    }, [data]);
+    }, [data, t.untitled]);
 
     if (!summary) return null;
 
@@ -46,14 +48,14 @@ function FileRow({ fileId }: { fileId: string }) {
                 <div className="truncate font-medium">{summary.name}</div>
                 <div className="text-xs text-muted-foreground">
                     {formatDistance(summary.distance)} · ↑{summary.elevationGain} m ·{' '}
-                    {summary.points} pts
+                    {summary.points} {t.pts}
                 </div>
             </div>
             <Button
                 variant="ghost"
                 size="icon"
                 className="size-7 opacity-0 group-hover:opacity-100"
-                title="Export GPX"
+                title={t.exportGpx}
                 onClick={(event) => {
                     event.stopPropagation();
                     void exportFile(fileId);
@@ -65,7 +67,7 @@ function FileRow({ fileId }: { fileId: string }) {
                 variant="ghost"
                 size="icon"
                 className="size-7 opacity-0 group-hover:opacity-100 hover:text-destructive"
-                title="Delete"
+                title={t.delete}
                 onClick={(event) => {
                     event.stopPropagation();
                     void deleteFile(fileId);
@@ -78,16 +80,17 @@ function FileRow({ fileId }: { fileId: string }) {
 }
 
 export function FileList() {
+    const { t } = useT();
     const fileIds = useLiveQuery(() => db.fileids.toArray());
 
     if (fileIds === undefined) {
-        return <div className="p-3 text-sm text-muted-foreground">Loading…</div>;
+        return <div className="p-3 text-sm text-muted-foreground">{t.loading}</div>;
     }
 
     if (fileIds.length === 0) {
         return (
             <div className="p-3 text-sm text-muted-foreground">
-                No files yet — import a .gpx or .zip to get started.
+                {t.noFiles}
             </div>
         );
     }

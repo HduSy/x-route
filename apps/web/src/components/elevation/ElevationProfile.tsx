@@ -8,6 +8,7 @@ import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { mapManager } from '@/lib/map/MapManager';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/store/i18n-slice';
 
 Chart.register(...registerables);
 
@@ -19,6 +20,7 @@ interface ProfilePoint {
 }
 
 export function ElevationProfile() {
+    const { t } = useT();
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const chartRef = useRef<Chart | null>(null);
     const [collapsed, setCollapsed] = useState(false);
@@ -229,7 +231,7 @@ export function ElevationProfile() {
             <div className="flex items-center justify-between border-b px-3 py-1.5 text-xs text-muted-foreground">
                 <div className="flex items-center gap-4">
                     <span className="flex items-center gap-1 font-semibold text-foreground">
-                        <Mountain className="size-3.5 text-primary" /> Elevation Profile
+                        <Mountain className="size-3.5 text-primary" /> {t.elevationProfile}
                     </span>
                     {stats && (
                         <>
@@ -252,7 +254,7 @@ export function ElevationProfile() {
                     size="icon"
                     className="size-6"
                     onClick={() => setCollapsed(!collapsed)}
-                    title={collapsed ? 'Expand' : 'Collapse'}
+                    title={collapsed ? t.expand : t.collapse}
                 >
                     {collapsed ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                 </Button>

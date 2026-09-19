@@ -3,8 +3,10 @@ import { ArrowLeftRight, Scissors, Sparkles, CircleDot, Check } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { useSelectionStore } from '@/store/selection-slice';
 import { reverseTrack, simplifyTrack, closeLoop, splitTrackAtMiddle } from '@/lib/file-actions';
+import { useT } from '@/store/i18n-slice';
 
 export function EditToolbar() {
+    const { t } = useT();
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
     const [actionStatus, setActionStatus] = useState<string | null>(null);
 
@@ -27,10 +29,10 @@ export function EditToolbar() {
                 size="sm"
                 className="h-8 px-2 text-xs"
                 onClick={() => void runAction('reversed', () => reverseTrack(selectedFileId))}
-                title="Reverse track direction"
+                title={t.reverseTitle}
             >
                 {actionStatus === 'reversed' ? <Check className="size-3.5 text-green-600" /> : <ArrowLeftRight className="size-3.5" />}
-                <span className="ml-1 hidden sm:inline">Reverse</span>
+                <span className="ml-1 hidden sm:inline">{t.reverse}</span>
             </Button>
 
             <Button
@@ -38,10 +40,10 @@ export function EditToolbar() {
                 size="sm"
                 className="h-8 px-2 text-xs"
                 onClick={() => void runAction('simplified', () => simplifyTrack(selectedFileId))}
-                title="Simplify track (RDP reduction)"
+                title={t.simplifyTitle}
             >
                 {actionStatus === 'simplified' ? <Check className="size-3.5 text-green-600" /> : <Sparkles className="size-3.5" />}
-                <span className="ml-1 hidden sm:inline">Simplify</span>
+                <span className="ml-1 hidden sm:inline">{t.simplify}</span>
             </Button>
 
             <Button
@@ -49,10 +51,10 @@ export function EditToolbar() {
                 size="sm"
                 className="h-8 px-2 text-xs"
                 onClick={() => void runAction('split', () => splitTrackAtMiddle(selectedFileId))}
-                title="Split track at midpoint"
+                title={t.splitTitle}
             >
                 {actionStatus === 'split' ? <Check className="size-3.5 text-green-600" /> : <Scissors className="size-3.5" />}
-                <span className="ml-1 hidden sm:inline">Split</span>
+                <span className="ml-1 hidden sm:inline">{t.split}</span>
             </Button>
 
             <Button
@@ -60,10 +62,10 @@ export function EditToolbar() {
                 size="sm"
                 className="h-8 px-2 text-xs"
                 onClick={() => void runAction('loop', () => closeLoop(selectedFileId))}
-                title="Close loop (connect end to start)"
+                title={t.loopTitle}
             >
                 {actionStatus === 'loop' ? <Check className="size-3.5 text-green-600" /> : <CircleDot className="size-3.5" />}
-                <span className="ml-1 hidden sm:inline">Loop</span>
+                <span className="ml-1 hidden sm:inline">{t.loop}</span>
             </Button>
         </div>
     );

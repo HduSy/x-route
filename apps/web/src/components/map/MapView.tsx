@@ -11,14 +11,16 @@ import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
 import { cn } from '@/lib/utils';
+import { useT } from '@/store/i18n-slice';
 
 // --- Track info popup bridged into MapLibre's DOM via createPortal (AD-6) ---
 
 function TrackPopupContent({ file }: { file: GPXFileType }) {
+    const { t } = useT();
     const { global } = useMemo(() => new GPXFile(file).getStatistics(), [file]);
     return (
         <div className="space-y-0.5 text-sm">
-            <div className="font-semibold">{file.metadata?.name ?? 'Untitled'}</div>
+            <div className="font-semibold">{file.metadata?.name ?? t.untitled}</div>
             <div className="text-muted-foreground">
                 {global.distance.total.toFixed(1)} km · ↑{Math.round(global.elevation.gain)} m
             </div>
@@ -35,6 +37,7 @@ function BasemapSwitcher({
     current: BasemapKey;
     onChange: (key: BasemapKey) => void;
 }) {
+    const { t } = useT();
     return (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border bg-background/95 p-1 shadow-md backdrop-blur">
             <Layers className="mx-1 size-4 text-muted-foreground" />
@@ -47,7 +50,7 @@ function BasemapSwitcher({
                     )}
                     onClick={() => onChange(key)}
                 >
-                    {BASEMAPS[key].label}
+                    {t.basemaps[key as keyof typeof t.basemaps] ?? BASEMAPS[key].label}
                 </button>
             ))}
         </div>

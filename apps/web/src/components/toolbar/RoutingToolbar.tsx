@@ -6,8 +6,10 @@ import { saveGPXFile } from '@/lib/file-actions';
 import { routingProfiles } from '@/lib/routing';
 import { cn } from '@/lib/utils';
 import { useRoutingStore } from '@/store/routing-slice';
+import { useT } from '@/store/i18n-slice';
 
 export function RoutingToolbar() {
+    const { t } = useT();
     const [saved, setSaved] = useState(false);
     const active = useRoutingStore((s) => s.active);
     const setActive = useRoutingStore((s) => s.setActive);
@@ -63,10 +65,10 @@ export function RoutingToolbar() {
                 variant={active ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setActive(!active)}
-                title="Toggle route planning"
+                title={t.togglePlan}
             >
                 <Route className="size-4" />
-                Plan
+                {active ? t.exitPlan : t.plan}
             </Button>
 
             {active && (
@@ -75,22 +77,22 @@ export function RoutingToolbar() {
                         className="h-8 rounded-md border bg-background px-2 text-xs"
                         value={profile}
                         onChange={(e) => setProfile(e.target.value)}
-                        title="Routing profile"
+                        title={t.profiles[profile as keyof typeof t.profiles] ?? 'Profile'}
                     >
                         {Object.entries(routingProfiles).map(([key, p]) => (
                             <option key={key} value={key}>
-                                {p.label}
+                                {t.profiles[key as keyof typeof t.profiles] ?? p.label}
                             </option>
                         ))}
                     </select>
 
-                    <Button variant="ghost" size="icon" className="size-8" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)">
+                    <Button variant="ghost" size="icon" className="size-8" disabled={!canUndo} onClick={undo} title={t.undo}>
                         <Undo2 className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="size-8" disabled={!canRedo} onClick={redo} title="Redo (Ctrl+Y)">
+                    <Button variant="ghost" size="icon" className="size-8" disabled={!canRedo} onClick={redo} title={t.redo}>
                         <Redo2 className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="size-8" disabled={anchors.length === 0} onClick={clear} title="Clear route">
+                    <Button variant="ghost" size="icon" className="size-8" disabled={anchors.length === 0} onClick={clear} title={t.clear}>
                         <Trash2 className="size-4" />
                     </Button>
 
@@ -114,7 +116,7 @@ export function RoutingToolbar() {
                         className={cn(resultPoints.length >= 2 && 'border-primary/40', saved && 'text-green-600 border-green-600/40')}
                     >
                         {saved ? <Check className="size-4 text-green-600" /> : <Save className="size-4" />}
-                        {saved ? 'Saved!' : 'Save'}
+                        {saved ? t.saved : t.save}
                     </Button>
                 </>
             )}
