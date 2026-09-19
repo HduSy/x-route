@@ -8,6 +8,8 @@ import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
 import { gpxLayers } from '@/lib/map/gpx-layer';
 import { useSelectionStore } from '@/store/selection-slice';
+import { useRoutingStore } from '@/store/routing-slice';
+import { useRoutingSync } from '@/hooks/use-routing-sync';
 import { cn } from '@/lib/utils';
 
 // --- Track info popup bridged into MapLibre's DOM via createPortal (AD-6) ---
@@ -57,6 +59,7 @@ function BasemapSwitcher({
 const EMPTY_IDS: string[] = [];
 
 export function MapView() {
+    useRoutingSync();
     const containerRef = useRef<HTMLDivElement>(null);
     const popupContainerRef = useRef<HTMLDivElement | null>(null);
     const popupRef = useRef<MapLibrePopup | null>(null);
@@ -103,8 +106,10 @@ export function MapView() {
         popupContainerRef.current = popupContainer;
         popupRef.current = popup;
 
-        // Delegated click: show info popup for any rendered track under the cursor
+        // Delegated click: show info popup for any rendered track under the
+        // cursor — suppressed while the routing tool is placing anchors
         const onMapClick = (e: MapMouseEvent) => {
+            if (useRoutingStore.getState().active) return;
             const layerIds = gpxLayers.getLayerIds().filter((id) => map.getLayer(id));
             const features = layerIds.length
                 ? map.queryRenderedFeatures(e.point, { layers: layerIds })

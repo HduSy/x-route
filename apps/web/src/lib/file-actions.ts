@@ -107,6 +107,19 @@ export async function exportFile(fileId: string) {
     saveAs(new Blob([xml], { type: 'application/gpx+xml' }), `${name}.gpx`);
 }
 
+// --- Save a computed route as a new file ---
+
+export async function saveGPXFile(file: GPXFile): Promise<string> {
+    const id = crypto.randomUUID();
+    file._data.id = id;
+    await db.transaction('rw', db.files, db.fileids, async () => {
+        await db.files.put(file, id);
+        await db.fileids.put(id, id);
+    });
+    useSelectionStore.getState().selectFile(id);
+    return id;
+}
+
 // --- Delete ---
 
 export async function deleteFile(fileId: string) {

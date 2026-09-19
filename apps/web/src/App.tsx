@@ -2,6 +2,7 @@ import { FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FileList } from '@/components/file-list/FileList';
 import { MapView } from '@/components/map/MapView';
+import { RoutingToolbar } from '@/components/toolbar/RoutingToolbar';
 import { triggerFileInput } from '@/lib/file-actions';
 
 export default function App() {
@@ -9,8 +10,9 @@ export default function App() {
         <div className="flex h-screen flex-col bg-background">
             <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
                 <span className="text-lg font-semibold tracking-tight">x-route</span>
-                <span className="text-xs text-muted-foreground">Phase 2 — map layer</span>
+                <span className="text-xs text-muted-foreground">Phase 3 — routing</span>
                 <div className="flex-1" />
+                <RoutingToolbar />
                 <Button variant="outline" size="sm" onClick={triggerFileInput}>
                     <FolderOpen className="size-4" />
                     Import GPX / ZIP
