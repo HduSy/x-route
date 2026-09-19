@@ -27,6 +27,8 @@ class MapManager {
     private container: HTMLElement | null = null;
     private basemap: BasemapKey = 'liberty';
     private cursorMarker: Marker | null = null;
+    private userLocationMarker: Marker | null = null;
+    private userLocationCoords: { lon: number; lat: number } | null = null;
     private styleReloadCallbacks = new Set<() => void>();
 
     /** Idempotent under React StrictMode double-mount: re-init with the same
@@ -59,6 +61,9 @@ class MapManager {
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = undefined;
         this.cursorMarker?.remove();
         this.cursorMarker = null;
+        this.userLocationMarker?.remove();
+        this.userLocationMarker = null;
+        this.userLocationCoords = null;
         this.map.remove();
         this.map = null;
         this.container = null;
@@ -85,6 +90,69 @@ class MapManager {
             this.cursorMarker = new Marker({ element: el }).addTo(this.map);
         }
         this.cursorMarker.setLngLat([coords.lon, coords.lat]);
+    }
+
+    setUserLocation(coords: { lon: number; lat: number } | null) {
+        if (!this.map) return;
+        if (!coords) {
+            this.userLocationMarker?.remove();
+            this.userLocationMarker = null;
+            this.userLocationCoords = null;
+            return;
+        }
+
+        this.userLocationCoords = coords;
+
+        if (!this.userLocationMarker) {
+            const container = document.createElement('div');
+            container.className = 'x-route-user-location';
+            container.style.cssText = `
+                width: 48px;
+                height: 48px;
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                pointer-events: none;
+            `;
+
+            // Pulsing breathing halo ring
+            const pulse = document.createElement('div');
+            pulse.className = 'x-route-user-location-pulse';
+            pulse.style.cssText = `
+                position: absolute;
+                width: 40px;
+                height: 40px;
+                border-radius: 9999px;
+                background-color: rgba(0, 122, 255, 0.35);
+                animation: user-location-pulse 2s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+            `;
+
+            // Center blue dot with white border and subtle breathing animation
+            const dot = document.createElement('div');
+            dot.className = 'x-route-user-location-dot';
+            dot.style.cssText = `
+                position: relative;
+                width: 16px;
+                height: 16px;
+                border-radius: 9999px;
+                background-color: #007AFF;
+                border: 2.5px solid #ffffff;
+                box-shadow: 0 1px 6px rgba(0, 122, 255, 0.75), 0 0 0 1px rgba(0,0,0,0.1);
+                animation: user-location-breathe 2s ease-in-out infinite;
+            `;
+
+            container.appendChild(pulse);
+            container.appendChild(dot);
+
+            this.userLocationMarker = new Marker({ element: container, anchor: 'center' }).addTo(this.map);
+        }
+
+        this.userLocationMarker.setLngLat([coords.lon, coords.lat]);
+    }
+
+    getUserLocation(): { lon: number; lat: number } | null {
+        return this.userLocationCoords;
     }
 
     getMap(): MapLibreMap | null {

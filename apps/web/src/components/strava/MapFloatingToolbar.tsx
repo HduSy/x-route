@@ -7,6 +7,7 @@ import {
     Crosshair,
     Flame,
     Layers,
+    Loader2,
     Redo2,
     Scissors,
     Sparkles,
@@ -44,22 +45,34 @@ export function MapFloatingToolbar() {
     const [toolActionStatus, setToolActionStatus] = useState<string | null>(null);
 
     const fileCount = useLiveQuery(() => db.fileids.count()) ?? 0;
+    const [isLocating, setIsLocating] = useState(false);
+    const [isLocated, setIsLocated] = useState(false);
 
     const handleLocateMe = () => {
-        if ('geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    const map = mapManager.getMap();
-                    map?.flyTo({
-                        center: [pos.coords.longitude, pos.coords.latitude],
-                        zoom: 15,
-                        essential: true,
-                    });
-                },
-                (err) => console.warn('Geolocation error:', err),
-                { enableHighAccuracy: true, timeout: 5000 }
-            );
-        }
+        if (!('geolocation' in navigator)) return;
+        setIsLocating(true);
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lon = pos.coords.longitude;
+                const lat = pos.coords.latitude;
+                mapManager.setUserLocation({ lon, lat });
+                setIsLocating(false);
+                setIsLocated(true);
+                const map = mapManager.getMap();
+                map?.flyTo({
+                    center: [lon, lat],
+                    zoom: 15,
+                    essential: true,
+                    duration: 1200,
+                });
+            },
+            (err) => {
+                console.warn('Geolocation error:', err);
+                setIsLocating(false);
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
     };
 
     const handleTrackAction = async (name: string, fn: () => Promise<void>) => {
@@ -80,10 +93,20 @@ export function MapFloatingToolbar() {
                 <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-background/95 p-1 shadow-sm backdrop-blur">
                     <button
                         onClick={handleLocateMe}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                        disabled={isLocating}
+                        className={cn(
+                            'flex size-7 items-center justify-center rounded-md transition',
+                            isLocated
+                                ? 'bg-blue-500/10 text-[#007AFF]'
+                                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                        )}
                         title={t.locateMe}
                     >
-                        <Crosshair className="size-4" />
+                        {isLocating ? (
+                            <Loader2 className="size-4 animate-spin text-[#007AFF]" />
+                        ) : (
+                            <Crosshair className="size-4" />
+                        )}
                     </button>
                     <div className="h-4 w-px bg-border mx-0.5" />
                     <button
