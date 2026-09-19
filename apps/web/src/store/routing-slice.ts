@@ -60,7 +60,7 @@ interface RoutingState {
 }
 
 export const useRoutingStore = create<RoutingState>()((set, get) => ({
-    active: false, // Default is browsing mode (little hand cursor); turns crosshair in route creation mode
+    active: true, // Default is route creation mode (crosshair cursor); allows instant click-to-route on refresh
     anchors: [],
     profile: 'bike',
     routingPreference: 'popular',
@@ -115,7 +115,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
             anchors: next,
             past: [...past, anchors],
             future: [],
-            active: next.length > 0,
+            active: true,
         });
     },
 
@@ -129,7 +129,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     clear: (resetHistory = false) => {
         const { anchors, past } = get();
         set({
-            active: false,
+            active: true,
             anchors: [],
             resultPoints: [],
             error: null,

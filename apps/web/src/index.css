@@ -182,6 +182,23 @@
   cursor: pointer !important;
 }
 
+/* Space-pan mode: pressing Space turns cursor into a hand (grab) for panning, overriding crosshair */
+.space-pan-active,
+.space-pan-active .maplibregl-canvas-container,
+.space-pan-active .maplibregl-canvas-container.maplibregl-interactive,
+.space-pan-active canvas.maplibregl-canvas {
+  cursor: grab !important;
+}
+
+.space-pan-active .maplibregl-canvas-container.maplibregl-interactive:active,
+.space-pan-active canvas.maplibregl-canvas:active,
+.space-pan-dragging,
+.space-pan-dragging .maplibregl-canvas-container,
+.space-pan-dragging .maplibregl-canvas-container.maplibregl-interactive,
+.space-pan-dragging canvas.maplibregl-canvas {
+  cursor: grabbing !important;
+}
+
 /* Marker hover animation via child dot — leaves outer MapLibre translate transform unaffected */
 .x-route-anchor-marker:hover .x-route-anchor-dot {
   transform: scale(1.22);
@@ -228,6 +245,11 @@
   .sidebar-open .maplibregl-ctrl-bottom-left {
     transform: translateX(326px);
   }
+}
+
+/* Smooth scale control width transitions to prevent jittering */
+.maplibregl-ctrl-scale {
+  transition: width 0.15s ease-out;
 }
 
 /* Compact attribution control collapsed by default & dark mode styles */

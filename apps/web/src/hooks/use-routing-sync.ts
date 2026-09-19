@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
+import { mapManager } from '@/lib/map/MapManager';
 import { route, getManualRoute } from '@/lib/routing';
 
 // Stale-response guard: only the latest request may write its result.
@@ -20,19 +21,22 @@ export function useRoutingSync() {
     // Map interactions -> store (wired once)
     useEffect(() => {
         routingLayer.onMapClick = (lngLat) => {
+            mapManager.markInteracted();
             const state = useRoutingStore.getState();
             if (!state.active) return;
             state.addAnchor(lngLat);
         };
         routingLayer.onInsertAnchor = (index, lngLat) => {
+            mapManager.markInteracted();
             const state = useRoutingStore.getState();
-            if (!state.active) return;
             state.insertAnchor(index, lngLat);
         };
         routingLayer.onMarkerDrag = (index, to) => {
+            mapManager.markInteracted();
             useRoutingStore.getState().moveAnchor(index, to);
         };
         routingLayer.onMarkerRightClick = (index) => {
+            mapManager.markInteracted();
             useRoutingStore.getState().removeAnchor(index);
         };
         return () => {

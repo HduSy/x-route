@@ -2,7 +2,7 @@ import { Marker, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl
 import { mapManager } from './MapManager';
 import type { RoutingAnchor, UnitType } from '@/store/routing-slice';
 import { TrackPoint, distance } from '@x-route/gpx';
-import { getClosestLinePoint, type ClosestPointDetails } from '@/lib/utils';
+import { getClosestLinePoint } from '@/lib/utils';
 
 // Strava Route Builder imperative routing layer:
 // - Strava signature energetic orange route polyline with casing
@@ -13,6 +13,7 @@ import { getClosestLinePoint, type ClosestPointDetails } from '@/lib/utils';
 const SOURCE_ID = 'x-route-routing';
 const LINE_CASING_LAYER_ID = 'x-route-routing-casing';
 const LINE_LAYER_ID = 'x-route-routing-line';
+const LINE_HIT_AREA_LAYER_ID = 'x-route-routing-hit-area';
 
 const MILESTONE_SIZE = 18;
 
@@ -89,12 +90,12 @@ function ghostAnchorElement(): HTMLElement {
     const el = document.createElement('div');
     el.className = 'x-route-ghost-marker';
     el.style.cssText = `
-        width: 14px;
-        height: 14px;
+        width: 18px;
+        height: 18px;
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: pointer;
+        pointer-events: none;
         user-select: none;
         box-sizing: border-box;
     `;
@@ -104,10 +105,9 @@ function ghostAnchorElement(): HTMLElement {
         width: 14px;
         height: 14px;
         border-radius: 9999px;
-        background-color: rgba(134, 59, 255, 0.85);
-        border: 2px solid #ffffff;
-        box-shadow: 0 2px 6px rgba(134, 59, 255, 0.5);
-        transition: transform 0.12s ease, background-color 0.12s ease;
+        background-color: #863BFF;
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 2px 8px rgba(134, 59, 255, 0.65), 0 1px 3px rgba(0,0,0,0.3);
         box-sizing: border-box;
     `;
     el.appendChild(dot);
@@ -237,10 +237,15 @@ function findInsertIndex(
 ): number {
     if (anchors.length <= 1) return anchors.length;
     if (anchors.length === 2) return 1;
+    if (points.length < 2) return anchors.length;
 
-    const anchorPointIndices: number[] = [];
+    // Map each anchor 0..m-1 to an index in points.
+    // Anchor 0 is always at index 0, and Anchor m-1 is always at points.length - 1.
+    // Intermediate anchors are matched monotonically along the path.
+    const anchorPointIndices: number[] = [0];
     let searchStart = 0;
-    for (const anchor of anchors) {
+    for (let a = 1; a < anchors.length - 1; a++) {
+        const anchor = anchors[a]!;
         let bestIdx = searchStart;
         let bestDist = Number.MAX_VALUE;
         for (let i = searchStart; i < points.length; i++) {
@@ -257,24 +262,29 @@ function findInsertIndex(
         anchorPointIndices.push(bestIdx);
         searchStart = bestIdx;
     }
+    anchorPointIndices.push(points.length - 1);
 
+    // Find the segment [k, k+1] that contains pointIndex
     for (let k = 0; k < anchorPointIndices.length - 1; k++) {
-        const startIdx = anchorPointIndices[k]!;
         const endIdx = anchorPointIndices[k + 1]!;
-        if (pointIndex >= startIdx && pointIndex <= endIdx) {
+        if (pointIndex <= endIdx) {
             return k + 1;
         }
     }
 
-    return anchors.length - 1;
+    return Math.max(1, anchors.length - 1);
 }
 
 export class RoutingLayerController {
     private markers: Marker[] = [];
     private ghostMarker: Marker | null = null;
-    private currentInsertIndex: number = 1;
-    private isDraggingGhost = false;
-    /** Set to true for one tick after a ghost drag ends, to suppress the click that fires on mouseup. */
+    private isHoveringLine = false;
+    private isDraggingLine = false;
+    private dragInsertIndex = 1;
+    private containerPointerDownHandler: ((e: MouseEvent | PointerEvent) => void) | null = null;
+    private containerMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
+    private containerMouseLeaveHandler: (() => void) | null = null;
+    /** Set to true for one tick after a drag ends, to suppress the click that fires on mouseup. */
     private justFinishedGhostDrag = false;
     private currentAnchors: RoutingAnchor[] = [];
     private currentPoints: TrackPoint[] = [];
@@ -288,8 +298,9 @@ export class RoutingLayerController {
     private clickHandler:
         | ((e: { lngLat: { lng: number; lat: number } }) => void)
         | null = null;
-    private lineMouseMoveHandler: ((e: any) => void) | null = null;
-    private lineMouseLeaveHandler: (() => void) | null = null;
+
+    /** Flag to temporarily suppress map click (e.g. during space-bar pan mode or right after marker drag) */
+    suppressClick = false;
 
     /** Set by the React layer. */
     onMapClick: ((lngLat: { lon: number; lat: number }) => void) | null = null;
@@ -299,6 +310,92 @@ export class RoutingLayerController {
 
     private wiredMap: MapLibreMap | null = null;
 
+    /**
+     * Synchronously tests if (screenX, screenY) in canvas pixel space is on the route line.
+     * Returns the closest line point and insert index, or null if outside hit threshold or near an anchor.
+     */
+    private getLineHit(
+        screenX: number,
+        screenY: number,
+        map: MapLibreMap
+    ): { closestLngLat: { lng: number; lat: number }; insertIndex: number } | null {
+        if (this.currentPoints.length < 2) return null;
+
+        // 1. Avoid triggering line hit when the cursor is near any existing anchor marker (radius 22px)
+        for (const anchor of this.currentAnchors) {
+            const ap = map.project([anchor.lon, anchor.lat]);
+            if (Math.hypot(ap.x - screenX, ap.y - screenY) < 22) {
+                return null;
+            }
+        }
+
+        // 2. Iterate each segment and find the closest segment in screen space
+        let bestDistSq = Infinity;
+        let bestSegmentIndex = 0;
+        let bestT = 0;
+        const HIT_RADIUS = 16; // pixels
+        const HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS;
+
+        const pts = this.currentPoints;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const p1 = pts[i]!;
+            const p2 = pts[i + 1]!;
+
+            const s1 = map.project([p1.attributes.lon, p1.attributes.lat]);
+            const s2 = map.project([p2.attributes.lon, p2.attributes.lat]);
+
+            // Quick AABB reject per segment with margin
+            const minX = Math.min(s1.x, s2.x) - HIT_RADIUS;
+            const maxX = Math.max(s1.x, s2.x) + HIT_RADIUS;
+            const minY = Math.min(s1.y, s2.y) - HIT_RADIUS;
+            const maxY = Math.max(s1.y, s2.y) + HIT_RADIUS;
+            if (screenX < minX || screenX > maxX || screenY < minY || screenY > maxY) {
+                continue;
+            }
+
+            const dx = s2.x - s1.x;
+            const dy = s2.y - s1.y;
+            const lenSq = dx * dx + dy * dy;
+
+            let t = 0;
+            let distSq = 0;
+            if (lenSq === 0) {
+                distSq = (screenX - s1.x) * (screenX - s1.x) + (screenY - s1.y) * (screenY - s1.y);
+            } else {
+                t = Math.max(0, Math.min(1, ((screenX - s1.x) * dx + (screenY - s1.y) * dy) / lenSq));
+                const projX = s1.x + t * dx;
+                const projY = s1.y + t * dy;
+                distSq = (screenX - projX) * (screenX - projX) + (screenY - projY) * (screenY - projY);
+            }
+
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                bestSegmentIndex = i;
+                bestT = t;
+            }
+        }
+
+        if (bestDistSq > HIT_RADIUS_SQ) {
+            return null;
+        }
+
+        const p1 = pts[bestSegmentIndex]!;
+        const p2 = pts[bestSegmentIndex + 1]!;
+        const interpLon = p1.attributes.lon + bestT * (p2.attributes.lon - p1.attributes.lon);
+        const interpLat = p1.attributes.lat + bestT * (p2.attributes.lat - p1.attributes.lat);
+
+        const insertIndex = findInsertIndex(
+            this.currentPoints,
+            this.currentAnchors,
+            bestSegmentIndex
+        );
+
+        return {
+            closestLngLat: { lng: interpLon, lat: interpLat },
+            insertIndex,
+        };
+    }
+
     wire(map: MapLibreMap) {
         if (this.wiredMap === map) return;
         if (this.wiredMap) {
@@ -307,8 +404,8 @@ export class RoutingLayerController {
         this.wiredMap = map;
 
         this.clickHandler = (e) => {
-            if (!this.onMapClick) return;
-            // Suppress the click that MapLibre fires right after a ghost drag ends
+            if (!this.onMapClick || this.suppressClick) return;
+            // Suppress the click that MapLibre fires right after a drag ends
             if (this.justFinishedGhostDrag) {
                 this.justFinishedGhostDrag = false;
                 return;
@@ -317,67 +414,197 @@ export class RoutingLayerController {
         };
         map.on('click', this.clickHandler);
 
-        this.lineMouseMoveHandler = (e: any) => {
-            // Ghost marker on line hover works in both Draw mode and Browse mode
-            if (this.isDraggingGhost) return;
+        const container = map.getCanvasContainer();
+
+        this.containerMouseMoveHandler = (e: MouseEvent) => {
+            if (this.isDraggingLine) return;
             if (map.isMoving() || map.isZooming()) return;
             if (this.currentPoints.length < 2) return;
 
-            const details: Partial<ClosestPointDetails> = {};
-            const closest = getClosestLinePoint(
-                this.currentPoints,
-                { lat: e.lngLat.lat, lon: e.lngLat.lng },
-                details
-            );
-            if (!closest) return;
+            const rect = map.getCanvas().getBoundingClientRect();
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
 
-            const lon = closest.attributes.lon;
-            const lat = closest.attributes.lat;
-            this.currentInsertIndex = findInsertIndex(
-                this.currentPoints,
-                this.currentAnchors,
-                details.index ?? 0
-            );
-
-            this.ensureGhostMarker(map);
-            this.ghostMarker?.setLngLat([lon, lat]);
-        };
-
-        this.lineMouseLeaveHandler = () => {
-            if (!this.isDraggingGhost) {
+            const hit = this.getLineHit(screenX, screenY, map);
+            if (hit) {
+                this.isHoveringLine = true;
+                this.ensureGhostMarker(map);
+                this.ghostMarker?.setLngLat([hit.closestLngLat.lng, hit.closestLngLat.lat]);
+                map.getCanvas().style.cursor = 'grab';
+            } else if (this.isHoveringLine) {
+                this.isHoveringLine = false;
                 this.removeGhostMarker();
+                map.getCanvas().style.cursor = '';
             }
         };
 
-        if (map.getLayer(LINE_LAYER_ID)) {
-            map.on('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
-            map.on('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
-        }
+        this.containerMouseLeaveHandler = () => {
+            if (this.isDraggingLine) return;
+            this.isHoveringLine = false;
+            this.removeGhostMarker();
+            map.getCanvas().style.cursor = '';
+        };
+
+        // Strava-grade Route Dragging:
+        // Captures pointerdown AND mousedown on the map container when clicking on the route line.
+        // Synchronously stops propagation and disables map dragPan BEFORE MapLibre can initiate a map pan!
+        this.containerPointerDownHandler = (e: MouseEvent | PointerEvent) => {
+            if (e.button !== 0) return;
+            if (this.isDraggingLine) return;
+            if (this.currentPoints.length < 2) return;
+
+            const canvas = map.getCanvas();
+            const rect = canvas.getBoundingClientRect();
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
+
+            const hit = this.getLineHit(screenX, screenY, map);
+            if (!hit) return;
+
+            // Stop propagation and prevent default IMMEDIATELY in capture phase: MapLibre will NEVER see this down event!
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+
+            mapManager.markInteracted();
+
+            // Freeze map panning completely - 100% immune to map drift
+            map.dragPan.disable();
+
+            this.isDraggingLine = true;
+            this.suppressClick = true;
+            this.dragInsertIndex = hit.insertIndex;
+            map.getCanvas().style.cursor = 'grabbing';
+
+            this.ensureGhostMarker(map);
+            if (this.ghostMarker) {
+                this.ghostMarker.setLngLat([hit.closestLngLat.lng, hit.closestLngLat.lat]);
+                this.showGhostTooltip(this.ghostMarker);
+            }
+
+            const startClientX = e.clientX;
+            const startClientY = e.clientY;
+
+            const getRubberBandCoords = (lngLat: { lng: number; lat: number }) => {
+                const coords: [number, number][] = [];
+                const idx = this.dragInsertIndex;
+                if (idx > 0 && this.currentAnchors[idx - 1]) {
+                    const prev = this.currentAnchors[idx - 1]!;
+                    coords.push([prev.lon, prev.lat]);
+                }
+                coords.push([lngLat.lng, lngLat.lat]);
+                if (idx < this.currentAnchors.length && this.currentAnchors[idx]) {
+                    const next = this.currentAnchors[idx]!;
+                    coords.push([next.lon, next.lat]);
+                }
+                return coords;
+            };
+
+            this.setRubberBand(getRubberBandCoords(hit.closestLngLat));
+
+            const removeAllListeners = () => {
+                window.removeEventListener('pointermove', onWindowMove, { capture: true });
+                window.removeEventListener('mousemove', onWindowMove, { capture: true });
+                window.removeEventListener('pointerup', onWindowUp, { capture: true });
+                window.removeEventListener('mouseup', onWindowUp, { capture: true });
+                window.removeEventListener('keydown', onKeyDown, { capture: true });
+                window.removeEventListener('blur', onBlur);
+            };
+
+            const cleanupState = () => {
+                map.dragPan.enable();
+                map.getCanvas().style.cursor = '';
+                this.isDraggingLine = false;
+                this.isHoveringLine = false;
+                this.clearRubberBand();
+                this.hideDragTooltip(this.ghostMarker);
+                this.removeGhostMarker();
+                setTimeout(() => {
+                    this.suppressClick = false;
+                    this.justFinishedGhostDrag = false;
+                }, 250);
+            };
+
+            const onWindowMove = (we: MouseEvent | PointerEvent) => {
+                if (!this.isDraggingLine) return;
+                we.stopPropagation();
+                we.stopImmediatePropagation();
+                we.preventDefault();
+                const curRect = canvas.getBoundingClientRect();
+                const curLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
+                this.ghostMarker?.setLngLat([curLngLat.lng, curLngLat.lat]);
+                this.setRubberBand(getRubberBandCoords(curLngLat));
+            };
+
+            const onWindowUp = (we: MouseEvent | PointerEvent) => {
+                removeAllListeners();
+
+                if (!this.isDraggingLine) return;
+                we.stopPropagation();
+                we.stopImmediatePropagation();
+                we.preventDefault();
+
+                const curRect = canvas.getBoundingClientRect();
+                const finalLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
+
+                // Only insert if dragged by at least 6px (deliberate drag, not an accidental micro-jitter)
+                const moveDist = Math.hypot(we.clientX - startClientX, we.clientY - startClientY);
+                if (moveDist >= 6) {
+                    this.justFinishedGhostDrag = true;
+                    this.onInsertAnchor?.(this.dragInsertIndex, { lon: finalLngLat.lng, lat: finalLngLat.lat });
+                }
+
+                cleanupState();
+            };
+
+            const onKeyDown = (ke: KeyboardEvent) => {
+                if (ke.key === 'Escape') {
+                    removeAllListeners();
+                    cleanupState();
+                }
+            };
+
+            const onBlur = () => {
+                removeAllListeners();
+                cleanupState();
+            };
+
+            window.addEventListener('pointermove', onWindowMove, { capture: true });
+            window.addEventListener('mousemove', onWindowMove, { capture: true });
+            window.addEventListener('pointerup', onWindowUp, { capture: true });
+            window.addEventListener('mouseup', onWindowUp, { capture: true });
+            window.addEventListener('keydown', onKeyDown, { capture: true });
+            window.addEventListener('blur', onBlur);
+        };
+
+        container.addEventListener('pointerdown', this.containerPointerDownHandler, { capture: true });
+        container.addEventListener('mousedown', this.containerPointerDownHandler, { capture: true });
+        container.addEventListener('mousemove', this.containerMouseMoveHandler);
+        container.addEventListener('mouseleave', this.containerMouseLeaveHandler);
     }
 
     unwire() {
         if (this.wiredMap) {
+            this.wiredMap.dragPan.enable();
+            const container = this.wiredMap.getCanvasContainer();
+            if (this.containerPointerDownHandler) {
+                container.removeEventListener('pointerdown', this.containerPointerDownHandler, { capture: true });
+                container.removeEventListener('mousedown', this.containerPointerDownHandler, { capture: true });
+                this.containerPointerDownHandler = null;
+            }
+            if (this.containerMouseMoveHandler) {
+                container.removeEventListener('mousemove', this.containerMouseMoveHandler);
+                this.containerMouseMoveHandler = null;
+            }
+            if (this.containerMouseLeaveHandler) {
+                container.removeEventListener('mouseleave', this.containerMouseLeaveHandler);
+                this.containerMouseLeaveHandler = null;
+            }
             if (this.clickHandler) {
                 this.wiredMap.off('click', this.clickHandler);
             }
-            if (this.lineMouseMoveHandler) {
-                try {
-                    this.wiredMap.off('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
-                } catch {
-                    // Layer might have been removed with style
-                }
-            }
-            if (this.lineMouseLeaveHandler) {
-                try {
-                    this.wiredMap.off('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
-                } catch {
-                    // Layer might have been removed with style
-                }
-            }
         }
         this.clickHandler = null;
-        this.lineMouseMoveHandler = null;
-        this.lineMouseLeaveHandler = null;
         this.wiredMap = null;
     }
 
@@ -440,10 +667,13 @@ export class RoutingLayerController {
         el.appendChild(tip);
     }
 
-    private hideDragTooltip(marker: Marker) {
-        const el = marker.getElement();
-        const tip = el.querySelector('.x-route-drag-tip');
-        tip?.remove();
+    private hideDragTooltip(marker?: Marker | null) {
+        if (marker) {
+            const el = marker.getElement();
+            const tip = el.querySelector('.x-route-drag-tip');
+            tip?.remove();
+        }
+        document.querySelectorAll('.x-route-drag-tip').forEach((t) => t.remove());
     }
 
     private setRubberBand(coords: [number, number][]) {
@@ -479,54 +709,10 @@ export class RoutingLayerController {
         const el = ghostAnchorElement();
         const marker = new Marker({
             element: el,
-            draggable: true,
+            draggable: false, // Purely visual projection node; drag is managed directly on canvas/window!
             anchor: 'center',
             subpixelPositioning: true,
         });
-
-        marker.on('dragstart', () => {
-            this.isDraggingGhost = true;
-            this.showGhostTooltip(marker);
-        });
-
-        marker.on('drag', () => {
-            const lngLat = marker.getLngLat();
-            const targetIndex = this.currentInsertIndex;
-            const coords: [number, number][] = [];
-            if (targetIndex > 0 && this.currentAnchors[targetIndex - 1]) {
-                const prev = this.currentAnchors[targetIndex - 1]!;
-                coords.push([prev.lon, prev.lat]);
-            }
-            coords.push([lngLat.lng, lngLat.lat]);
-            if (targetIndex < this.currentAnchors.length && this.currentAnchors[targetIndex]) {
-                const next = this.currentAnchors[targetIndex]!;
-                coords.push([next.lon, next.lat]);
-            }
-            this.setRubberBand(coords);
-        });
-
-        marker.on('dragend', () => {
-            this.isDraggingGhost = false;
-            // In Draw mode the map click fires after dragend — suppress it so we don't add an extra anchor
-            if (this.isDrawMode) {
-                this.justFinishedGhostDrag = true;
-            }
-            this.hideDragTooltip(marker);
-            this.clearRubberBand();
-            const pos = marker.getLngLat();
-            const targetIndex = this.currentInsertIndex;
-            this.removeGhostMarker();
-            this.onInsertAnchor?.(targetIndex, { lon: pos.lng, lat: pos.lat });
-        });
-
-        marker.getElement().addEventListener('click', (e) => {
-            e.stopPropagation();
-            const pos = marker.getLngLat();
-            const targetIndex = this.currentInsertIndex;
-            this.removeGhostMarker();
-            this.onInsertAnchor?.(targetIndex, { lon: pos.lng, lat: pos.lat });
-        });
-
         marker.addTo(map);
         this.ghostMarker = marker;
     }
@@ -590,14 +776,32 @@ export class RoutingLayerController {
         const el = anchorElement(kind, index, total);
         const marker = new Marker({
             element: el,
-            draggable: !this.isDrawMode,
+            draggable: true,
             anchor: 'center',
             subpixelPositioning: true,
         })
             .setLngLat([anchor.lon, anchor.lat])
             .addTo(map);
 
+        el.addEventListener('pointerdown', () => {
+            el.style.cursor = 'grabbing';
+        });
+
+        el.addEventListener('mousedown', () => {
+            el.style.cursor = 'grabbing';
+        });
+
+        el.addEventListener('mouseup', () => {
+            el.style.cursor = 'grab';
+            // Safety: guarantee map panning is never stuck disabled if a click did not start a drag
+            map.dragPan.enable();
+            this.suppressClick = false;
+        });
+
         marker.on('dragstart', () => {
+            mapManager.markInteracted();
+            map.dragPan.disable();
+            this.suppressClick = true;
             this.showDragTooltip(marker, index, total);
         });
 
@@ -617,13 +821,21 @@ export class RoutingLayerController {
         });
 
         marker.on('dragend', () => {
+            mapManager.markInteracted();
+            map.dragPan.enable();
+            el.style.cursor = 'grab';
             this.hideDragTooltip(marker);
             this.clearRubberBand();
             const lngLat = marker.getLngLat();
             this.onMarkerDrag?.(index, { lon: lngLat.lng, lat: lngLat.lat });
+            setTimeout(() => {
+                this.suppressClick = false;
+            }, 250);
         });
+
         el.addEventListener('contextmenu', (event) => {
             event.preventDefault();
+            event.stopPropagation();
             this.onMarkerRightClick?.(index);
         });
 
@@ -671,6 +883,21 @@ export class RoutingLayerController {
                     'line-color': '#863BFF',
                     'line-width': 5,
                     'line-opacity': this.showRoutePath ? 0.95 : 0,
+                },
+            });
+        }
+
+        // Invisible wide hit-area layer for easy, butter-smooth hovering
+        if (!map.getLayer(LINE_HIT_AREA_LAYER_ID)) {
+            map.addLayer({
+                id: LINE_HIT_AREA_LAYER_ID,
+                type: 'line',
+                source: SOURCE_ID,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#863BFF',
+                    'line-width': 26,
+                    'line-opacity': 0.0001,
                 },
             });
         }
@@ -754,24 +981,6 @@ export class RoutingLayerController {
                 },
             });
         }
-
-        // Re-attach line mouse handlers to the line layer
-        if (this.lineMouseMoveHandler) {
-            try {
-                map.off('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
-                map.on('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
-            } catch {
-                // Layer might not be ready
-            }
-        }
-        if (this.lineMouseLeaveHandler) {
-            try {
-                map.off('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
-                map.on('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
-            } catch {
-                // Layer might not be ready
-            }
-        }
     }
 
     setOptions(options: {
@@ -782,13 +991,6 @@ export class RoutingLayerController {
     }) {
         if (options.isDrawMode !== undefined && this.isDrawMode !== options.isDrawMode) {
             this.isDrawMode = options.isDrawMode;
-            if (this.isDrawMode) {
-                this.removeGhostMarker();
-                this.clearRubberBand();
-            }
-            for (const marker of this.markers) {
-                marker.setDraggable(!this.isDrawMode);
-            }
         }
         if (options.showDistanceMarkers !== undefined) {
             this.showDistanceMarkers = options.showDistanceMarkers;
@@ -990,12 +1192,17 @@ export class RoutingLayerController {
 
     /** Soft clear: drop markers and the result line, keep click listener wired */
     clear() {
+        const map = this.wiredMap ?? mapManager.getMap();
+        map?.dragPan.enable();
+        this.isDraggingLine = false;
+        this.isHoveringLine = false;
         for (const marker of this.markers) marker.remove();
         this.markers = [];
         this.currentPoints = [];
         this.currentAnchors = [];
         this.removeGhostMarker();
         this.clearRubberBand();
+        this.hideDragTooltip();
         this.setResult([]);
     }
 
@@ -1006,6 +1213,7 @@ export class RoutingLayerController {
         const map = mapManager.getMap();
         if (map) {
             try {
+                if (map.getLayer(LINE_HIT_AREA_LAYER_ID)) map.removeLayer(LINE_HIT_AREA_LAYER_ID);
                 if (map.getLayer(RUBBER_BAND_LAYER_ID)) map.removeLayer(RUBBER_BAND_LAYER_ID);
                 if (map.getLayer(MILESTONES_LAYER_ID)) map.removeLayer(MILESTONES_LAYER_ID);
                 if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);

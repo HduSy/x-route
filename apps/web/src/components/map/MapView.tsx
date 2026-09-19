@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check, Compass, Layers, Maximize2, Minus, Plus, Route, Spline } from 'lucide-react';
+import { Check, Compass, Focus, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
 import { gpxLayers } from '@/lib/map/gpx-layer';
 import { routingLayer } from '@/lib/map/routing-layer';
-import { lassoModeStore } from '@/components/strava/MapFloatingToolbar';
+import { lassoModeStore } from '@/store/lasso-store';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
@@ -139,8 +139,8 @@ export function MapView() {
             const bounds = gpxLayers.getBounds(layerFiles);
             // Only auto-fit while the viewport is still pristine (hydration /
             // first import). Never yank the camera away from a user who is
-            // inspecting their route — that turned 100m views into 100km.
-            if (bounds && !mapManager.hasUserInteracted()) {
+            // inspecting their route or actively creating one.
+            if (bounds && !mapManager.hasUserInteracted() && useRoutingStore.getState().anchors.length === 0) {
                 mapManager.fitBounds(bounds, 60, true);
             }
         }
@@ -170,7 +170,7 @@ export function MapView() {
         unsubscribe = lassoModeStore.subscribe(onLassoChange);
 
         const onMouseDown = (e: MouseEvent) => {
-            if (!isLassoActiveRef.current) return;
+            if (!isLassoActiveRef.current || routingLayer.suppressClick) return;
             // Only left-button and only on map canvas itself
             if (e.button !== 0) return;
             e.preventDefault();
@@ -249,6 +249,100 @@ export function MapView() {
         };
     }, []);
 
+    // Space-bar drag to pan: turns cursor into grab hand and drags the map
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        let isSpacePressed = false;
+        let isMouseDown = false;
+
+        const isTargetEditable = (target: EventTarget | null) => {
+            if (!target || !(target instanceof HTMLElement)) return false;
+            const tag = target.tagName.toLowerCase();
+            return tag === 'input' || tag === 'textarea' || target.isContentEditable;
+        };
+
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.code !== 'Space') return;
+            if (isTargetEditable(e.target)) return;
+
+            // Prevent default page scroll on space
+            e.preventDefault();
+            if (isSpacePressed) return;
+            isSpacePressed = true;
+            routingLayer.suppressClick = true;
+
+            container.classList.add('space-pan-active');
+            const map = mapManager.getMap();
+            if (map && !map.dragPan.isEnabled()) {
+                map.dragPan.enable();
+            }
+        };
+
+        const onKeyUp = (e: KeyboardEvent) => {
+            if (e.code !== 'Space') return;
+            if (isTargetEditable(e.target)) return;
+
+            isSpacePressed = false;
+            container.classList.remove('space-pan-active', 'space-pan-dragging');
+
+            const map = mapManager.getMap();
+            if (map && isLassoActiveRef.current) {
+                map.dragPan.disable();
+            }
+
+            // Keep suppressing map click for a brief moment after space is released
+            setTimeout(() => {
+                if (!isSpacePressed) {
+                    routingLayer.suppressClick = false;
+                }
+            }, 120);
+        };
+
+        const onMouseDown = (e: MouseEvent) => {
+            if (isSpacePressed && e.button === 0) {
+                isMouseDown = true;
+                container.classList.add('space-pan-dragging');
+            }
+        };
+
+        const onMouseUp = () => {
+            if (isMouseDown) {
+                isMouseDown = false;
+                container.classList.remove('space-pan-dragging');
+            }
+        };
+
+        const onBlur = () => {
+            if (isSpacePressed) {
+                isSpacePressed = false;
+                isMouseDown = false;
+                container.classList.remove('space-pan-active', 'space-pan-dragging');
+                const map = mapManager.getMap();
+                if (map && isLassoActiveRef.current) {
+                    map.dragPan.disable();
+                }
+                routingLayer.suppressClick = false;
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown, { capture: true });
+        window.addEventListener('keyup', onKeyUp, { capture: true });
+        window.addEventListener('mousedown', onMouseDown, { capture: true });
+        window.addEventListener('mouseup', onMouseUp, { capture: true });
+        window.addEventListener('blur', onBlur);
+
+        return () => {
+            window.removeEventListener('keydown', onKeyDown, { capture: true });
+            window.removeEventListener('keyup', onKeyUp, { capture: true });
+            window.removeEventListener('mousedown', onMouseDown, { capture: true });
+            window.removeEventListener('mouseup', onMouseUp, { capture: true });
+            window.removeEventListener('blur', onBlur);
+            routingLayer.suppressClick = false;
+        };
+    }, []);
+
 
     const handleZoomIn = () => mapManager.getMap()?.zoomIn();
     const handleZoomOut = () => mapManager.getMap()?.zoomOut();
@@ -293,10 +387,12 @@ export function MapView() {
         const map = mapManager.getMap();
         if (!map) return;
         if (is3D) {
+            map.dragRotate.disable();
             map.easeTo({ pitch: 0, bearing: 0, duration: 600 });
             setIs3D(false);
             setBearing(0);
         } else {
+            map.dragRotate.enable();
             map.easeTo({ pitch: 60, bearing: -20, duration: 600 });
             setIs3D(true);
             setBearing(-20);
@@ -389,7 +485,7 @@ export function MapView() {
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
                     title={t.fitRoute}
                 >
-                    <Maximize2 className="size-4" />
+                    <Focus className="size-4" />
                 </button>
                 <button
                     onClick={handleResetCompass}

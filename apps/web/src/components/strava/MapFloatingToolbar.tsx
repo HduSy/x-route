@@ -8,7 +8,6 @@ import {
     Check,
     ChevronDown,
     Crosshair,
-    Flame,
     Layers,
     Loader2,
     Redo2,
@@ -20,10 +19,11 @@ import {
 import { useRoutingStore } from '@/store/routing-slice';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useT } from '@/store/i18n-slice';
-import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
+import { mapManager } from '@/lib/map/MapManager';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { reverseTrack, simplifyTrack, splitTrackAtMiddle, closeLoop } from '@/lib/file-actions';
+import { lassoModeStore } from '@/store/lasso-store';
 import { cn } from '@/lib/utils';
 
 export function MapFloatingToolbar() {
@@ -44,8 +44,6 @@ export function MapFloatingToolbar() {
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
 
-    const [basemapOpen, setBasemapOpen] = useState(false);
-    const [currentBasemap, setCurrentBasemap] = useState<BasemapKey>('bright');
     const [toolsOpen, setToolsOpen] = useState(false);
     const [toolActionStatus, setToolActionStatus] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -55,64 +53,86 @@ export function MapFloatingToolbar() {
     const [isLocating, setIsLocating] = useState(false);
     const [isLocated, setIsLocated] = useState(false);
 
-    const handleLocateMe = () => {
+    const handleLocateMe = (isManual = false) => {
         if (!('geolocation' in navigator)) return;
-        const existing = mapManager.getUserLocation();
-        const map = mapManager.getMap();
+        const currentMap = mapManager.getMap();
+        if (!currentMap) return;
 
-        if (isLocated && existing && map) {
-            // Already located once, re-center smoothly
-            map.flyTo({
-                center: [existing.lon, existing.lat],
-                zoom: 15,
-                essential: true,
-                duration: 1000,
-            });
-            return;
+        // Auto-locate on load should NEVER disrupt an active user who is already drawing a route
+        // or interacting with the map.
+        const canFly = isManual || (
+            !mapManager.hasUserInteracted() &&
+            useRoutingStore.getState().anchors.length === 0
+        );
+
+        // If we already have a cached location and flying is permitted:
+        const existing = mapManager.getUserLocation();
+        if (existing) {
+            if (canFly) {
+                currentMap.flyTo({
+                    center: [existing.lon, existing.lat],
+                    zoom: Math.max(currentMap.getZoom(), 15),
+                    essential: true,
+                    duration: 800,
+                });
+            }
+            setIsLocated(true);
         }
 
+        // Always request the freshest position from navigator.geolocation
         setIsLocating(true);
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const lon = pos.coords.longitude;
-                const lat = pos.coords.latitude;
-                const currentMap = mapManager.getMap();
 
-                if (!currentMap) {
-                    setIsLocating(false);
-                    return;
-                }
-
-                // Fly to target position first — DO NOT show the breathing marker until arrival
-                currentMap.flyTo({
-                    center: [lon, lat],
-                    zoom: 15,
-                    essential: true,
-                    duration: 1200,
-                });
-
-                // ONLY once the map arrives at user position, spawn the breathing dot!
-                let settled = false;
-                const onSettle = () => {
-                    if (settled) return;
-                    settled = true;
-                    currentMap.off('moveend', onSettle);
-                    mapManager.setUserLocation({ lon, lat });
-                    setIsLocating(false);
-                    setIsLocated(true);
-                };
-                currentMap.once('moveend', onSettle);
-                setTimeout(onSettle, 1400); // Safety fallback
-            },
-            (err) => {
-                console.warn('Geolocation error:', err);
+        const onPositionSuccess = (pos: GeolocationPosition) => {
+            const lon = pos.coords.longitude;
+            const lat = pos.coords.latitude;
+            const map = mapManager.getMap();
+            if (!map) {
                 setIsLocating(false);
+                return;
+            }
+
+            mapManager.setUserLocation({ lon, lat });
+
+            // Only fly camera if explicitly clicked by user OR on a pristine first load (no user actions/route)
+            const shouldFlyNow = isManual || (
+                !mapManager.hasUserInteracted() &&
+                useRoutingStore.getState().anchors.length === 0
+            );
+
+            if (shouldFlyNow) {
+                map.flyTo({
+                    center: [lon, lat],
+                    zoom: Math.max(map.getZoom(), 15),
+                    essential: true,
+                    duration: 1000,
+                });
+            }
+            setIsLocating(false);
+            setIsLocated(true);
+        };
+
+        const tryLowAccuracy = () => {
+            navigator.geolocation.getCurrentPosition(
+                onPositionSuccess,
+                (err) => {
+                    console.warn('Geolocation fallback error:', err);
+                    setIsLocating(false);
+                },
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
+            );
+        };
+
+        navigator.geolocation.getCurrentPosition(
+            onPositionSuccess,
+            (err) => {
+                console.warn('Geolocation high accuracy error, trying fallback:', err);
+                tryLowAccuracy();
             },
-            { enableHighAccuracy: true, timeout: 8000 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 }
         );
     };
 
-    // Auto-locate user on initial page open
+    // Auto-locate user on page load / refresh
     const hasAutoLocatedRef = useRef(false);
     useEffect(() => {
         if (hasAutoLocatedRef.current) return;
@@ -122,7 +142,7 @@ export function MapFloatingToolbar() {
             const map = mapManager.getMap();
             if (map) {
                 mapManager.onReady(() => {
-                    handleLocateMe();
+                    handleLocateMe(false);
                 });
             } else {
                 setTimeout(checkAndLocate, 100);
@@ -175,15 +195,14 @@ export function MapFloatingToolbar() {
                 {/* Navigation / Action buttons card */}
                 <div className="flex h-8 sm:h-9 items-center gap-0.5 rounded-lg border border-border bg-white dark:bg-card p-0.5 sm:p-1 shadow-sm">
                     <button
-                        onClick={handleLocateMe}
-                        disabled={isLocating}
-                        className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer disabled:cursor-not-allowed"
+                        onClick={() => handleLocateMe(true)}
+                        className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
                         title={t.locateMe}
                     >
                         {isLocating ? (
                             <Loader2 className="size-3.5 sm:size-4 animate-spin text-[#863BFF]" />
                         ) : (
-                            <Crosshair className="size-3.5 sm:size-4" />
+                            <Crosshair className={cn('size-3.5 sm:size-4', isLocated && 'text-[#863BFF]')} />
                         )}
                     </button>
                     <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />
@@ -239,77 +258,10 @@ export function MapFloatingToolbar() {
                     )}
                 </div>
 
-                {/* Save Route Button */}
-                <button
-                    onClick={() => setSaveModalOpen(true)}
-                    disabled={resultPoints.length < 2}
-                    className={cn(
-                        'group flex h-8 sm:h-9 items-center gap-1.5 rounded-lg px-2.5 sm:px-4 text-xs font-bold tracking-tight transition-all duration-150 select-none',
-                        resultPoints.length >= 2
-                            ? 'bg-[#863BFF] text-white shadow-sm hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
-                            : 'bg-muted/80 text-muted-foreground/60 border border-border/50 cursor-not-allowed shadow-none'
-                    )}
-                    title={t.saveRoute}
-                >
-                    <BookmarkPlus
-                        className={cn(
-                            'size-3.5 sm:size-4 stroke-[2.2]',
-                            resultPoints.length >= 2 && 'transition-transform group-hover:scale-110'
-                        )}
-                    />
-                    <span className="hidden sm:inline">{t.saveRoute}</span>
-                </button>
-
-                {/* Heatmaps & Basemaps Dropdown */}
+                {/* Track Tools Dropdown (Segments / Editing) placed to the left of Save Route */}
                 <div className="relative">
                     <button
-                        onClick={() => {
-                            setBasemapOpen(!basemapOpen);
-                            setToolsOpen(false);
-                        }}
-                        className="flex h-8 sm:h-9 items-center gap-1 sm:gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-2 sm:px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
-                        title={t.heatmaps}
-                    >
-                        <Flame className="size-3.5 text-[#863BFF]" />
-                        <span className="hidden md:inline">{t.heatmaps}</span>
-                        <ChevronDown className="size-3 text-muted-foreground hidden md:inline" />
-                    </button>
-
-                    {basemapOpen && (
-                        <div className="absolute left-0 top-10 sm:top-11 z-50 min-w-44 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
-                            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                {t.basemap}
-                            </div>
-                            {(Object.keys(BASEMAPS) as BasemapKey[]).map((key) => (
-                                <button
-                                    key={key}
-                                    onClick={() => {
-                                        setCurrentBasemap(key);
-                                        mapManager.setBasemap(key);
-                                        setBasemapOpen(false);
-                                    }}
-                                    className={cn(
-                                        'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition cursor-pointer',
-                                        currentBasemap === key
-                                            ? 'bg-[#863BFF]/10 font-bold text-[#863BFF]'
-                                            : 'hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] text-foreground'
-                                    )}
-                                >
-                                    <span>{t.basemaps[key as keyof typeof t.basemaps] ?? BASEMAPS[key].label}</span>
-                                    {currentBasemap === key && <Check className="size-3 text-[#863BFF]" />}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Track Tools Dropdown (Segments / Editing) */}
-                <div className="relative">
-                    <button
-                        onClick={() => {
-                            setToolsOpen(!toolsOpen);
-                            setBasemapOpen(false);
-                        }}
+                        onClick={() => setToolsOpen(!toolsOpen)}
                         className="flex h-8 sm:h-9 items-center gap-1 sm:gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-2 sm:px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
                         title={t.segments}
                     >
@@ -371,6 +323,27 @@ export function MapFloatingToolbar() {
                         </div>
                     )}
                 </div>
+
+                {/* Save Route Button */}
+                <button
+                    onClick={() => setSaveModalOpen(true)}
+                    disabled={resultPoints.length < 2}
+                    className={cn(
+                        'group flex h-8 sm:h-9 items-center gap-1.5 rounded-lg px-2.5 sm:px-4 text-xs font-bold tracking-tight transition-all duration-150 select-none',
+                        resultPoints.length >= 2
+                            ? 'bg-[#863BFF] text-white shadow-sm hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
+                            : 'bg-muted/80 text-muted-foreground/60 border border-border/50 cursor-not-allowed shadow-none'
+                    )}
+                    title={t.saveRoute}
+                >
+                    <BookmarkPlus
+                        className={cn(
+                            'size-3.5 sm:size-4 stroke-[2.2]',
+                            resultPoints.length >= 2 && 'transition-transform group-hover:scale-110'
+                        )}
+                    />
+                    <span className="hidden sm:inline">{t.saveRoute}</span>
+                </button>
             </div>
 
             {/* Right side: My Routes button (Solid opaque, never transparent on hover) */}
@@ -423,18 +396,3 @@ export function MapFloatingToolbar() {
         </div>
     );
 }
-
-/** Expose lasso mode state to MapView via a simple singleton.
- *  MapView reads this to know whether to activate box-select behavior. */
-export const lassoModeStore = {
-    active: false,
-    listeners: new Set<(v: boolean) => void>(),
-    set(v: boolean) {
-        this.active = v;
-        this.listeners.forEach((fn) => fn(v));
-    },
-    subscribe(fn: (v: boolean) => void) {
-        this.listeners.add(fn);
-        return () => this.listeners.delete(fn);
-    },
-};
