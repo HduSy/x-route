@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
     ArrowLeftRight,
     Bookmark,
+    BookmarkPlus,
     Check,
     ChevronDown,
     Crosshair,
@@ -50,22 +51,52 @@ export function MapFloatingToolbar() {
 
     const handleLocateMe = () => {
         if (!('geolocation' in navigator)) return;
-        setIsLocating(true);
+        const existing = mapManager.getUserLocation();
+        const map = mapManager.getMap();
 
+        if (isLocated && existing && map) {
+            // Already located once, re-center smoothly
+            map.flyTo({
+                center: [existing.lon, existing.lat],
+                zoom: 15,
+                essential: true,
+                duration: 1000,
+            });
+            return;
+        }
+
+        setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const lon = pos.coords.longitude;
                 const lat = pos.coords.latitude;
-                mapManager.setUserLocation({ lon, lat });
-                setIsLocating(false);
-                setIsLocated(true);
-                const map = mapManager.getMap();
-                map?.flyTo({
+                const currentMap = mapManager.getMap();
+
+                if (!currentMap) {
+                    setIsLocating(false);
+                    return;
+                }
+
+                // Fly to target position first — DO NOT show the breathing marker until arrival
+                currentMap.flyTo({
                     center: [lon, lat],
                     zoom: 15,
                     essential: true,
                     duration: 1200,
                 });
+
+                // ONLY once the map arrives at user position, spawn the breathing dot!
+                let settled = false;
+                const onSettle = () => {
+                    if (settled) return;
+                    settled = true;
+                    currentMap.off('moveend', onSettle);
+                    mapManager.setUserLocation({ lon, lat });
+                    setIsLocating(false);
+                    setIsLocated(true);
+                };
+                currentMap.once('moveend', onSettle);
+                setTimeout(onSettle, 1400); // Safety fallback
             },
             (err) => {
                 console.warn('Geolocation error:', err);
@@ -73,6 +104,12 @@ export function MapFloatingToolbar() {
             },
             { enableHighAccuracy: true, timeout: 8000 }
         );
+    };
+
+    const handleClear = () => {
+        clear();
+        mapManager.clearUserLocation();
+        setIsLocated(false);
     };
 
     const handleTrackAction = async (name: string, fn: () => Promise<void>) => {
@@ -97,13 +134,13 @@ export function MapFloatingToolbar() {
                         className={cn(
                             'flex size-7 items-center justify-center rounded-md transition',
                             isLocated
-                                ? 'bg-blue-500/10 text-[#007AFF]'
+                                ? 'bg-[#863BFF]/15 text-[#863BFF]'
                                 : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                         )}
                         title={t.locateMe}
                     >
                         {isLocating ? (
-                            <Loader2 className="size-4 animate-spin text-[#007AFF]" />
+                            <Loader2 className="size-4 animate-spin text-[#863BFF]" />
                         ) : (
                             <Crosshair className="size-4" />
                         )}
@@ -135,7 +172,7 @@ export function MapFloatingToolbar() {
                     </button>
                     <div className="h-4 w-px bg-border mx-0.5" />
                     <button
-                        onClick={clear}
+                        onClick={handleClear}
                         disabled={anchors.length === 0}
                         className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 transition"
                         title={t.clearRoute}
@@ -144,16 +181,18 @@ export function MapFloatingToolbar() {
                     </button>
                 </div>
 
-                {/* Strava Signature Save Route Button */}
+                {/* Save Route Button */}
                 <button
                     onClick={() => setSaveModalOpen(true)}
                     disabled={resultPoints.length < 2}
                     className={cn(
-                        'flex h-9 items-center justify-center rounded-lg bg-[#863BFF] px-4 text-xs font-bold tracking-wide text-white shadow-sm transition hover:bg-[#7424F8] active:scale-98',
-                        resultPoints.length < 2 && 'cursor-not-allowed opacity-50 hover:bg-[#863BFF]'
+                        'group flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-4 text-xs font-extrabold tracking-wide text-white shadow-md shadow-[#863BFF]/25 transition-all duration-200 hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97',
+                        resultPoints.length < 2 &&
+                            'cursor-not-allowed bg-muted text-muted-foreground opacity-50 shadow-none hover:from-muted hover:to-muted hover:shadow-none'
                     )}
                 >
-                    {t.saveRoute}
+                    <BookmarkPlus className="size-4 stroke-[2.5] transition-transform group-hover:scale-110" />
+                    <span>{t.saveRoute}</span>
                 </button>
 
                 {/* Heatmaps & Basemaps Dropdown */}
@@ -271,12 +310,12 @@ export function MapFloatingToolbar() {
             <div className="pointer-events-auto flex items-center gap-2">
                 <button
                     onClick={() => setMyRoutesOpen(true)}
-                    className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background/95 px-3 text-xs font-bold tracking-tight text-foreground shadow-sm backdrop-blur transition hover:border-[#863BFF] hover:text-[#863BFF]"
+                    className="group flex h-9 items-center gap-2 rounded-lg border border-border/90 bg-background/95 px-3.5 text-xs font-bold tracking-tight text-foreground shadow-sm backdrop-blur transition-all duration-150 hover:border-[#863BFF]/60 hover:bg-[#863BFF]/5 hover:text-[#863BFF] hover:shadow-md hover:shadow-[#863BFF]/10 active:scale-98"
                 >
-                    <Bookmark className="size-4 text-[#863BFF]" />
+                    <Bookmark className="size-4 text-[#863BFF] transition-transform group-hover:scale-110" />
                     <span>{t.myRoutes}</span>
                     {fileCount > 0 && (
-                        <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px] font-bold text-muted-foreground">
+                        <span className="rounded-full bg-[#863BFF]/15 px-2 py-0.5 text-[10px] font-black text-[#863BFF]">
                             {fileCount}
                         </span>
                     )}

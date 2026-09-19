@@ -23,9 +23,6 @@ export function StravaNavbar() {
                     <span className="text-xl font-black italic tracking-tighter text-[#863BFF]">
                         X-ROUTE
                     </span>
-                    <span className="ml-0.5 rounded bg-[#863BFF]/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#863BFF]">
-                        BUILDER
-                    </span>
                 </div>
 
                 {/* Nav Links directly jumping to Strava sections */}

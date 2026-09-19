@@ -1,16 +1,20 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+    ArrowRight,
     Bookmark,
+    Clock,
+    Compass,
     Download,
     FileJson,
-    FolderOpen,
+    Mountain,
     Plus,
     Route,
+    Search,
     Trash2,
+    UploadCloud,
     X,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { deleteFile, exportFile, triggerFileInput } from '@/lib/file-actions';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
@@ -29,6 +33,8 @@ export function MyRoutesDrawer() {
     const selectFile = useSelectionStore((s) => s.selectFile);
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
 
+    const [searchQuery, setSearchQuery] = useState('');
+
     const fileIds = useLiveQuery(() => db.fileids.toArray()) ?? [];
     const files = useLiveQuery(() => db.files.toArray());
 
@@ -40,6 +46,19 @@ export function MyRoutesDrawer() {
         }
         return map;
     }, [files]);
+
+    // Filter file IDs by search query
+    const filteredFileIds = useMemo(() => {
+        if (!searchQuery.trim()) return fileIds;
+        const q = searchQuery.toLowerCase().trim();
+        return fileIds.filter((id) => {
+            const fileData = fileMap.get(id);
+            if (!fileData) return false;
+            const file = new GPXFile(fileData);
+            const name = file.metadata?.name?.toLowerCase() || '';
+            return name.includes(q) || id.toLowerCase().includes(q);
+        });
+    }, [fileIds, fileMap, searchQuery]);
 
     const handleLoadRoute = (fileId: string) => {
         const fileData = fileMap.get(fileId);
@@ -69,101 +88,163 @@ export function MyRoutesDrawer() {
 
             {/* Slide-over panel */}
             <div className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-border bg-background shadow-2xl animate-in slide-in-from-right duration-200">
+                {/* Top Accent Gradient Line */}
+                <div className="h-1 w-full shrink-0 bg-gradient-to-r from-[#863BFF] via-[#A855F7] to-[#C084FC]" />
+
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                    <div className="flex items-center gap-2">
-                        <Bookmark className="size-5 text-[#863BFF]" />
-                        <h2 className="text-base font-bold tracking-tight text-foreground">
-                            {t.myRoutes}
-                        </h2>
-                        {fileIds.length > 0 && (
-                            <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                                {fileIds.length}
-                            </span>
-                        )}
+                <div className="flex items-center justify-between border-b border-border/80 px-5 py-3.5">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-[#863BFF]/10 text-[#863BFF]">
+                            <Bookmark className="size-4.5 fill-[#863BFF]/20" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-base font-extrabold tracking-tight text-foreground">
+                                    {t.myRoutes}
+                                </h2>
+                                {fileIds.length > 0 && (
+                                    <span className="rounded-full bg-[#863BFF]/15 px-2 py-0.5 text-[11px] font-black text-[#863BFF]">
+                                        {fileIds.length}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleNewRoute}
-                            className="flex items-center gap-1 rounded-md bg-[#863BFF] px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-[#7424F8]"
+                            className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:from-[#7829F5] hover:to-[#6517EA] active:scale-97"
                         >
                             <Plus className="size-3.5 stroke-[3]" />
                             <span>{t.newRoute}</span>
                         </button>
                         <button
                             onClick={() => setMyRoutesOpen(false)}
-                            className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                            className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
                         >
                             <X className="size-5" />
                         </button>
                     </div>
                 </div>
 
-                {/* Import toolbar */}
-                <div className="border-b border-border bg-accent/30 px-5 py-2.5">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 border-dashed font-semibold text-xs text-foreground hover:border-[#863BFF] hover:text-[#863BFF]"
+                {/* Toolbar: Search + Quick Import */}
+                <div className="border-b border-border/70 bg-accent/20 px-4 py-3 space-y-2.5">
+                    {/* Search bar */}
+                    {fileIds.length > 1 && (
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="搜索路线名称…"
+                                className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground outline-none transition focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF]"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="size-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Import GPX Card */}
+                    <button
                         onClick={triggerFileInput}
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#863BFF]/40 bg-[#863BFF]/5 py-2.5 px-3 text-xs font-bold text-[#863BFF] transition-all hover:border-[#863BFF] hover:bg-[#863BFF]/10 active:scale-98"
                     >
-                        <FolderOpen className="size-4 text-[#863BFF]" />
+                        <UploadCloud className="size-4 stroke-[2.2] transition-transform group-hover:-translate-y-0.5" />
                         <span>{t.importBtn}</span>
-                    </Button>
+                    </button>
                 </div>
 
                 {/* Route list */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {fileIds.length === 0 ? (
-                        <div className="flex h-64 flex-col items-center justify-center text-center px-4 text-muted-foreground">
-                            <Route className="size-12 stroke-[1.5] text-muted-foreground/50 mb-3" />
-                            <p className="text-sm font-medium">{t.noRoutesSaved}</p>
+                        <div className="flex h-72 flex-col items-center justify-center text-center px-4 text-muted-foreground">
+                            <div className="flex size-14 items-center justify-center rounded-2xl bg-[#863BFF]/10 text-[#863BFF] ring-8 ring-[#863BFF]/5 mb-3.5">
+                                <Compass className="size-7 stroke-[1.8]" />
+                            </div>
+                            <p className="text-sm font-bold text-foreground mb-1">
+                                {t.noRoutesSaved}
+                            </p>
+                            <p className="text-xs text-muted-foreground max-w-xs mb-4">
+                                点击地图规划路线后保存，或直接导入本地 GPX 轨迹文件
+                            </p>
+                            <button
+                                onClick={triggerFileInput}
+                                className="rounded-lg border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-xs transition hover:border-[#863BFF] hover:text-[#863BFF]"
+                            >
+                                立即导入轨迹
+                            </button>
+                        </div>
+                    ) : filteredFileIds.length === 0 ? (
+                        <div className="flex h-48 flex-col items-center justify-center text-center px-4 text-muted-foreground">
+                            <Search className="size-8 stroke-[1.5] text-muted-foreground/40 mb-2" />
+                            <p className="text-xs font-medium">未找到匹配 “{searchQuery}” 的路线</p>
                         </div>
                     ) : (
-                        fileIds.map((id) => {
+                        filteredFileIds.map((id) => {
                             const fileData = fileMap.get(id);
                             if (!fileData) return null;
                             const file = new GPXFile(fileData);
                             const { global } = file.getStatistics();
                             const name = file.metadata?.name?.trim() || t.untitled;
+                            const isSelected = selectedFileId === id;
+
+                            // Estimate moving time based on ~20km/h
+                            const estMin = Math.round((global.distance.total / 20) * 60);
+                            const estTime =
+                                estMin >= 60
+                                    ? `${Math.floor(estMin / 60)}h ${estMin % 60}m`
+                                    : `${estMin}m`;
 
                             return (
                                 <div
                                     key={id}
                                     className={cn(
-                                        'group relative flex flex-col rounded-xl border border-border p-3.5 shadow-xs transition hover:border-[#863BFF]/50 hover:shadow-md bg-card',
-                                        selectedFileId === id && 'border-[#863BFF] ring-1 ring-[#863BFF]/30'
+                                        'group relative flex flex-col rounded-2xl border border-border/80 bg-card p-4 shadow-xs transition-all duration-200 hover:border-[#863BFF]/60 hover:shadow-md hover:shadow-[#863BFF]/10',
+                                        isSelected &&
+                                            'border-[#863BFF] ring-2 ring-[#863BFF]/30 bg-[#863BFF]/[0.03]'
                                     )}
                                 >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#863BFF]/10 text-[#863BFF]">
-                                                <FileJson className="size-4" />
+                                    {/* Card Header */}
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                                            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#863BFF]/10 text-[#863BFF] mt-0.5">
+                                                <FileJson className="size-4.5" />
                                             </div>
-                                            <div className="min-w-0">
-                                                <h3 className="truncate text-sm font-bold text-foreground">
+                                            <div className="min-w-0 flex-1">
+                                                <h3
+                                                    onClick={() => handleLoadRoute(id)}
+                                                    className="truncate text-sm font-bold text-foreground cursor-pointer transition hover:text-[#863BFF]"
+                                                    title={name}
+                                                >
                                                     {name}
                                                 </h3>
-                                                <div className="text-xs font-semibold text-muted-foreground mt-0.5">
-                                                    {global.distance.total.toFixed(1)} km · ↑
-                                                    {Math.round(global.elevation.gain)} m ·{' '}
-                                                    {global.length} {t.pts}
+                                                <div className="text-[11px] font-medium text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                                                    <span>{global.length} {t.pts}</span>
+                                                    <span>·</span>
+                                                    <span>GPX Track</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Action buttons */}
-                                        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                                        <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => void exportFile(id)}
-                                                className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                                className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-[#863BFF]/10 hover:text-[#863BFF]"
                                                 title={t.exportGpx}
                                             >
                                                 <Download className="size-4" />
                                             </button>
                                             <button
                                                 onClick={() => void deleteFile(id)}
-                                                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
                                                 title={t.delete}
                                             >
                                                 <Trash2 className="size-4" />
@@ -171,17 +252,55 @@ export function MyRoutesDrawer() {
                                         </div>
                                     </div>
 
-                                    {/* Load button */}
+                                    {/* Metrics Grid */}
+                                    <div className="mt-3.5 grid grid-cols-3 gap-2 rounded-xl bg-accent/40 p-2.5 text-center">
+                                        <div>
+                                            <div className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                <Route className="size-3 text-[#863BFF]" />
+                                                <span>{t.distance}</span>
+                                            </div>
+                                            <div className="text-xs font-black text-foreground mt-0.5">
+                                                {global.distance.total.toFixed(1)} km
+                                            </div>
+                                        </div>
+                                        <div className="border-x border-border/60">
+                                            <div className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                <Mountain className="size-3 text-[#863BFF]" />
+                                                <span>{t.ascent}</span>
+                                            </div>
+                                            <div className="text-xs font-black text-foreground mt-0.5">
+                                                ↑{Math.round(global.elevation.gain)} m
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                <Clock className="size-3 text-[#863BFF]" />
+                                                <span>预估耗时</span>
+                                            </div>
+                                            <div className="text-xs font-black text-foreground mt-0.5">
+                                                {estTime}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom Load CTA */}
                                     <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between">
-                                        <span className="text-[11px] text-muted-foreground">
-                                            GPX Track
+                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                            {isSelected ? (
+                                                <span className="inline-flex items-center gap-1 text-[#863BFF] font-bold">
+                                                    <span className="size-1.5 rounded-full bg-[#863BFF] animate-pulse" />
+                                                    当前编辑中
+                                                </span>
+                                            ) : (
+                                                '准备就绪'
+                                            )}
                                         </span>
                                         <button
                                             onClick={() => handleLoadRoute(id)}
-                                            className="flex items-center gap-1 text-xs font-bold text-[#863BFF] hover:underline"
+                                            className="group/btn inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold text-[#863BFF] transition hover:bg-[#863BFF]/10 active:scale-98"
                                         >
                                             <span>{t.loadRoute}</span>
-                                            <span>→</span>
+                                            <ArrowRight className="size-3.5 transition-transform group-hover/btn:translate-x-0.5" />
                                         </button>
                                     </div>
                                 </div>

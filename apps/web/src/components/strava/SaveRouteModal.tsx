@@ -94,47 +94,51 @@ export function SaveRouteModal() {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in select-none">
-            <div className="relative w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl animate-in zoom-in-95">
+            <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border/80 bg-background p-6 shadow-2xl animate-in zoom-in-95">
+                {/* Top Accent Gradient Line */}
+                <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-[#863BFF] via-[#A855F7] to-[#C084FC]" />
+
                 {/* Close Button */}
                 <button
                     onClick={() => setSaveModalOpen(false)}
-                    className="absolute right-4 top-4 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="absolute right-4 top-4 rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
                 >
                     <X className="size-5" />
                 </button>
 
                 {/* Modal Header */}
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="flex size-9 items-center justify-center rounded-xl bg-[#863BFF]/10 text-[#863BFF]">
-                        <Bookmark className="size-5" />
+                <div className="flex items-center gap-3 mb-5 mt-1">
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-[#863BFF]/10 text-[#863BFF] ring-4 ring-[#863BFF]/5">
+                        <Bookmark className="size-5 fill-[#863BFF]/20" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold tracking-tight text-foreground">
+                        <h2 className="text-base font-extrabold tracking-tight text-foreground">
                             {t.saveRouteModalTitle}
                         </h2>
                         <p className="text-xs text-muted-foreground">
-                            Save this planned route to your local library
+                            保存当前规划路线至本地个人路线库
                         </p>
                     </div>
                 </div>
 
                 {/* Route Summary Pill */}
                 {summary && (
-                    <div className="mb-5 flex items-center justify-around rounded-xl bg-accent/40 p-3 text-center border border-border/60">
+                    <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-accent/40 p-3 text-center border border-border/60">
                         <div>
-                            <div className="flex items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground">
-                                <Route className="size-3.5 text-[#863BFF]" /> {t.distance}
+                            <div className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                <Route className="size-3 text-[#863BFF]" />
+                                <span>{t.distance}</span>
                             </div>
-                            <div className="text-sm font-bold text-foreground">
+                            <div className="text-sm font-black text-foreground mt-0.5">
                                 {summary.distFormatted}
                             </div>
                         </div>
-                        <div className="h-6 w-px bg-border" />
-                        <div>
-                            <div className="flex items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground">
-                                <Mountain className="size-3.5 text-[#863BFF]" /> {t.elevationGain}
+                        <div className="border-l border-border/60">
+                            <div className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                <Mountain className="size-3 text-[#863BFF]" />
+                                <span>{t.elevationGain}</span>
                             </div>
-                            <div className="text-sm font-bold text-foreground">
+                            <div className="text-sm font-black text-foreground mt-0.5">
                                 {summary.eleFormatted}
                             </div>
                         </div>
@@ -144,7 +148,7 @@ export function SaveRouteModal() {
                 {/* Form */}
                 <form onSubmit={handleSave} className="space-y-4">
                     <div>
-                        <label className="mb-1 block text-xs font-semibold text-foreground">
+                        <label className="mb-1.5 block text-xs font-bold text-foreground">
                             {t.routeName}
                         </label>
                         <input
@@ -152,21 +156,21 @@ export function SaveRouteModal() {
                             value={routeName}
                             onChange={(e) => setRouteName(e.target.value)}
                             required
-                            placeholder="e.g. Sunday Morning Mountain Loop"
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF]"
+                            placeholder="例如：周日环山绿道骑行…"
+                            className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground outline-none transition focus:border-[#863BFF] focus:ring-2 focus:ring-[#863BFF]/20"
                         />
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-xs font-semibold text-foreground">
+                        <label className="mb-1.5 block text-xs font-bold text-foreground">
                             {t.routeDescription}
                         </label>
                         <textarea
                             rows={3}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Add notes about road surface, water stations, climbs..."
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF]"
+                            placeholder="添加路况备注、补给点、推荐季节等信息…"
+                            className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground outline-none transition focus:border-[#863BFF] focus:ring-2 focus:ring-[#863BFF]/20"
                         />
                     </div>
 
@@ -174,14 +178,14 @@ export function SaveRouteModal() {
                         <button
                             type="button"
                             onClick={() => setSaveModalOpen(false)}
-                            className="rounded-lg px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
+                            className="rounded-xl px-4 py-2 text-xs font-bold text-muted-foreground transition hover:bg-accent hover:text-foreground"
                         >
                             {t.cancel}
                         </button>
                         <button
                             type="submit"
                             disabled={saving || savedSuccess}
-                            className="flex items-center gap-1.5 rounded-lg bg-[#863BFF] px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#7424F8] disabled:opacity-60"
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-5 py-2 text-xs font-bold text-white shadow-md shadow-[#863BFF]/25 transition hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97 disabled:opacity-60"
                         >
                             {savedSuccess ? (
                                 <>

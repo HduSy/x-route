@@ -145,10 +145,17 @@ class MapManager {
             container.appendChild(pulse);
             container.appendChild(dot);
 
-            this.userLocationMarker = new Marker({ element: container, anchor: 'center' }).addTo(this.map);
+            this.userLocationMarker = new Marker({ element: container, anchor: 'center' });
         }
 
         this.userLocationMarker.setLngLat([coords.lon, coords.lat]);
+        if (!this.userLocationMarker.getElement().parentElement) {
+            this.userLocationMarker.addTo(this.map);
+        }
+    }
+
+    clearUserLocation() {
+        this.setUserLocation(null);
     }
 
     getUserLocation(): { lon: number; lat: number } | null {
