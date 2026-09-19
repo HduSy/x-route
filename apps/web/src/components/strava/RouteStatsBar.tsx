@@ -190,8 +190,8 @@ export function RouteStatsBar() {
         );
 
         const gradient = ctx.createLinearGradient(0, 0, 0, 110);
-        gradient.addColorStop(0, 'rgba(252, 82, 0, 0.45)');
-        gradient.addColorStop(1, 'rgba(252, 82, 0, 0.02)');
+        gradient.addColorStop(0, 'rgba(134, 59, 255, 0.45)');
+        gradient.addColorStop(1, 'rgba(134, 59, 255, 0.02)');
 
         if (chartRef.current) {
             chartRef.current.data.labels = sampled.map((p) =>
@@ -216,13 +216,13 @@ export function RouteStatsBar() {
                         data: sampled.map((p) =>
                             units === 'mi' ? Math.round(p.ele * 3.28084) : p.ele
                         ),
-                        borderColor: '#FC5200',
+                        borderColor: '#863BFF',
                         borderWidth: 2,
                         fill: true,
                         backgroundColor: gradient,
                         pointRadius: 0,
                         pointHoverRadius: 5,
-                        pointHoverBackgroundColor: '#FC5200',
+                        pointHoverBackgroundColor: '#863BFF',
                         pointHoverBorderColor: '#FFFFFF',
                         pointHoverBorderWidth: 2,
                         tension: 0.1,
@@ -311,11 +311,11 @@ export function RouteStatsBar() {
                 <div className="flex items-center gap-8 md:gap-12">
                     {/* Activity Icon & Label */}
                     <div className="flex items-center gap-2.5">
-                        <div className="flex size-9 items-center justify-center rounded-full bg-accent text-[#FC5200]">
+                        <div className="flex size-9 items-center justify-center rounded-full bg-accent text-[#863BFF]">
                             {profile === 'foot' ? (
-                                <Footprints className="size-5 text-[#FC5200]" />
+                                <Footprints className="size-5 text-[#863BFF]" />
                             ) : (
-                                <Bike className="size-5 text-[#FC5200]" />
+                                <Bike className="size-5 text-[#863BFF]" />
                             )}
                         </div>
                         <div className="hidden sm:block">
@@ -401,7 +401,7 @@ export function RouteStatsBar() {
                     onClick={toggleElevation}
                     disabled={pointsData.length < 2}
                     className={cn(
-                        'flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-[#FC5200] hover:text-[#FC5200]',
+                        'flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-[#863BFF] hover:text-[#863BFF]',
                         pointsData.length < 2 && 'opacity-40 cursor-not-allowed hover:border-border hover:text-foreground'
                     )}
                 >

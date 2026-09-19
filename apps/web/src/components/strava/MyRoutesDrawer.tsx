@@ -72,7 +72,7 @@ export function MyRoutesDrawer() {
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-border px-5 py-4">
                     <div className="flex items-center gap-2">
-                        <Bookmark className="size-5 text-[#FC5200]" />
+                        <Bookmark className="size-5 text-[#863BFF]" />
                         <h2 className="text-base font-bold tracking-tight text-foreground">
                             {t.myRoutes}
                         </h2>
@@ -85,7 +85,7 @@ export function MyRoutesDrawer() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleNewRoute}
-                            className="flex items-center gap-1 rounded-md bg-[#FC5200] px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-[#E04800]"
+                            className="flex items-center gap-1 rounded-md bg-[#863BFF] px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-[#7424F8]"
                         >
                             <Plus className="size-3.5 stroke-[3]" />
                             <span>{t.newRoute}</span>
@@ -104,10 +104,10 @@ export function MyRoutesDrawer() {
                     <Button
                         variant="outline"
                         size="sm"
-                        className="w-full gap-2 border-dashed font-semibold text-xs text-foreground hover:border-[#FC5200] hover:text-[#FC5200]"
+                        className="w-full gap-2 border-dashed font-semibold text-xs text-foreground hover:border-[#863BFF] hover:text-[#863BFF]"
                         onClick={triggerFileInput}
                     >
-                        <FolderOpen className="size-4 text-[#FC5200]" />
+                        <FolderOpen className="size-4 text-[#863BFF]" />
                         <span>{t.importBtn}</span>
                     </Button>
                 </div>
@@ -131,13 +131,13 @@ export function MyRoutesDrawer() {
                                 <div
                                     key={id}
                                     className={cn(
-                                        'group relative flex flex-col rounded-xl border border-border p-3.5 shadow-xs transition hover:border-[#FC5200]/50 hover:shadow-md bg-card',
-                                        selectedFileId === id && 'border-[#FC5200] ring-1 ring-[#FC5200]/30'
+                                        'group relative flex flex-col rounded-xl border border-border p-3.5 shadow-xs transition hover:border-[#863BFF]/50 hover:shadow-md bg-card',
+                                        selectedFileId === id && 'border-[#863BFF] ring-1 ring-[#863BFF]/30'
                                     )}
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#FC5200]/10 text-[#FC5200]">
+                                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#863BFF]/10 text-[#863BFF]">
                                                 <FileJson className="size-4" />
                                             </div>
                                             <div className="min-w-0">
@@ -178,7 +178,7 @@ export function MyRoutesDrawer() {
                                         </span>
                                         <button
                                             onClick={() => handleLoadRoute(id)}
-                                            className="flex items-center gap-1 text-xs font-bold text-[#FC5200] hover:underline"
+                                            className="flex items-center gap-1 text-xs font-bold text-[#863BFF] hover:underline"
                                         >
                                             <span>{t.loadRoute}</span>
                                             <span>→</span>

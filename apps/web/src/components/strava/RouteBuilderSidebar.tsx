@@ -130,7 +130,7 @@ export function RouteBuilderSidebar() {
 
                 {/* Location Search Input */}
                 <div className="relative p-4 pb-2">
-                    <div className="relative flex items-center rounded-lg border border-border bg-background px-3 py-2 shadow-xs focus-within:border-[#FC5200] focus-within:ring-1 focus-within:ring-[#FC5200]">
+                    <div className="relative flex items-center rounded-lg border border-border bg-background px-3 py-2 shadow-xs focus-within:border-[#863BFF] focus-within:ring-1 focus-within:ring-[#863BFF]">
                         <Search className="mr-2 size-4 shrink-0 text-muted-foreground" />
                         <input
                             type="text"
@@ -175,7 +175,7 @@ export function RouteBuilderSidebar() {
                                     className="flex w-full items-start gap-2 border-b border-border/50 px-3 py-2 text-left text-xs hover:bg-accent last:border-b-0"
                                     onClick={() => handleSelectLocation(item)}
                                 >
-                                    <MapPin className="mt-0.5 size-3.5 shrink-0 text-[#FC5200]" />
+                                    <MapPin className="mt-0.5 size-3.5 shrink-0 text-[#863BFF]" />
                                     <span className="line-clamp-2 leading-snug text-foreground">
                                         {item.display_name}
                                     </span>
@@ -198,7 +198,7 @@ export function RouteBuilderSidebar() {
                             <select
                                 value={profile}
                                 onChange={(e) => setProfile(e.target.value)}
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#FC5200] focus:ring-1 focus:ring-[#FC5200] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
                             >
                                 <option value="bike">{t.ride}</option>
                                 <option value="racing_bike">{t.roadBike}</option>
@@ -208,9 +208,9 @@ export function RouteBuilderSidebar() {
                             </select>
                             <div className="pointer-events-none absolute left-3 top-2.5 text-muted-foreground">
                                 {profile === 'foot' ? (
-                                    <Footprints className="size-4 text-[#FC5200]" />
+                                    <Footprints className="size-4 text-[#863BFF]" />
                                 ) : (
-                                    <Bike className="size-4 text-[#FC5200]" />
+                                    <Bike className="size-4 text-[#863BFF]" />
                                 )}
                             </div>
                             <ChevronDown className="pointer-events-none absolute right-2.5 top-3 size-3.5 text-muted-foreground" />
@@ -224,7 +224,7 @@ export function RouteBuilderSidebar() {
                             <select
                                 value={profile}
                                 onChange={(e) => setProfile(e.target.value)}
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#FC5200] focus:ring-1 focus:ring-[#FC5200] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
                             >
                                 <option value="bike">{t.followPopular}</option>
                                 <option value="racing_bike">{t.minElevation}</option>
@@ -239,7 +239,7 @@ export function RouteBuilderSidebar() {
                         <label className="text-xs font-semibold text-foreground">{t.anyElevation}</label>
                         <div className="relative">
                             <select
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#FC5200] focus:ring-1 focus:ring-[#FC5200] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
                             >
                                 <option>{t.anyElevation}</option>
                                 <option>{t.minElevation}</option>
@@ -254,7 +254,7 @@ export function RouteBuilderSidebar() {
                         <label className="text-xs font-semibold text-foreground">{t.anySurface}</label>
                         <div className="relative">
                             <select
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#FC5200] focus:ring-1 focus:ring-[#FC5200] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
                             >
                                 <option>{t.anySurface}</option>
                                 <option>{t.pavedOnly}</option>
@@ -283,7 +283,7 @@ export function RouteBuilderSidebar() {
                             onClick={() => setManualMode(!manualMode)}
                             className={cn(
                                 'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                                manualMode ? 'bg-[#FC5200]' : 'bg-muted'
+                                manualMode ? 'bg-[#863BFF]' : 'bg-muted'
                             )}
                         >
                             <span
@@ -314,7 +314,7 @@ export function RouteBuilderSidebar() {
                             onClick={() => setShowSurfaceType(!showSurfaceType)}
                             className={cn(
                                 'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                                showSurfaceType ? 'bg-[#FC5200]' : 'bg-muted'
+                                showSurfaceType ? 'bg-[#863BFF]' : 'bg-muted'
                             )}
                         >
                             <span
@@ -336,7 +336,7 @@ export function RouteBuilderSidebar() {
                             onClick={() => setShowDistanceMarkers(!showDistanceMarkers)}
                             className={cn(
                                 'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                                showDistanceMarkers ? 'bg-[#FC5200]' : 'bg-muted'
+                                showDistanceMarkers ? 'bg-[#863BFF]' : 'bg-muted'
                             )}
                         >
                             <span
@@ -358,7 +358,7 @@ export function RouteBuilderSidebar() {
                             onClick={() => setShowRoutePath(!showRoutePath)}
                             className={cn(
                                 'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                                showRoutePath ? 'bg-[#FC5200]' : 'bg-muted'
+                                showRoutePath ? 'bg-[#863BFF]' : 'bg-muted'
                             )}
                         >
                             <span
@@ -376,7 +376,7 @@ export function RouteBuilderSidebar() {
                         <select
                             value={units}
                             onChange={(e) => setUnits(e.target.value as UnitType)}
-                            className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground focus:border-[#FC5200] outline-none"
+                            className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground focus:border-[#863BFF] outline-none"
                         >
                             <option value="km">{t.kilometers}</option>
                             <option value="mi">{t.miles}</option>

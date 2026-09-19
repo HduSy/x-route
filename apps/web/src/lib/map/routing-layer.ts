@@ -42,7 +42,7 @@ function anchorElement(kind: 'start' | 'end' | 'via', _index: number, total: num
             width: 22px;
             height: 22px;
             border-radius: 9999px;
-            background-color: #fc5200;
+            background-color: #863bff;
             border: 2.5px solid #ffffff;
             box-shadow: 0 2px 6px rgba(0,0,0,0.4);
             cursor: grab;
@@ -62,7 +62,7 @@ function anchorElement(kind: 'start' | 'end' | 'via', _index: number, total: num
             height: 14px;
             border-radius: 9999px;
             background-color: #ffffff;
-            border: 3.5px solid #fc5200;
+            border: 3.5px solid #863bff;
             box-shadow: 0 2px 5px rgba(0,0,0,0.35);
             cursor: grab;
             user-select: none;
@@ -77,19 +77,19 @@ function ghostAnchorElement(): HTMLElement {
         width: 16px;
         height: 16px;
         border-radius: 9999px;
-        background-color: rgba(252, 82, 0, 0.85);
+        background-color: rgba(134, 59, 255, 0.85);
         border: 2.5px solid #ffffff;
-        box-shadow: 0 2px 6px rgba(252, 82, 0, 0.5);
+        box-shadow: 0 2px 6px rgba(134, 59, 255, 0.5);
         cursor: pointer;
         transition: transform 0.12s ease;
     `;
     el.onmouseenter = () => {
         el.style.transform = 'scale(1.3)';
-        el.style.backgroundColor = '#fc5200';
+        el.style.backgroundColor = '#863bff';
     };
     el.onmouseleave = () => {
         el.style.transform = 'scale(1.0)';
-        el.style.backgroundColor = 'rgba(252, 82, 0, 0.85)';
+        el.style.backgroundColor = 'rgba(134, 59, 255, 0.85)';
     };
     return el;
 }
@@ -103,7 +103,7 @@ function distanceMarkerElement(label: string): HTMLElement {
         font-weight: 700;
         border-radius: 9999px;
         padding: 1px 5px;
-        border: 1.5px solid #fc5200;
+        border: 1.5px solid #863bff;
         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         pointer-events: none;
         user-select: none;
@@ -337,7 +337,7 @@ export class RoutingLayerController {
             });
         }
 
-        // Strava signature orange route polyline
+        // Strava signature route polyline
         if (!map.getLayer(LINE_LAYER_ID)) {
             map.addLayer({
                 id: LINE_LAYER_ID,
@@ -345,7 +345,7 @@ export class RoutingLayerController {
                 source: SOURCE_ID,
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
-                    'line-color': '#FC5200',
+                    'line-color': '#863BFF',
                     'line-width': 5,
                     'line-opacity': this.showRoutePath ? 0.95 : 0,
                 },

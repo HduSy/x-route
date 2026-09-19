@@ -105,7 +105,7 @@ export function SaveRouteModal() {
 
                 {/* Modal Header */}
                 <div className="flex items-center gap-2 mb-4">
-                    <div className="flex size-9 items-center justify-center rounded-xl bg-[#FC5200]/10 text-[#FC5200]">
+                    <div className="flex size-9 items-center justify-center rounded-xl bg-[#863BFF]/10 text-[#863BFF]">
                         <Bookmark className="size-5" />
                     </div>
                     <div>
@@ -123,7 +123,7 @@ export function SaveRouteModal() {
                     <div className="mb-5 flex items-center justify-around rounded-xl bg-accent/40 p-3 text-center border border-border/60">
                         <div>
                             <div className="flex items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground">
-                                <Route className="size-3.5 text-[#FC5200]" /> {t.distance}
+                                <Route className="size-3.5 text-[#863BFF]" /> {t.distance}
                             </div>
                             <div className="text-sm font-bold text-foreground">
                                 {summary.distFormatted}
@@ -132,7 +132,7 @@ export function SaveRouteModal() {
                         <div className="h-6 w-px bg-border" />
                         <div>
                             <div className="flex items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground">
-                                <Mountain className="size-3.5 text-[#FC5200]" /> {t.elevationGain}
+                                <Mountain className="size-3.5 text-[#863BFF]" /> {t.elevationGain}
                             </div>
                             <div className="text-sm font-bold text-foreground">
                                 {summary.eleFormatted}
@@ -153,7 +153,7 @@ export function SaveRouteModal() {
                             onChange={(e) => setRouteName(e.target.value)}
                             required
                             placeholder="e.g. Sunday Morning Mountain Loop"
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-[#FC5200] focus:ring-1 focus:ring-[#FC5200]"
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF]"
                         />
                     </div>
 
@@ -166,7 +166,7 @@ export function SaveRouteModal() {
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Add notes about road surface, water stations, climbs..."
-                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-[#FC5200] focus:ring-1 focus:ring-[#FC5200]"
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF]"
                         />
                     </div>
 
@@ -181,7 +181,7 @@ export function SaveRouteModal() {
                         <button
                             type="submit"
                             disabled={saving || savedSuccess}
-                            className="flex items-center gap-1.5 rounded-lg bg-[#FC5200] px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#E04800] disabled:opacity-60"
+                            className="flex items-center gap-1.5 rounded-lg bg-[#863BFF] px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-[#7424F8] disabled:opacity-60"
                         >
                             {savedSuccess ? (
                                 <>

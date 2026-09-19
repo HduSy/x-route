@@ -149,8 +149,8 @@ export function MapFloatingToolbar() {
                     onClick={() => setSaveModalOpen(true)}
                     disabled={resultPoints.length < 2}
                     className={cn(
-                        'flex h-9 items-center justify-center rounded-lg bg-[#FC5200] px-4 text-xs font-bold tracking-wide text-white shadow-sm transition hover:bg-[#E04800] active:scale-98',
-                        resultPoints.length < 2 && 'cursor-not-allowed opacity-50 hover:bg-[#FC5200]'
+                        'flex h-9 items-center justify-center rounded-lg bg-[#863BFF] px-4 text-xs font-bold tracking-wide text-white shadow-sm transition hover:bg-[#7424F8] active:scale-98',
+                        resultPoints.length < 2 && 'cursor-not-allowed opacity-50 hover:bg-[#863BFF]'
                     )}
                 >
                     {t.saveRoute}
@@ -165,7 +165,7 @@ export function MapFloatingToolbar() {
                         }}
                         className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background/95 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-accent"
                     >
-                        <Flame className="size-3.5 text-[#FC5200]" />
+                        <Flame className="size-3.5 text-[#863BFF]" />
                         <span>{t.heatmaps}</span>
                         <ChevronDown className="size-3 text-muted-foreground" />
                     </button>
@@ -186,12 +186,12 @@ export function MapFloatingToolbar() {
                                     className={cn(
                                         'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition',
                                         currentBasemap === key
-                                            ? 'bg-[#FC5200]/10 font-bold text-[#FC5200]'
+                                            ? 'bg-[#863BFF]/10 font-bold text-[#863BFF]'
                                             : 'hover:bg-accent text-foreground'
                                     )}
                                 >
                                     <span>{t.basemaps[key as keyof typeof t.basemaps] ?? BASEMAPS[key].label}</span>
-                                    {currentBasemap === key && <Check className="size-3 text-[#FC5200]" />}
+                                    {currentBasemap === key && <Check className="size-3 text-[#863BFF]" />}
                                 </button>
                             ))}
                         </div>
@@ -271,9 +271,9 @@ export function MapFloatingToolbar() {
             <div className="pointer-events-auto flex items-center gap-2">
                 <button
                     onClick={() => setMyRoutesOpen(true)}
-                    className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background/95 px-3 text-xs font-bold tracking-tight text-foreground shadow-sm backdrop-blur transition hover:border-[#FC5200] hover:text-[#FC5200]"
+                    className="flex h-9 items-center gap-2 rounded-lg border border-border bg-background/95 px-3 text-xs font-bold tracking-tight text-foreground shadow-sm backdrop-blur transition hover:border-[#863BFF] hover:text-[#863BFF]"
                 >
-                    <Bookmark className="size-4 text-[#FC5200]" />
+                    <Bookmark className="size-4 text-[#863BFF]" />
                     <span>{t.myRoutes}</span>
                     {fileCount > 0 && (
                         <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px] font-bold text-muted-foreground">

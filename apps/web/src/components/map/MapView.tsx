@@ -162,7 +162,7 @@ export function MapView() {
             <div className="absolute bottom-4 left-3 z-10 select-none">
                 <button
                     onClick={handleToggle3D}
-                    className="flex h-8 items-center justify-center rounded-lg border border-border bg-background/95 px-2.5 text-xs font-bold text-foreground shadow-sm backdrop-blur transition hover:border-[#FC5200] hover:text-[#FC5200]"
+                    className="flex h-8 items-center justify-center rounded-lg border border-border bg-background/95 px-2.5 text-xs font-bold text-foreground shadow-sm backdrop-blur transition hover:border-[#863BFF] hover:text-[#863BFF]"
                     title="Toggle 2D / 3D tilt"
                 >
                     {is3D ? '2D' : '3D'}
