@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, FolderOpen, Gift, Languages, Plus, Search } from 'lucide-react';
+import { FolderOpen, Languages, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { triggerFileInput } from '@/lib/file-actions';
 import { useT } from '@/store/i18n-slice';
@@ -7,11 +7,14 @@ export function StravaNavbar() {
     const { t, lang, toggleLanguage } = useT();
 
     return (
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 select-none">
             {/* Left brand & navigation */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-8">
                 {/* Strava style Logo */}
-                <div className="flex cursor-pointer items-center gap-1.5 select-none" onClick={() => window.location.reload()}>
+                <div
+                    className="flex cursor-pointer items-center gap-1.5"
+                    onClick={() => window.location.reload()}
+                >
                     <svg className="size-6 text-[#FC5200]" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7.38 14.544h4.172" />
                     </svg>
@@ -23,34 +26,45 @@ export function StravaNavbar() {
                     </span>
                 </div>
 
-                <div className="flex items-center text-muted-foreground hover:text-foreground cursor-pointer">
-                    <Search className="size-4" />
-                </div>
-
-                {/* Nav Links */}
-                <nav className="hidden items-center gap-5 text-sm font-medium md:flex">
-                    <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                        {t.dashboard} <ChevronDown className="size-3.5" />
-                    </button>
-                    <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                        {t.training} <ChevronDown className="size-3.5" />
-                    </button>
-                    <button className="relative flex items-center gap-1 font-semibold text-foreground">
+                {/* Nav Links directly jumping to Strava sections */}
+                <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+                    <a
+                        href="https://www.strava.com/dashboard"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground transition hover:text-foreground"
+                    >
+                        {t.dashboard}
+                    </a>
+                    <a
+                        href="https://www.strava.com/athlete/training"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground transition hover:text-foreground"
+                    >
+                        {t.training}
+                    </a>
+                    <span className="relative flex items-center font-semibold text-foreground cursor-default">
                         {t.maps}
                         <span className="absolute -bottom-4.5 left-0 h-0.5 w-full bg-[#FC5200]" />
-                    </button>
-                    <button className="text-muted-foreground hover:text-foreground">
+                    </span>
+                    <a
+                        href="https://www.strava.com/challenges"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground transition hover:text-foreground"
+                    >
                         {t.challenges}
-                    </button>
+                    </a>
                 </nav>
             </div>
 
             {/* Right controls */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
                 <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5 border-dashed text-xs font-medium"
+                    className="h-8 gap-1.5 border-dashed text-xs font-semibold"
                     onClick={triggerFileInput}
                     title="Import GPX / ZIP"
                 >
@@ -69,31 +83,11 @@ export function StravaNavbar() {
                     {lang === 'en' ? '中文' : 'EN'}
                 </Button>
 
-                <button
-                    className="hidden items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:border-[#FC5200] hover:text-foreground lg:flex"
-                    title="Gift"
-                >
-                    <Gift className="size-3.5 text-[#FC5200]" />
-                    <span>Give a Gift</span>
-                </button>
-
-                <button className="text-muted-foreground hover:text-foreground" title="Notifications">
-                    <Bell className="size-4.5" />
-                </button>
-
-                {/* User Avatar */}
-                <div
-                    className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-gradient-to-tr from-amber-500 to-[#FC5200] text-xs font-bold text-white shadow-sm ring-2 ring-background"
-                    title="Runner Athlete"
-                >
-                    XR
-                </div>
-
                 {/* Plus create button */}
                 <button
-                    className="flex size-7 items-center justify-center rounded-full bg-[#FC5200] text-white shadow transition hover:bg-[#E04800]"
-                    title="Create Route"
-                    onClick={() => triggerFileInput()}
+                    className="flex size-7 items-center justify-center rounded-full bg-[#FC5200] text-white shadow-xs transition hover:bg-[#E04800]"
+                    title="Import GPX / ZIP"
+                    onClick={triggerFileInput}
                 >
                     <Plus className="size-4 stroke-[3]" />
                 </button>
