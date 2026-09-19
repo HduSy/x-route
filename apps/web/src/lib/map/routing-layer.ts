@@ -223,6 +223,7 @@ export class RoutingLayerController {
 
         this.lineMouseMoveHandler = (e: any) => {
             if (this.isDraggingGhost) return;
+            if (map.isMoving() || map.isZooming()) return;
             if (this.currentPoints.length < 2) return;
 
             const details: Partial<ClosestPointDetails> = {};
@@ -499,10 +500,33 @@ export class RoutingLayerController {
         const map = mapManager.getMap();
         if (!map) return;
 
-        const intervalKm = this.units === 'mi' ? 1.60934 : 1.0;
+        const isImperial = this.units === 'mi';
+        const baseUnitKm = isImperial ? 1.60934 : 1.0;
+
+        // Calculate total distance first to determine appropriate adaptive milestone step
+        let totalKm = 0;
+        for (let i = 1; i < this.currentPoints.length; i++) {
+            const p1 = this.currentPoints[i - 1]!;
+            const p2 = this.currentPoints[i]!;
+            totalKm += distance(
+                { lat: p1.attributes.lat, lon: p1.attributes.lon },
+                { lat: p2.attributes.lat, lon: p2.attributes.lon }
+            ) / 1000;
+        }
+
+        const totalUnits = totalKm / baseUnitKm;
+        let step = 1;
+        if (totalUnits > 300) step = 50;
+        else if (totalUnits > 120) step = 20;
+        else if (totalUnits > 50) step = 10;
+        else if (totalUnits > 20) step = 5;
+        else if (totalUnits > 10) step = 2;
+        else step = 1;
+
+        const stepKm = step * baseUnitKm;
         let accumulatedKm = 0;
-        let nextMarkerKm = intervalKm;
-        let markerCount = 1;
+        let nextMarkerKm = stepKm;
+        let currentMilestoneVal = step;
 
         for (let i = 1; i < this.currentPoints.length; i++) {
             const p1 = this.currentPoints[i - 1]!;
@@ -516,7 +540,7 @@ export class RoutingLayerController {
                 const lon = c1.lon + (c2.lon - c1.lon) * fraction;
                 const lat = c1.lat + (c2.lat - c1.lat) * fraction;
 
-                const el = distanceMarkerElement(String(markerCount));
+                const el = distanceMarkerElement(String(currentMilestoneVal));
                 const marker = new Marker({
                     element: el,
                     anchor: 'center',
@@ -526,8 +550,8 @@ export class RoutingLayerController {
                     .addTo(map);
 
                 this.distanceMarkers.push(marker);
-                markerCount++;
-                nextMarkerKm += intervalKm;
+                currentMilestoneVal += step;
+                nextMarkerKm += stepKm;
             }
 
             accumulatedKm += segDistKm;

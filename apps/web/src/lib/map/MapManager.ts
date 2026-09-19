@@ -31,6 +31,7 @@ class MapManager {
     private userLocationCoords: { lon: number; lat: number } | null = null;
     private scaleControl: ScaleControl | null = null;
     private styleReloadCallbacks = new Set<() => void>();
+    private wheelGuardHandler: ((e: WheelEvent) => void) | null = null;
 
     /** Idempotent under React StrictMode double-mount: re-init with the same
      *  container is a no-op; a different container tears down and rebuilds. */
@@ -57,8 +58,27 @@ class MapManager {
         map.addControl(new AttributionControl({ compact: true }));
 
         // Responsive scroll and pinch zoom rates: smooth and snappy without runaway zoom
-        map.scrollZoom.setWheelZoomRate(1 / 800);
-        map.scrollZoom.setZoomRate(1 / 150);
+        map.scrollZoom.setWheelZoomRate(1 / 1200);
+        map.scrollZoom.setZoomRate(1 / 200);
+
+        // Guard against runaway wheel delta bursts during free-spinning mouse wheels or lag spikes
+        let lastWheelTime = 0;
+        let recentWheelDelta = 0;
+        this.wheelGuardHandler = (e: WheelEvent) => {
+            const now = performance.now();
+            if (now - lastWheelTime > 160) {
+                recentWheelDelta = 0;
+            }
+            lastWheelTime = now;
+            recentWheelDelta += Math.abs(e.deltaY);
+
+            // If wheel delta exceeds the safety burst threshold within 160ms,
+            // clamp further wheel events to prevent runaway zooming to 300km
+            if (recentWheelDelta > 1200) {
+                e.stopImmediatePropagation();
+            }
+        };
+        container.addEventListener('wheel', this.wheelGuardHandler, { capture: true, passive: false });
 
         const scale = new ScaleControl({ maxWidth: 90, unit: 'metric' });
         map.addControl(scale, 'bottom-left');
@@ -76,6 +96,10 @@ class MapManager {
     }
 
     destroy() {
+        if (this.container && this.wheelGuardHandler) {
+            this.container.removeEventListener('wheel', this.wheelGuardHandler, { capture: true });
+            this.wheelGuardHandler = null;
+        }
         if (!this.map) return;
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = undefined;
         this.cursorMarker?.remove();
