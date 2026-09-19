@@ -77,6 +77,7 @@ function anchorElement(kind: 'start' | 'end' | 'via', _index: number, _total: nu
 
 function ghostAnchorElement(): HTMLElement {
     const el = document.createElement('div');
+    el.className = 'x-route-ghost-marker';
     el.style.cssText = `
         width: 16px;
         height: 16px;

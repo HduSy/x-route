@@ -150,6 +150,38 @@
   }
 }
 
+/* Route building mode: map canvas cursor is crosshair instead of grab hand */
+.route-building-cursor,
+.route-building-cursor .maplibregl-canvas-container,
+.route-building-cursor .maplibregl-canvas-container.maplibregl-interactive,
+.route-building-cursor canvas.maplibregl-canvas {
+  cursor: crosshair !important;
+}
+
+/* When dragging to pan the map, show grabbing */
+.route-building-cursor .maplibregl-canvas-container.maplibregl-interactive:active,
+.route-building-cursor canvas.maplibregl-canvas:active {
+  cursor: grabbing !important;
+}
+
+/* Markers and controls retain their intuitive cursor */
+.route-building-cursor .maplibregl-marker,
+.route-building-cursor .x-route-anchor-marker {
+  cursor: grab !important;
+}
+.route-building-cursor .maplibregl-marker:active,
+.route-building-cursor .x-route-anchor-marker:active {
+  cursor: grabbing !important;
+}
+.route-building-cursor .x-route-ghost-marker {
+  cursor: pointer !important;
+}
+.route-building-cursor button,
+.route-building-cursor [role="button"],
+.route-building-cursor a {
+  cursor: pointer !important;
+}
+
 @keyframes user-location-pulse {
   0% {
     transform: scale(0.6);
