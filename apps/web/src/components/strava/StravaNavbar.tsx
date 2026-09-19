@@ -31,7 +31,7 @@ export function StravaNavbar() {
                         href="https://www.strava.com/dashboard"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground transition hover:text-foreground"
+                        className="text-muted-foreground transition hover:text-foreground cursor-pointer"
                     >
                         {t.dashboard}
                     </a>
@@ -39,7 +39,7 @@ export function StravaNavbar() {
                         href="https://www.strava.com/athlete/training"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground transition hover:text-foreground"
+                        className="text-muted-foreground transition hover:text-foreground cursor-pointer"
                     >
                         {t.training}
                     </a>
@@ -51,7 +51,7 @@ export function StravaNavbar() {
                         href="https://www.strava.com/challenges"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted-foreground transition hover:text-foreground"
+                        className="text-muted-foreground transition hover:text-foreground cursor-pointer"
                     >
                         {t.challenges}
                     </a>
@@ -63,7 +63,7 @@ export function StravaNavbar() {
                 <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5 border-dashed text-xs font-semibold text-foreground hover:border-[#863BFF] hover:text-[#863BFF]"
+                    className="h-8 gap-1.5 border-dashed text-xs font-semibold text-foreground hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
                     onClick={triggerFileInput}
                     title="Import GPX / ZIP"
                 >
@@ -74,7 +74,7 @@ export function StravaNavbar() {
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 px-2 text-xs font-medium hover:text-[#863BFF]"
+                    className="h-8 px-2 text-xs font-medium hover:text-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] cursor-pointer"
                     onClick={toggleLanguage}
                     title="Switch Language / 切换语言"
                 >
@@ -84,7 +84,7 @@ export function StravaNavbar() {
 
                 {/* Plus create button */}
                 <button
-                    className="flex size-7 items-center justify-center rounded-full bg-[#863BFF] text-white shadow-xs transition hover:bg-[#7424F8]"
+                    className="flex size-7 items-center justify-center rounded-full bg-[#863BFF] text-white shadow-xs transition hover:bg-[#7424F8] active:scale-95 cursor-pointer"
                     title="Import GPX / ZIP"
                     onClick={triggerFileInput}
                 >

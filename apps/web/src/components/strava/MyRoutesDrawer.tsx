@@ -113,14 +113,14 @@ export function MyRoutesDrawer() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleNewRoute}
-                            className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:from-[#7829F5] hover:to-[#6517EA] active:scale-97"
+                            className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:from-[#7829F5] hover:to-[#6517EA] active:scale-97 cursor-pointer"
                         >
                             <Plus className="size-3.5 stroke-[3]" />
                             <span>{t.newRoute}</span>
                         </button>
                         <button
                             onClick={() => setMyRoutesOpen(false)}
-                            className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                            className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground cursor-pointer"
                         >
                             <X className="size-5" />
                         </button>
@@ -143,7 +143,7 @@ export function MyRoutesDrawer() {
                             {searchQuery && (
                                 <button
                                     onClick={() => setSearchQuery('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                                 >
                                     <X className="size-3.5" />
                                 </button>
@@ -154,7 +154,7 @@ export function MyRoutesDrawer() {
                     {/* Import GPX Card */}
                     <button
                         onClick={triggerFileInput}
-                        className="group flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#863BFF]/40 bg-[#863BFF]/5 py-2.5 px-3 text-xs font-bold text-[#863BFF] transition-all hover:border-[#863BFF] hover:bg-[#863BFF]/10 active:scale-98"
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#863BFF]/40 bg-white dark:bg-card py-2.5 px-3 text-xs font-bold text-[#863BFF] transition-all hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] active:scale-98 cursor-pointer shadow-xs"
                     >
                         <UploadCloud className="size-4 stroke-[2.2] transition-transform group-hover:-translate-y-0.5" />
                         <span>{t.importBtn}</span>
@@ -176,7 +176,7 @@ export function MyRoutesDrawer() {
                             </p>
                             <button
                                 onClick={triggerFileInput}
-                                className="rounded-lg border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-xs transition hover:border-[#863BFF] hover:text-[#863BFF]"
+                                className="rounded-lg border border-border bg-white dark:bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-xs transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
                             >
                                 立即导入轨迹
                             </button>
@@ -206,9 +206,9 @@ export function MyRoutesDrawer() {
                                 <div
                                     key={id}
                                     className={cn(
-                                        'group relative flex flex-col rounded-2xl border border-border/80 bg-card p-4 shadow-xs transition-all duration-200 hover:border-[#863BFF]/60 hover:shadow-md hover:shadow-[#863BFF]/10',
+                                        'group relative flex flex-col rounded-2xl border border-border/80 bg-white dark:bg-card p-4 shadow-xs transition-all duration-200 hover:border-[#863BFF] hover:shadow-md hover:shadow-[#863BFF]/10',
                                         isSelected &&
-                                            'border-[#863BFF] ring-2 ring-[#863BFF]/30 bg-[#863BFF]/[0.03]'
+                                            'border-[#863BFF] ring-2 ring-[#863BFF]/30 bg-[#FBF9FF] dark:bg-[#251540]'
                                     )}
                                 >
                                     {/* Card Header */}
@@ -237,14 +237,14 @@ export function MyRoutesDrawer() {
                                         <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 onClick={() => void exportFile(id)}
-                                                className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-[#863BFF]/10 hover:text-[#863BFF]"
+                                                className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
                                                 title={t.exportGpx}
                                             >
                                                 <Download className="size-4" />
                                             </button>
                                             <button
                                                 onClick={() => void deleteFile(id)}
-                                                className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                                                className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-red-50 hover:text-destructive cursor-pointer"
                                                 title={t.delete}
                                             >
                                                 <Trash2 className="size-4" />
@@ -297,7 +297,7 @@ export function MyRoutesDrawer() {
                                         </span>
                                         <button
                                             onClick={() => handleLoadRoute(id)}
-                                            className="group/btn inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold text-[#863BFF] transition hover:bg-[#863BFF]/10 active:scale-98"
+                                            className="group/btn inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold text-[#863BFF] transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] cursor-pointer active:scale-98"
                                         >
                                             <span>{t.loadRoute}</span>
                                             <ArrowRight className="size-3.5 transition-transform group-hover/btn:translate-x-0.5" />

@@ -127,15 +127,15 @@ export function MapFloatingToolbar() {
             {/* Left toolbar group */}
             <div className="pointer-events-auto flex items-center gap-2">
                 {/* Navigation / Action buttons card */}
-                <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-background/95 p-1 shadow-sm backdrop-blur">
+                <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm">
                     <button
                         onClick={handleLocateMe}
                         disabled={isLocating}
                         className={cn(
-                            'flex size-7 items-center justify-center rounded-md transition',
+                            'flex size-7 items-center justify-center rounded-md transition cursor-pointer disabled:cursor-not-allowed',
                             isLocated
                                 ? 'bg-[#863BFF]/15 text-[#863BFF]'
-                                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                : 'text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF]'
                         )}
                         title={t.locateMe}
                     >
@@ -149,7 +149,7 @@ export function MapFloatingToolbar() {
                     <button
                         onClick={reverseAnchors}
                         disabled={anchors.length < 2}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40 transition"
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.reverseRoute}
                     >
                         <ArrowLeftRight className="size-4" />
@@ -157,7 +157,7 @@ export function MapFloatingToolbar() {
                     <button
                         onClick={undo}
                         disabled={!canUndo}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40 transition"
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.undo}
                     >
                         <Undo2 className="size-4" />
@@ -165,7 +165,7 @@ export function MapFloatingToolbar() {
                     <button
                         onClick={redo}
                         disabled={!canRedo}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40 transition"
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.redo}
                     >
                         <Redo2 className="size-4" />
@@ -174,7 +174,7 @@ export function MapFloatingToolbar() {
                     <button
                         onClick={handleClear}
                         disabled={anchors.length === 0}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 transition"
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-destructive disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.clearRoute}
                     >
                         <Trash2 className="size-4" />
@@ -186,7 +186,7 @@ export function MapFloatingToolbar() {
                     onClick={() => setSaveModalOpen(true)}
                     disabled={resultPoints.length < 2}
                     className={cn(
-                        'group flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-4 text-xs font-extrabold tracking-wide text-white shadow-md shadow-[#863BFF]/25 transition-all duration-200 hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97',
+                        'group flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-4 text-xs font-extrabold tracking-wide text-white shadow-md shadow-[#863BFF]/25 transition-all duration-200 hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97 cursor-pointer disabled:cursor-not-allowed',
                         resultPoints.length < 2 &&
                             'cursor-not-allowed bg-muted text-muted-foreground opacity-50 shadow-none hover:from-muted hover:to-muted hover:shadow-none'
                     )}
@@ -202,7 +202,7 @@ export function MapFloatingToolbar() {
                             setBasemapOpen(!basemapOpen);
                             setToolsOpen(false);
                         }}
-                        className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background/95 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-accent"
+                        className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
                     >
                         <Flame className="size-3.5 text-[#863BFF]" />
                         <span>{t.heatmaps}</span>
@@ -210,7 +210,7 @@ export function MapFloatingToolbar() {
                     </button>
 
                     {basemapOpen && (
-                        <div className="absolute left-0 top-11 z-50 min-w-44 rounded-lg border border-border bg-background p-1 shadow-lg">
+                        <div className="absolute left-0 top-11 z-50 min-w-44 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
                             <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 {t.basemap}
                             </div>
@@ -223,10 +223,10 @@ export function MapFloatingToolbar() {
                                         setBasemapOpen(false);
                                     }}
                                     className={cn(
-                                        'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition',
+                                        'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition cursor-pointer',
                                         currentBasemap === key
                                             ? 'bg-[#863BFF]/10 font-bold text-[#863BFF]'
-                                            : 'hover:bg-accent text-foreground'
+                                            : 'hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] text-foreground'
                                     )}
                                 >
                                     <span>{t.basemaps[key as keyof typeof t.basemaps] ?? BASEMAPS[key].label}</span>
@@ -244,7 +244,7 @@ export function MapFloatingToolbar() {
                             setToolsOpen(!toolsOpen);
                             setBasemapOpen(false);
                         }}
-                        className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background/95 px-3 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-accent"
+                        className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
                     >
                         <Layers className="size-3.5 text-muted-foreground" />
                         <span>{t.segments}</span>
@@ -252,14 +252,14 @@ export function MapFloatingToolbar() {
                     </button>
 
                     {toolsOpen && (
-                        <div className="absolute left-0 top-11 z-50 min-w-48 rounded-lg border border-border bg-background p-1 shadow-lg">
+                        <div className="absolute left-0 top-11 z-50 min-w-48 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
                             <button
                                 disabled={!selectedFileId}
                                 onClick={() =>
                                     selectedFileId &&
                                     handleTrackAction('reversed', () => reverseTrack(selectedFileId))
                                 }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-accent disabled:opacity-40"
+                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <ArrowLeftRight className="size-3.5 text-muted-foreground" />
                                 <span>{t.reverse}</span>
@@ -271,7 +271,7 @@ export function MapFloatingToolbar() {
                                     selectedFileId &&
                                     handleTrackAction('simplified', () => simplifyTrack(selectedFileId))
                                 }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-accent disabled:opacity-40"
+                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <Sparkles className="size-3.5 text-muted-foreground" />
                                 <span>{t.simplify}</span>
@@ -283,7 +283,7 @@ export function MapFloatingToolbar() {
                                     selectedFileId &&
                                     handleTrackAction('split', () => splitTrackAtMiddle(selectedFileId))
                                 }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-accent disabled:opacity-40"
+                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <Scissors className="size-3.5 text-muted-foreground" />
                                 <span>{t.split}</span>
@@ -295,7 +295,7 @@ export function MapFloatingToolbar() {
                                     selectedFileId &&
                                     handleTrackAction('loop', () => closeLoop(selectedFileId))
                                 }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-accent disabled:opacity-40"
+                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <Check className="size-3.5 text-muted-foreground" />
                                 <span>{t.loop}</span>
@@ -306,11 +306,11 @@ export function MapFloatingToolbar() {
                 </div>
             </div>
 
-            {/* Right side: My Routes button */}
+            {/* Right side: My Routes button (Solid opaque, never transparent on hover) */}
             <div className="pointer-events-auto flex items-center gap-2">
                 <button
                     onClick={() => setMyRoutesOpen(true)}
-                    className="group flex h-9 items-center gap-2 rounded-lg border border-border/90 bg-background/95 px-3.5 text-xs font-bold tracking-tight text-foreground shadow-sm backdrop-blur transition-all duration-150 hover:border-[#863BFF]/60 hover:bg-[#863BFF]/5 hover:text-[#863BFF] hover:shadow-md hover:shadow-[#863BFF]/10 active:scale-98"
+                    className="group flex h-9 items-center gap-2 rounded-lg border border-border bg-white dark:bg-card px-3.5 text-xs font-bold tracking-tight text-foreground shadow-sm transition-all duration-150 hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] hover:shadow-md cursor-pointer active:scale-98"
                 >
                     <Bookmark className="size-4 text-[#863BFF] transition-transform group-hover:scale-110" />
                     <span>{t.myRoutes}</span>

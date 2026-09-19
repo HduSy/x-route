@@ -101,7 +101,7 @@ export function SaveRouteModal() {
                 {/* Close Button */}
                 <button
                     onClick={() => setSaveModalOpen(false)}
-                    className="absolute right-4 top-4 rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                    className="absolute right-4 top-4 rounded-lg p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground cursor-pointer"
                 >
                     <X className="size-5" />
                 </button>
@@ -178,14 +178,14 @@ export function SaveRouteModal() {
                         <button
                             type="button"
                             onClick={() => setSaveModalOpen(false)}
-                            className="rounded-xl px-4 py-2 text-xs font-bold text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                            className="rounded-xl px-4 py-2 text-xs font-bold text-muted-foreground transition hover:bg-accent hover:text-foreground cursor-pointer"
                         >
                             {t.cancel}
                         </button>
                         <button
                             type="submit"
                             disabled={saving || savedSuccess}
-                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-5 py-2 text-xs font-bold text-white shadow-md shadow-[#863BFF]/25 transition hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97 disabled:opacity-60"
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-5 py-2 text-xs font-bold text-white shadow-md shadow-[#863BFF]/25 transition hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {savedSuccess ? (
                                 <>

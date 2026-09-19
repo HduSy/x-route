@@ -106,7 +106,7 @@ export function RouteBuilderSidebar() {
         >
             {/* Collapse toggle tab button sitting on the map edge */}
             <button
-                className="absolute -right-6 top-16 z-30 flex h-10 w-6 items-center justify-center rounded-r-md border border-l-0 border-border bg-background shadow-md transition hover:bg-accent text-muted-foreground hover:text-foreground"
+                className="absolute -right-6 top-16 z-30 flex h-10 w-6 items-center justify-center rounded-r-md border border-l-0 border-border bg-background shadow-md transition hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={toggleSidebar}
                 title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
@@ -121,7 +121,7 @@ export function RouteBuilderSidebar() {
                         {t.buildYourRoute}
                     </h2>
                     <button
-                        className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
                         onClick={toggleSidebar}
                     >
                         <X className="size-4" />
@@ -154,7 +154,7 @@ export function RouteBuilderSidebar() {
                                     setSearchResults([]);
                                     setShowDropdown(false);
                                 }}
-                                className="text-muted-foreground hover:text-foreground"
+                                className="text-muted-foreground hover:text-foreground cursor-pointer"
                             >
                                 <X className="size-3.5" />
                             </button>
@@ -172,7 +172,7 @@ export function RouteBuilderSidebar() {
                             {searchResults.map((item) => (
                                 <button
                                     key={item.place_id}
-                                    className="flex w-full items-start gap-2 border-b border-border/50 px-3 py-2 text-left text-xs hover:bg-accent last:border-b-0"
+                                    className="flex w-full items-start gap-2 border-b border-border/50 px-3 py-2 text-left text-xs hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] last:border-b-0 cursor-pointer"
                                     onClick={() => handleSelectLocation(item)}
                                 >
                                     <MapPin className="mt-0.5 size-3.5 shrink-0 text-[#863BFF]" />
@@ -198,7 +198,7 @@ export function RouteBuilderSidebar() {
                             <select
                                 value={profile}
                                 onChange={(e) => setProfile(e.target.value)}
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
                                 <option value="bike">{t.ride}</option>
                                 <option value="racing_bike">{t.roadBike}</option>
@@ -224,7 +224,7 @@ export function RouteBuilderSidebar() {
                             <select
                                 value={profile}
                                 onChange={(e) => setProfile(e.target.value)}
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
                                 <option value="bike">{t.followPopular}</option>
                                 <option value="racing_bike">{t.minElevation}</option>
@@ -239,7 +239,7 @@ export function RouteBuilderSidebar() {
                         <label className="text-xs font-semibold text-foreground">{t.anyElevation}</label>
                         <div className="relative">
                             <select
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
                                 <option>{t.anyElevation}</option>
                                 <option>{t.minElevation}</option>
@@ -254,7 +254,7 @@ export function RouteBuilderSidebar() {
                         <label className="text-xs font-semibold text-foreground">{t.anySurface}</label>
                         <div className="relative">
                             <select
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none"
+                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
                                 <option>{t.anySurface}</option>
                                 <option>{t.pavedOnly}</option>

@@ -401,8 +401,8 @@ export function RouteStatsBar() {
                     onClick={toggleElevation}
                     disabled={pointsData.length < 2}
                     className={cn(
-                        'flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-[#863BFF] hover:text-[#863BFF]',
-                        pointsData.length < 2 && 'opacity-40 cursor-not-allowed hover:border-border hover:text-foreground'
+                        'flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer disabled:cursor-not-allowed',
+                        pointsData.length < 2 && 'opacity-40 cursor-not-allowed hover:border-border hover:text-foreground hover:bg-transparent'
                     )}
                 >
                     <span>{elevationExpanded ? t.hideElevation : t.showElevation}</span>

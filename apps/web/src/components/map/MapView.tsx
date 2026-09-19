@@ -133,17 +133,17 @@ export function MapView() {
             <div ref={containerRef} className="h-full w-full" />
 
             {/* Strava style Map Controls (Zoom in, Zoom out, Compass) */}
-            <div className="absolute left-3 top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-background/95 p-1 shadow-sm backdrop-blur select-none">
+            <div className="absolute left-3 top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none">
                 <button
                     onClick={handleZoomIn}
-                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
                     title="Zoom in"
                 >
                     <Plus className="size-4" />
                 </button>
                 <button
                     onClick={handleZoomOut}
-                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
                     title="Zoom out"
                 >
                     <Minus className="size-4" />
@@ -151,7 +151,7 @@ export function MapView() {
                 <div className="h-px w-full bg-border" />
                 <button
                     onClick={handleResetCompass}
-                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
                     title="Reset bearing"
                 >
                     <Compass className="size-4" />
@@ -162,7 +162,7 @@ export function MapView() {
             <div className="absolute bottom-4 left-3 z-10 select-none">
                 <button
                     onClick={handleToggle3D}
-                    className="flex h-8 items-center justify-center rounded-lg border border-border bg-background/95 px-2.5 text-xs font-bold text-foreground shadow-sm backdrop-blur transition hover:border-[#863BFF] hover:text-[#863BFF]"
+                    className="flex h-8 items-center justify-center rounded-lg border border-border bg-white dark:bg-card px-2.5 text-xs font-bold text-foreground shadow-sm transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer active:scale-98"
                     title="Toggle 2D / 3D tilt"
                 >
                     {is3D ? '2D' : '3D'}
