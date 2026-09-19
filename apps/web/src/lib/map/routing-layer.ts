@@ -114,31 +114,117 @@ function ghostAnchorElement(): HTMLElement {
     return el;
 }
 
-function distanceMarkerElement(label: string): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'x-route-distance-marker';
-    el.style.cssText = `
-        min-width: ${MILESTONE_SIZE}px;
-        height: ${MILESTONE_SIZE}px;
-        border-radius: 9999px;
-        padding: 0 3px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: #ffffff;
-        color: #18181b;
-        font-size: 9.5px;
-        font-weight: 800;
-        border: 2px solid #863bff;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-        pointer-events: none;
-        user-select: none;
-        white-space: nowrap;
-        line-height: 1;
-        box-sizing: border-box;
-    `;
-    el.innerText = label;
-    return el;
+const MILESTONES_SOURCE_ID = 'x-route-milestones';
+const MILESTONES_LAYER_ID = 'x-route-milestones-symbol';
+const BADGE_IMAGE_ID = 'x-route-milestone-badge';
+const BADGE_IMAGE_WIDE_ID = 'x-route-milestone-badge-wide';
+
+function drawRoundedRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number
+) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+function ensureBadgeImages(map: MapLibreMap) {
+    // 1. Standard circular milestone badge (for 1-99)
+    if (!map.hasImage(BADGE_IMAGE_ID)) {
+        const size = 48; // 24px CSS diameter @ 2x pixelRatio
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, size, size);
+            const center = size / 2;
+            const radius = 17;
+
+            // Soft drop shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 1.5;
+
+            // White disc fill
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+
+            // Crisp purple border
+            ctx.shadowColor = 'transparent';
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = '#863BFF';
+            ctx.stroke();
+
+            const imageData = ctx.getImageData(0, 0, size, size);
+            map.addImage(BADGE_IMAGE_ID, imageData, { pixelRatio: 2 });
+        }
+    }
+
+    // 2. Wide pill milestone badge (for 100+)
+    if (!map.hasImage(BADGE_IMAGE_WIDE_ID)) {
+        const width = 60; // 30px CSS width @ 2x pixelRatio
+        const height = 48; // 24px CSS height @ 2x pixelRatio
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, width, height);
+
+            // Soft drop shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 1.5;
+
+            // Pill fill
+            const x = 6;
+            const y = 7;
+            const w = width - 12;
+            const h = 34;
+            const r = 17;
+
+            drawRoundedRect(ctx, x, y, w, h, r);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+
+            // Crisp purple border
+            ctx.shadowColor = 'transparent';
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = '#863BFF';
+            ctx.stroke();
+
+            const imageData = ctx.getImageData(0, 0, width, height);
+            map.addImage(BADGE_IMAGE_WIDE_ID, imageData, { pixelRatio: 2 });
+        }
+    }
+}
+
+function getPreferredFontStack(map: MapLibreMap): string[] {
+    const style = map.getStyle();
+    if (style && style.layers) {
+        for (const layer of style.layers) {
+            if (layer.type === 'symbol' && layer.layout && 'text-font' in layer.layout) {
+                const font = (layer.layout as any)['text-font'];
+                if (Array.isArray(font) && font.length > 0 && typeof font[0] === 'string') {
+                    const boldFont = font.find((f: string) => f.includes('Bold'));
+                    if (boldFont) return [boldFont];
+                    return font;
+                }
+            }
+        }
+    }
+    return ['Noto Sans Bold', 'Noto Sans Regular'];
 }
 
 function findInsertIndex(
@@ -182,7 +268,6 @@ function findInsertIndex(
 
 export class RoutingLayerController {
     private markers: Marker[] = [];
-    private distanceMarkers: Marker[] = [];
     private ghostMarker: Marker | null = null;
     private currentInsertIndex: number = 1;
     private isDraggingGhost = false;
@@ -289,13 +374,6 @@ export class RoutingLayerController {
             this.ghostMarker.remove();
             this.ghostMarker = null;
         }
-    }
-
-    private removeDistanceMarkers() {
-        for (const m of this.distanceMarkers) {
-            m.remove();
-        }
-        this.distanceMarkers = [];
     }
 
     private ensureGhostMarker(map: MapLibreMap) {
@@ -416,6 +494,8 @@ export class RoutingLayerController {
             return;
         }
 
+        ensureBadgeImages(map);
+
         if (!map.getSource(SOURCE_ID)) {
             map.addSource(SOURCE_ID, {
                 type: 'geojson',
@@ -453,7 +533,64 @@ export class RoutingLayerController {
             });
         }
 
-        // Re-attach line mouse handlers to the newly added line layer
+        // WebGL Distance Milestones (GeoJSON Vector Source + Symbol Layer with dynamic collision avoidance)
+        if (!map.getSource(MILESTONES_SOURCE_ID)) {
+            map.addSource(MILESTONES_SOURCE_ID, {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] },
+            });
+        }
+
+        if (!map.getLayer(MILESTONES_LAYER_ID)) {
+            const fontStack = getPreferredFontStack(map);
+            map.addLayer({
+                id: MILESTONES_LAYER_ID,
+                type: 'symbol',
+                source: MILESTONES_SOURCE_ID,
+                filter: ['<=', ['get', 'minzoom'], ['zoom']],
+                layout: {
+                    'icon-image': [
+                        'case',
+                        ['>=', ['get', 'distance'], 100],
+                        BADGE_IMAGE_WIDE_ID,
+                        BADGE_IMAGE_ID,
+                    ],
+                    'icon-size': 1,
+                    'icon-anchor': 'center',
+                    'icon-pitch-alignment': 'viewport',
+                    'icon-rotation-alignment': 'viewport',
+                    'icon-allow-overlap': false,
+                    'icon-ignore-placement': false,
+
+                    'text-field': ['to-string', ['get', 'distance']],
+                    'text-font': fontStack,
+                    'text-size': [
+                        'step',
+                        ['get', 'distance'],
+                        9.5,
+                        10,
+                        8.5,
+                        100,
+                        7.5,
+                    ],
+                    'text-anchor': 'center',
+                    'text-justify': 'center',
+                    'text-pitch-alignment': 'viewport',
+                    'text-rotation-alignment': 'viewport',
+                    'text-allow-overlap': false,
+                    'text-ignore-placement': false,
+                    'symbol-sort-key': ['get', 'sort_key'],
+                    'visibility': this.showDistanceMarkers && this.showRoutePath ? 'visible' : 'none',
+                },
+                paint: {
+                    'text-color': '#18181B',
+                    'text-opacity': 1,
+                    'icon-opacity': 1,
+                },
+            });
+        }
+
+        // Re-attach line mouse handlers to the line layer
         if (this.lineMouseMoveHandler) {
             try {
                 map.off('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
@@ -490,72 +627,140 @@ export class RoutingLayerController {
         if (options.units !== undefined) {
             this.units = options.units;
         }
+        mapManager.onReady((map) => {
+            if (map.getLayer(MILESTONES_LAYER_ID)) {
+                map.setLayoutProperty(
+                    MILESTONES_LAYER_ID,
+                    'visibility',
+                    this.showDistanceMarkers && this.showRoutePath ? 'visible' : 'none'
+                );
+            }
+        });
         this.updateDistanceMarkers();
     }
 
     private updateDistanceMarkers() {
-        this.removeDistanceMarkers();
-        if (!this.showDistanceMarkers || this.currentPoints.length < 2) return;
-
         const map = mapManager.getMap();
         if (!map) return;
 
-        const isImperial = this.units === 'mi';
-        const baseUnitKm = isImperial ? 1.60934 : 1.0;
+        const source = map.getSource(MILESTONES_SOURCE_ID) as GeoJSONSource | undefined;
+        if (!source) return;
 
-        // Calculate total distance first to determine appropriate adaptive milestone step
-        let totalKm = 0;
-        for (let i = 1; i < this.currentPoints.length; i++) {
-            const p1 = this.currentPoints[i - 1]!;
-            const p2 = this.currentPoints[i]!;
-            totalKm += distance(
+        if (!this.showDistanceMarkers || this.currentPoints.length < 2) {
+            source.setData({ type: 'FeatureCollection', features: [] });
+            return;
+        }
+
+        const isImperial = this.units === 'mi';
+        const unitFactorMeters = isImperial ? 1609.344 : 1000.0;
+
+        const points = this.currentPoints;
+        const accumulatedDistances: number[] = [0];
+        let totalMeters = 0;
+
+        for (let i = 1; i < points.length; i++) {
+            const p1 = points[i - 1]!;
+            const p2 = points[i]!;
+            const segDist = distance(
                 { lat: p1.attributes.lat, lon: p1.attributes.lon },
                 { lat: p2.attributes.lat, lon: p2.attributes.lon }
-            ) / 1000;
+            );
+            totalMeters += segDist;
+            accumulatedDistances.push(totalMeters);
         }
 
-        const totalUnits = totalKm / baseUnitKm;
+        const totalUnits = totalMeters / unitFactorMeters;
         let step = 1;
-        if (totalUnits > 300) step = 50;
-        else if (totalUnits > 120) step = 20;
-        else if (totalUnits > 50) step = 10;
-        else if (totalUnits > 20) step = 5;
-        else if (totalUnits > 10) step = 2;
+        if (totalUnits > 300) step = 10;
+        else if (totalUnits > 150) step = 5;
+        else if (totalUnits > 60) step = 2;
         else step = 1;
 
-        const stepKm = step * baseUnitKm;
-        let accumulatedKm = 0;
-        let nextMarkerKm = stepKm;
+        const stepMeters = step * unitFactorMeters;
+        const features: any[] = [];
+
         let currentMilestoneVal = step;
+        let targetMeters = stepMeters;
+        let segIndex = 1;
 
-        for (let i = 1; i < this.currentPoints.length; i++) {
-            const p1 = this.currentPoints[i - 1]!;
-            const p2 = this.currentPoints[i]!;
-            const c1 = { lat: p1.attributes.lat, lon: p1.attributes.lon };
-            const c2 = { lat: p2.attributes.lat, lon: p2.attributes.lon };
-            const segDistKm = distance(c1, c2) / 1000;
+        const startPt = { lat: points[0]!.attributes.lat, lon: points[0]!.attributes.lon };
+        const endPt = {
+            lat: points[points.length - 1]!.attributes.lat,
+            lon: points[points.length - 1]!.attributes.lon,
+        };
 
-            while (accumulatedKm + segDistKm >= nextMarkerKm) {
-                const fraction = (nextMarkerKm - accumulatedKm) / segDistKm;
-                const lon = c1.lon + (c2.lon - c1.lon) * fraction;
-                const lat = c1.lat + (c2.lat - c1.lat) * fraction;
+        while (targetMeters <= totalMeters && segIndex < points.length) {
+            while (segIndex < points.length && accumulatedDistances[segIndex]! < targetMeters) {
+                segIndex++;
+            }
+            if (segIndex >= points.length) break;
 
-                const el = distanceMarkerElement(String(currentMilestoneVal));
-                const marker = new Marker({
-                    element: el,
-                    anchor: 'center',
-                    subpixelPositioning: true,
-                })
-                    .setLngLat([lon, lat])
-                    .addTo(map);
+            const segStartMeters = accumulatedDistances[segIndex - 1]!;
+            const segEndMeters = accumulatedDistances[segIndex]!;
+            const segLen = segEndMeters - segStartMeters;
 
-                this.distanceMarkers.push(marker);
-                currentMilestoneVal += step;
-                nextMarkerKm += stepKm;
+            const p1 = points[segIndex - 1]!;
+            const p2 = points[segIndex]!;
+
+            let lon: number;
+            let lat: number;
+
+            if (segLen <= 0) {
+                lon = p1.attributes.lon;
+                lat = p1.attributes.lat;
+            } else {
+                const fraction = Math.max(0, Math.min(1, (targetMeters - segStartMeters) / segLen));
+                lon = p1.attributes.lon + (p2.attributes.lon - p1.attributes.lon) * fraction;
+                lat = p1.attributes.lat + (p2.attributes.lat - p1.attributes.lat) * fraction;
             }
 
-            accumulatedKm += segDistKm;
+            // Avoid overlapping Start or Finish nodes (within 65m)
+            const distFromStart = distance(startPt, { lat, lon });
+            const distFromEnd = distance(endPt, { lat, lon });
+
+            if (distFromStart > 65 && distFromEnd > 65) {
+                let sort_key = 10;
+                let minzoom = 12.5;
+
+                if (currentMilestoneVal % 50 === 0) {
+                    sort_key = 1;
+                    minzoom = 5;
+                } else if (currentMilestoneVal % 20 === 0) {
+                    sort_key = 2;
+                    minzoom = 7;
+                } else if (currentMilestoneVal % 10 === 0) {
+                    sort_key = 3;
+                    minzoom = 8.5;
+                } else if (currentMilestoneVal % 5 === 0) {
+                    sort_key = 4;
+                    minzoom = 10;
+                } else if (currentMilestoneVal % 2 === 0) {
+                    sort_key = 5;
+                    minzoom = 11.5;
+                }
+
+                features.push({
+                    type: 'Feature',
+                    properties: {
+                        distance: currentMilestoneVal,
+                        sort_key,
+                        minzoom,
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [lon, lat],
+                    },
+                });
+            }
+
+            currentMilestoneVal += step;
+            targetMeters += stepMeters;
         }
+
+        source.setData({
+            type: 'FeatureCollection',
+            features,
+        });
     }
 
     setResult(points: TrackPoint[]) {
@@ -567,7 +772,7 @@ export class RoutingLayerController {
             if (points.length < 2) {
                 source.setData({ type: 'FeatureCollection', features: [] });
                 this.removeGhostMarker();
-                this.removeDistanceMarkers();
+                this.updateDistanceMarkers();
                 return;
             }
             source.setData({
@@ -610,7 +815,6 @@ export class RoutingLayerController {
         this.currentPoints = [];
         this.currentAnchors = [];
         this.removeGhostMarker();
-        this.removeDistanceMarkers();
         this.setResult([]);
     }
 
@@ -621,9 +825,13 @@ export class RoutingLayerController {
         const map = mapManager.getMap();
         if (map) {
             try {
+                if (map.getLayer(MILESTONES_LAYER_ID)) map.removeLayer(MILESTONES_LAYER_ID);
                 if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
                 if (map.getLayer(LINE_CASING_LAYER_ID)) map.removeLayer(LINE_CASING_LAYER_ID);
+                if (map.getSource(MILESTONES_SOURCE_ID)) map.removeSource(MILESTONES_SOURCE_ID);
                 if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+                if (map.hasImage(BADGE_IMAGE_ID)) map.removeImage(BADGE_IMAGE_ID);
+                if (map.hasImage(BADGE_IMAGE_WIDE_ID)) map.removeImage(BADGE_IMAGE_WIDE_ID);
             } catch {
                 // Ignore cleanup errors
             }
