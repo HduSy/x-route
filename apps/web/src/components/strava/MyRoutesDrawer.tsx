@@ -76,6 +76,8 @@ export function MyRoutesDrawer() {
     const handleNewRoute = () => {
         clear();
         selectFile(null);
+        useRoutingStore.getState().setActive(true);
+        useRoutingStore.getState().setSidebarCollapsed(false);
         setMyRoutesOpen(false);
     };
 

@@ -182,6 +182,18 @@
   cursor: pointer !important;
 }
 
+/* Marker hover animation via child dot — leaves outer MapLibre translate transform unaffected */
+.x-route-anchor-marker:hover .x-route-anchor-dot {
+  transform: scale(1.22);
+}
+.x-route-anchor-marker:active .x-route-anchor-dot {
+  transform: scale(0.92);
+}
+.x-route-ghost-marker:hover .x-route-ghost-dot {
+  transform: scale(1.28);
+  background-color: #863bff;
+}
+
 @keyframes user-location-pulse {
   0% {
     transform: scale(0.6);

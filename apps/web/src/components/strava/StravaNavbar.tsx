@@ -2,6 +2,7 @@ import { FolderOpen, Languages, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { triggerFileInput } from '@/lib/file-actions';
 import { useT } from '@/store/i18n-slice';
+import { useRoutingStore } from '@/store/routing-slice';
 
 export function StravaNavbar() {
     const { t, lang, toggleLanguage } = useT();
@@ -85,8 +86,11 @@ export function StravaNavbar() {
                 {/* Plus create button */}
                 <button
                     className="flex size-7 items-center justify-center rounded-full bg-[#863BFF] text-white shadow-xs transition hover:bg-[#7424F8] active:scale-95 cursor-pointer"
-                    title="Import GPX / ZIP"
-                    onClick={triggerFileInput}
+                    title={t.startDrawing}
+                    onClick={() => {
+                        useRoutingStore.getState().setActive(true);
+                        useRoutingStore.getState().setSidebarCollapsed(false);
+                    }}
                 >
                     <Plus className="size-4 stroke-[3]" />
                 </button>

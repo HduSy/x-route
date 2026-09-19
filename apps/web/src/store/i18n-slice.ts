@@ -41,6 +41,14 @@ export const translations = {
 
         // Strava Route Builder specific translations
         buildYourRoute: 'Build your route',
+        startDrawing: 'Start Route Planning',
+        pauseDrawing: 'Exit Route Planning',
+        drawingActive: 'Route Planning Mode',
+        browsingMode: 'Map Browsing Mode',
+        clickMapToAddPoint: 'Click on map to place route points (Crosshair cursor)',
+        dragToPanMap: 'Drag to pan and explore map (Hand cursor)',
+        drawRouteTooltipActive: 'Route Planning active (Click to switch to hand cursor)',
+        drawRouteTooltipInactive: 'Start Route Planning (Click to switch to crosshair cursor)',
         clickMapOrSearch: 'Click the map or enter start point',
         routingPreferences: 'Routing preferences',
         activity: 'Activity',
@@ -147,6 +155,14 @@ export const translations = {
 
         // Strava 风格路线创建界面中文翻译
         buildYourRoute: '创建路线',
+        startDrawing: '开始创建路线',
+        pauseDrawing: '退出规划模式',
+        drawingActive: '创建路线模式',
+        browsingMode: '地图浏览模式',
+        clickMapToAddPoint: '点击地图添加路线节点 (十字光标)',
+        dragToPanMap: '拖拽平移自由浏览地图 (小手光标)',
+        drawRouteTooltipActive: '创建路线中 (十字光标，点击切换为小手)',
+        drawRouteTooltipInactive: '开始创建路线 (点击切换为十字光标绘制)',
         clickMapOrSearch: '在地图上点击或搜索起点',
         routingPreferences: '路线规划偏好',
         activity: '运动类型',

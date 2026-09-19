@@ -5,7 +5,9 @@ import {
     ChevronLeft,
     ChevronRight,
     Compass,
+    Crosshair,
     Footprints,
+    Hand,
     MapPin,
     Mountain,
     Search,
@@ -28,6 +30,8 @@ export function RouteBuilderSidebar() {
     const { t } = useT();
 
     // Store state
+    const active = useRoutingStore((s) => s.active);
+    const setActive = useRoutingStore((s) => s.setActive);
     const profile = useRoutingStore((s) => s.profile);
     const setProfile = useRoutingStore((s) => s.setProfile);
     const manualMode = useRoutingStore((s) => s.manualMode);
@@ -88,6 +92,7 @@ export function RouteBuilderSidebar() {
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
             const map = mapManager.getMap();
             map?.flyTo({ center: [lon, lat], zoom: 14 });
+            setActive(true);
             addAnchor({ lat, lon });
         }
         setSearchQuery('');
@@ -122,6 +127,41 @@ export function RouteBuilderSidebar() {
                         onClick={toggleSidebar}
                     >
                         <X className="size-4" />
+                    </button>
+                </div>
+
+                {/* Route Mode Status & Toggle */}
+                <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-border bg-muted/30 p-2.5">
+                    <div className="flex items-center gap-2">
+                        <div
+                            className={cn(
+                                'flex size-7 shrink-0 items-center justify-center rounded-md transition',
+                                active
+                                    ? 'bg-[#863BFF] text-white shadow-xs'
+                                    : 'bg-muted text-muted-foreground'
+                            )}
+                        >
+                            {active ? <Crosshair className="size-4" /> : <Hand className="size-4" />}
+                        </div>
+                        <div className="leading-tight">
+                            <div className="text-xs font-semibold text-foreground">
+                                {active ? t.drawingActive : t.browsingMode}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                                {active ? t.clickMapToAddPoint : t.dragToPanMap}
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setActive(!active)}
+                        className={cn(
+                            'shrink-0 rounded-md px-2.5 py-1 text-xs font-bold transition cursor-pointer',
+                            active
+                                ? 'bg-[#863BFF]/15 text-[#863BFF] hover:bg-[#863BFF]/25'
+                                : 'bg-[#863BFF] text-white shadow-xs hover:bg-[#7424F8]'
+                        )}
+                    >
+                        {active ? t.pauseDrawing : t.startDrawing}
                     </button>
                 </div>
 

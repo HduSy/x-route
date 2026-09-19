@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check, Compass, Layers, Minus, Plus, Spline } from 'lucide-react';
+import { Check, Compass, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
@@ -44,6 +44,7 @@ export function MapView() {
     const [basemapOpen, setBasemapOpen] = useState(false);
 
     const active = useRoutingStore((s) => s.active);
+    const setActive = useRoutingStore((s) => s.setActive);
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
     const units = useRoutingStore((s) => s.units);
@@ -161,6 +162,24 @@ export function MapView() {
 
             {/* Strava style Vertical Map Controls (Draw mode, Zoom in, Zoom out, Compass) */}
             <div className="absolute left-3 top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none">
+                {/* Route planning / creation mode toggle */}
+                <button
+                    onClick={() => setActive(!active)}
+                    className={cn(
+                        'flex size-7 items-center justify-center rounded-md transition cursor-pointer',
+                        active
+                            ? 'bg-[#863BFF] text-white shadow-xs'
+                            : 'text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF]'
+                    )}
+                    title={
+                        active
+                            ? t.drawRouteTooltipActive
+                            : t.drawRouteTooltipInactive
+                    }
+                >
+                    <Route className="size-4" />
+                </button>
+
                 {/* Manual straight line drawing mode toggle */}
                 <button
                     onClick={() => setManualMode(!manualMode)}

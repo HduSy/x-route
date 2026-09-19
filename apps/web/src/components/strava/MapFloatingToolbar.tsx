@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     ArrowLeftRight,
     Bookmark,
@@ -105,6 +105,25 @@ export function MapFloatingToolbar() {
             { enableHighAccuracy: true, timeout: 8000 }
         );
     };
+
+    // Auto-locate user on initial page open
+    const hasAutoLocatedRef = useRef(false);
+    useEffect(() => {
+        if (hasAutoLocatedRef.current) return;
+        hasAutoLocatedRef.current = true;
+
+        const checkAndLocate = () => {
+            const map = mapManager.getMap();
+            if (map) {
+                mapManager.onReady(() => {
+                    handleLocateMe();
+                });
+            } else {
+                setTimeout(checkAndLocate, 100);
+            }
+        };
+        checkAndLocate();
+    }, []);
 
     const handleClear = () => {
         clear();

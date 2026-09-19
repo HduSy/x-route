@@ -58,7 +58,7 @@ interface RoutingState {
 }
 
 export const useRoutingStore = create<RoutingState>()((set, get) => ({
-    active: true, // Route creation is ready and enabled by default (Strava style)
+    active: false, // Default is browsing mode (little hand cursor); turns crosshair in route creation mode
     anchors: [],
     profile: 'bike',
     routingPreference: 'popular',
@@ -85,7 +85,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
 
     addAnchor: (anchor) => {
         const { anchors, past } = get();
-        set({ anchors: [...anchors, anchor], past: [...past, anchors], future: [] });
+        set({ active: true, anchors: [...anchors, anchor], past: [...past, anchors], future: [] });
     },
 
     insertAnchor: (index, anchor) => {
@@ -96,7 +96,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
             anchor,
             ...anchors.slice(clampedIndex),
         ];
-        set({ anchors: next, past: [...past, anchors], future: [] });
+        set({ active: true, anchors: next, past: [...past, anchors], future: [] });
     },
 
     moveAnchor: (index, to) => {
@@ -107,10 +107,12 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
 
     removeAnchor: (index) => {
         const { anchors, past } = get();
+        const next = anchors.filter((_, i) => i !== index);
         set({
-            anchors: anchors.filter((_, i) => i !== index),
+            anchors: next,
             past: [...past, anchors],
             future: [],
+            active: next.length > 0,
         });
     },
 
@@ -124,6 +126,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     clear: () => {
         const { anchors, past } = get();
         set({
+            active: false,
             anchors: [],
             resultPoints: [],
             error: null,

@@ -14,57 +14,64 @@ const SOURCE_ID = 'x-route-routing';
 const LINE_CASING_LAYER_ID = 'x-route-routing-casing';
 const LINE_LAYER_ID = 'x-route-routing-line';
 
+const MILESTONE_SIZE = 18;
+
 function anchorElement(kind: 'start' | 'end' | 'via', _index: number, _total: number): HTMLElement {
+    // Outer container: MapLibre manages transform: translate(...) here. NEVER modify el.style.transform directly!
     const el = document.createElement('div');
-    el.className = 'x-route-anchor-marker';
+    el.className = `x-route-anchor-marker x-route-anchor-${kind}`;
+    el.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        user-select: none;
+        box-sizing: border-box;
+    `;
+
+    const dot = document.createElement('div');
+    dot.className = 'x-route-anchor-dot';
 
     if (kind === 'start') {
-        // Strava signature green starting node
-        el.style.cssText = `
-            width: 20px;
-            height: 20px;
+        // Strava signature green starting node (matching kilometer circle diameter)
+        dot.style.cssText = `
+            width: ${MILESTONE_SIZE}px;
+            height: ${MILESTONE_SIZE}px;
             border-radius: 9999px;
             background-color: #00B548;
-            border: 2.5px solid #ffffff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-            cursor: grab;
-            user-select: none;
-            transition: transform 0.1s ease;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+            transition: transform 0.15s ease;
+            box-sizing: border-box;
         `;
     } else if (kind === 'end') {
-        // Strava signature checkered finish line flag node 🏁
-        el.style.cssText = `
-            width: 20px;
-            height: 20px;
+        // Strava signature checkered finish line flag node 🏁 (matching kilometer circle diameter)
+        dot.style.cssText = `
+            width: ${MILESTONE_SIZE}px;
+            height: ${MILESTONE_SIZE}px;
             border-radius: 9999px;
-            background: repeating-conic-gradient(#18181b 0% 25%, #ffffff 0% 50%) 50% / 6px 6px;
-            border: 2.5px solid #ffffff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.45);
-            cursor: grab;
-            user-select: none;
-            transition: transform 0.1s ease;
+            background: repeating-conic-gradient(#18181b 0% 25%, #ffffff 0% 50%) 50% / 5px 5px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.45);
+            transition: transform 0.15s ease;
+            box-sizing: border-box;
         `;
     } else {
         // Intermediate waypoint node
-        el.style.cssText = `
+        dot.style.cssText = `
             width: 12px;
             height: 12px;
             border-radius: 9999px;
             background-color: #ffffff;
-            border: 3px solid #863bff;
+            border: 2.5px solid #863bff;
             box-shadow: 0 1px 4px rgba(0,0,0,0.35);
-            cursor: grab;
-            user-select: none;
-            transition: transform 0.1s ease;
+            transition: transform 0.15s ease;
+            box-sizing: border-box;
         `;
     }
 
-    el.addEventListener('mouseenter', () => {
-        el.style.transform = 'scale(1.18)';
-    });
-    el.addEventListener('mouseleave', () => {
-        el.style.transform = 'scale(1.0)';
-    });
+    el.appendChild(dot);
+
     el.addEventListener('mousedown', () => {
         el.style.cursor = 'grabbing';
     });
@@ -79,41 +86,50 @@ function ghostAnchorElement(): HTMLElement {
     const el = document.createElement('div');
     el.className = 'x-route-ghost-marker';
     el.style.cssText = `
-        width: 16px;
-        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+    `;
+    const dot = document.createElement('div');
+    dot.className = 'x-route-ghost-dot';
+    dot.style.cssText = `
+        width: 14px;
+        height: 14px;
         border-radius: 9999px;
         background-color: rgba(134, 59, 255, 0.85);
-        border: 2.5px solid #ffffff;
+        border: 2px solid #ffffff;
         box-shadow: 0 2px 6px rgba(134, 59, 255, 0.5);
-        cursor: pointer;
-        transition: transform 0.12s ease;
+        transition: transform 0.12s ease, background-color 0.12s ease;
+        box-sizing: border-box;
     `;
-    el.onmouseenter = () => {
-        el.style.transform = 'scale(1.3)';
-        el.style.backgroundColor = '#863bff';
-    };
-    el.onmouseleave = () => {
-        el.style.transform = 'scale(1.0)';
-        el.style.backgroundColor = 'rgba(134, 59, 255, 0.85)';
-    };
+    el.appendChild(dot);
     return el;
 }
 
 function distanceMarkerElement(label: string): HTMLElement {
     const el = document.createElement('div');
+    el.className = 'x-route-distance-marker';
     el.style.cssText = `
-        background-color: #ffffff;
-        color: #262626;
-        font-size: 10px;
-        font-weight: 700;
+        min-width: ${MILESTONE_SIZE}px;
+        height: ${MILESTONE_SIZE}px;
         border-radius: 9999px;
-        padding: 1px 5px;
-        border: 1.5px solid #863bff;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        padding: 0 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #ffffff;
+        color: #18181b;
+        font-size: 9.5px;
+        font-weight: 800;
+        border: 2px solid #863bff;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
         pointer-events: none;
         user-select: none;
         white-space: nowrap;
-        line-height: 1.2;
+        line-height: 1;
+        box-sizing: border-box;
     `;
     el.innerText = label;
     return el;
@@ -247,7 +263,7 @@ export class RoutingLayerController {
     private ensureGhostMarker(map: MapLibreMap) {
         if (this.ghostMarker) return;
         const el = ghostAnchorElement();
-        const marker = new Marker({ element: el, draggable: true });
+        const marker = new Marker({ element: el, draggable: true, anchor: 'center' });
 
         marker.on('dragstart', () => {
             this.isDraggingGhost = true;
@@ -297,7 +313,7 @@ export class RoutingLayerController {
     ): Marker {
         const kind = index === 0 ? 'start' : index === total - 1 ? 'end' : 'via';
         const el = anchorElement(kind, index, total);
-        const marker = new Marker({ element: el, draggable: true })
+        const marker = new Marker({ element: el, draggable: true, anchor: 'center' })
             .setLngLat([anchor.lon, anchor.lat])
             .addTo(map);
 
