@@ -27,7 +27,7 @@ interface SearchResult {
 }
 
 export function RouteBuilderSidebar() {
-    const { t } = useT();
+    const { t, lang } = useT();
 
     // Store state
     const active = useRoutingStore((s) => s.active);
@@ -102,21 +102,27 @@ export function RouteBuilderSidebar() {
     return (
         <aside
             className={cn(
-                'relative z-20 flex h-full flex-col border-r border-border bg-background transition-all duration-300 ease-in-out select-none',
-                sidebarCollapsed ? 'w-0 overflow-hidden border-none' : 'w-80 min-w-80 shadow-md'
+                'relative z-20 flex h-full flex-col transition-[width] duration-300 ease-in-out select-none',
+                sidebarCollapsed ? 'w-0' : 'w-80 min-w-80 shadow-md'
             )}
         >
-            {/* Collapse toggle tab button sitting on the map edge */}
+            {/* Collapse toggle tab button sitting on the map edge — NEVER clipped */}
             <button
+                type="button"
                 className="absolute -right-6 top-16 z-30 flex h-10 w-6 items-center justify-center rounded-r-md border border-l-0 border-border bg-background shadow-md transition hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={toggleSidebar}
-                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={sidebarCollapsed ? (lang === 'zh' ? '展开面板' : 'Expand sidebar') : (lang === 'zh' ? '折叠面板' : 'Collapse sidebar')}
             >
                 {sidebarCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
             </button>
 
             {/* Sidebar content */}
-            <div className="flex h-full flex-col overflow-y-auto">
+            <div
+                className={cn(
+                    'flex h-full w-80 min-w-80 flex-col overflow-y-auto border-r border-border bg-background transition-opacity duration-200',
+                    sidebarCollapsed ? 'opacity-0 pointer-events-none overflow-hidden' : 'opacity-100'
+                )}
+            >
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
                     <h2 className="text-base font-bold tracking-tight text-foreground">
@@ -130,39 +136,38 @@ export function RouteBuilderSidebar() {
                     </button>
                 </div>
 
-                {/* Route Mode Status & Toggle */}
-                <div className="mx-4 mt-3 flex items-center justify-between rounded-lg border border-border bg-muted/30 p-2.5">
-                    <div className="flex items-center gap-2">
-                        <div
+                {/* Route Mode Segmented Control (Browse vs Draw) */}
+                <div className="mx-4 mt-3 select-none">
+                    <div className="grid grid-cols-2 rounded-lg bg-muted/60 p-1 text-xs border border-border/70 shadow-2xs">
+                        <button
+                            type="button"
+                            onClick={() => setActive(false)}
                             className={cn(
-                                'flex size-7 shrink-0 items-center justify-center rounded-md transition',
-                                active
-                                    ? 'bg-[#863BFF] text-white shadow-xs'
-                                    : 'bg-muted text-muted-foreground'
+                                'flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-all cursor-pointer',
+                                !active
+                                    ? 'bg-background text-foreground shadow-xs font-bold'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
                             )}
+                            title={t.dragToPanMap}
                         >
-                            {active ? <Crosshair className="size-4" /> : <Hand className="size-4" />}
-                        </div>
-                        <div className="leading-tight">
-                            <div className="text-xs font-semibold text-foreground">
-                                {active ? t.drawingActive : t.browsingMode}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground">
-                                {active ? t.clickMapToAddPoint : t.dragToPanMap}
-                            </div>
-                        </div>
+                            <Hand className="size-3.5" />
+                            <span>{lang === 'zh' ? '浏览地图' : 'Browse'}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActive(true)}
+                            className={cn(
+                                'flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-all cursor-pointer',
+                                active
+                                    ? 'bg-[#863BFF] text-white shadow-xs font-bold'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-background/40'
+                            )}
+                            title={t.clickMapToAddPoint}
+                        >
+                            <Crosshair className="size-3.5" />
+                            <span>{lang === 'zh' ? '绘制路线' : 'Draw'}</span>
+                        </button>
                     </div>
-                    <button
-                        onClick={() => setActive(!active)}
-                        className={cn(
-                            'shrink-0 rounded-md px-2.5 py-1 text-xs font-bold transition cursor-pointer',
-                            active
-                                ? 'bg-[#863BFF]/15 text-[#863BFF] hover:bg-[#863BFF]/25'
-                                : 'bg-[#863BFF] text-white shadow-xs hover:bg-[#7424F8]'
-                        )}
-                    >
-                        {active ? t.pauseDrawing : t.startDrawing}
-                    </button>
                 </div>
 
                 {/* Location Search Input */}

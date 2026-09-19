@@ -150,12 +150,7 @@ export function MapFloatingToolbar() {
                     <button
                         onClick={handleLocateMe}
                         disabled={isLocating}
-                        className={cn(
-                            'flex size-7 items-center justify-center rounded-md transition cursor-pointer disabled:cursor-not-allowed',
-                            isLocated
-                                ? 'bg-[#863BFF]/15 text-[#863BFF]'
-                                : 'text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF]'
-                        )}
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.locateMe}
                     >
                         {isLocating ? (

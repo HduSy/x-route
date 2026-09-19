@@ -3,9 +3,27 @@ import { Button } from '@/components/ui/button';
 import { triggerFileInput } from '@/lib/file-actions';
 import { useT } from '@/store/i18n-slice';
 import { useRoutingStore } from '@/store/routing-slice';
+import { cn } from '@/lib/utils';
 
 export function StravaNavbar() {
     const { t, lang, toggleLanguage } = useT();
+
+    const active = useRoutingStore((s) => s.active);
+    const setActive = useRoutingStore((s) => s.setActive);
+    const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
+    const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
+
+    const isPanelActive = active && !sidebarCollapsed;
+
+    const handleToggleRoutePanel = () => {
+        if (isPanelActive) {
+            setActive(false);
+            setSidebarCollapsed(true);
+        } else {
+            setActive(true);
+            setSidebarCollapsed(false);
+        }
+    };
 
     return (
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 select-none">
@@ -83,16 +101,18 @@ export function StravaNavbar() {
                     {lang === 'en' ? '中文' : 'EN'}
                 </Button>
 
-                {/* Plus create button */}
+                {/* Strava style Outlined Plus Create Route button (Outlined circle, no solid fill) */}
                 <button
-                    className="flex size-7 items-center justify-center rounded-full bg-[#863BFF] text-white shadow-xs transition hover:bg-[#7424F8] active:scale-95 cursor-pointer"
-                    title={t.startDrawing}
-                    onClick={() => {
-                        useRoutingStore.getState().setActive(true);
-                        useRoutingStore.getState().setSidebarCollapsed(false);
-                    }}
+                    className={cn(
+                        'flex size-8 items-center justify-center rounded-full transition-all cursor-pointer select-none active:scale-95',
+                        isPanelActive
+                            ? 'border-2 border-[#863BFF] text-[#863BFF] bg-[#863BFF]/15 ring-2 ring-[#863BFF]/30 shadow-xs'
+                            : 'border-[1.5px] border-[#863BFF]/75 text-[#863BFF] hover:border-[#863BFF] hover:bg-[#863BFF]/10 hover:shadow-xs'
+                    )}
+                    title={isPanelActive ? t.exitPlan : t.startDrawing}
+                    onClick={handleToggleRoutePanel}
                 >
-                    <Plus className="size-4 stroke-[3]" />
+                    <Plus className={cn('size-4 transition-transform', isPanelActive ? 'stroke-[2.2]' : 'stroke-[1.8]')} />
                 </button>
             </div>
         </header>
