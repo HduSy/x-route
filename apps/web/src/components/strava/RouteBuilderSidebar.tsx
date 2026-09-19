@@ -100,26 +100,32 @@ export function RouteBuilderSidebar() {
     if (sidebarCollapsed) return null;
 
     return (
-        <aside className="relative z-20 flex h-full w-80 min-w-80 flex-col border-r border-border bg-background shadow-md select-none">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
-                <h2 className="text-base font-bold tracking-tight text-foreground">
-                    {t.buildYourRoute}
-                </h2>
-                <button
-                    className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
-                    onClick={() => {
-                        setSidebarCollapsed(true);
-                        setActive(false);
-                    }}
-                    title={lang === 'zh' ? '关闭面板' : 'Close'}
-                >
-                    <X className="size-4" />
-                </button>
-            </div>
+        <>
+            {/* Mobile backdrop */}
+            <div
+                className="fixed inset-0 z-30 bg-black/40 backdrop-blur-2xs sm:hidden animate-in fade-in"
+                onClick={() => setSidebarCollapsed(true)}
+            />
 
-            {/* Sidebar content */}
-            <div className="flex h-full flex-col overflow-y-auto">
+            <aside className="fixed inset-y-0 left-0 z-40 w-[85vw] max-w-xs sm:relative sm:z-20 sm:w-80 sm:min-w-80 sm:max-w-none flex h-full flex-col border-r border-border bg-background shadow-2xl sm:shadow-md select-none animate-in slide-in-from-left duration-200 sm:animate-none">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
+                    <h2 className="text-base font-bold tracking-tight text-foreground">
+                        {t.buildYourRoute}
+                    </h2>
+                    <button
+                        className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+                        onClick={() => {
+                            setSidebarCollapsed(true);
+                        }}
+                        title={lang === 'zh' ? '关闭面板' : 'Close'}
+                    >
+                        <X className="size-4" />
+                    </button>
+                </div>
+
+                {/* Sidebar content */}
+                <div className="flex h-full flex-col overflow-y-auto">
 
                 {/* Route Mode Segmented Control (Browse vs Draw) */}
                 <div className="mx-4 mt-3 select-none">
@@ -372,7 +378,23 @@ export function RouteBuilderSidebar() {
                         </select>
                     </div>
                 </div>
+
+                {/* Mobile: Tap to draw on full map */}
+                <div className="sm:hidden mt-auto border-t border-border p-3 bg-muted/20">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setActive(true);
+                            setSidebarCollapsed(true);
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#863BFF] py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#7424F8] active:scale-98 cursor-pointer"
+                    >
+                        <Crosshair className="size-4" />
+                        <span>{lang === 'zh' ? '在地图上选点绘制' : 'Draw on map'}</span>
+                    </button>
+                </div>
             </div>
         </aside>
-    );
+    </>
+);
 }

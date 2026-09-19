@@ -242,17 +242,22 @@ class MapManager {
      *  style settles, and isStyleLoaded() pends forever when remote glyphs
      *  404. A bounded retry loop is the robust option. */
     onReady(callback: (map: MapLibreMap) => void) {
-        if (!this.map) return;
         const started = Date.now();
-        let delay = 50;
+        let delay = 25;
         const run = () => {
-            if (!this.map) return;
+            if (!this.map) {
+                if (Date.now() - started < 10000) {
+                    setTimeout(run, delay);
+                    delay = Math.min(delay * 1.5, 250);
+                }
+                return;
+            }
             try {
                 callback(this.map);
             } catch (error) {
                 if (Date.now() - started < 10000) {
                     setTimeout(run, delay);
-                    delay = Math.min(delay * 2, 500);
+                    delay = Math.min(delay * 1.5, 250);
                 } else {
                     console.error('[map] onReady gave up:', error);
                 }

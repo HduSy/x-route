@@ -206,11 +206,14 @@ export class RoutingLayerController {
     onMarkerDrag: ((index: number, lngLat: { lon: number; lat: number }) => void) | null = null;
     onMarkerRightClick: ((index: number) => void) | null = null;
 
-    private wired = false;
+    private wiredMap: MapLibreMap | null = null;
 
-    private wire(map: MapLibreMap) {
-        if (this.wired) return;
-        this.wired = true;
+    wire(map: MapLibreMap) {
+        if (this.wiredMap === map) return;
+        if (this.wiredMap) {
+            this.unwire();
+        }
+        this.wiredMap = map;
 
         this.clickHandler = (e) => {
             if (!this.onMapClick) return;
@@ -248,8 +251,36 @@ export class RoutingLayerController {
             }
         };
 
-        map.on('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
-        map.on('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
+        if (map.getLayer(LINE_LAYER_ID)) {
+            map.on('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
+            map.on('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
+        }
+    }
+
+    unwire() {
+        if (this.wiredMap) {
+            if (this.clickHandler) {
+                this.wiredMap.off('click', this.clickHandler);
+            }
+            if (this.lineMouseMoveHandler) {
+                try {
+                    this.wiredMap.off('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
+                } catch {
+                    // Layer might have been removed with style
+                }
+            }
+            if (this.lineMouseLeaveHandler) {
+                try {
+                    this.wiredMap.off('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
+                } catch {
+                    // Layer might have been removed with style
+                }
+            }
+        }
+        this.clickHandler = null;
+        this.lineMouseMoveHandler = null;
+        this.lineMouseLeaveHandler = null;
+        this.wiredMap = null;
     }
 
     private removeGhostMarker() {
@@ -379,6 +410,11 @@ export class RoutingLayerController {
     }
 
     private ensureLayers(map: MapLibreMap) {
+        if (!map.isStyleLoaded()) {
+            map.once('styledata', () => this.ensureLayers(map));
+            return;
+        }
+
         if (!map.getSource(SOURCE_ID)) {
             map.addSource(SOURCE_ID, {
                 type: 'geojson',
@@ -414,6 +450,24 @@ export class RoutingLayerController {
                     'line-opacity': this.showRoutePath ? 0.95 : 0,
                 },
             });
+        }
+
+        // Re-attach line mouse handlers to the newly added line layer
+        if (this.lineMouseMoveHandler) {
+            try {
+                map.off('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
+                map.on('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
+            } catch {
+                // Layer might not be ready
+            }
+        }
+        if (this.lineMouseLeaveHandler) {
+            try {
+                map.off('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
+                map.on('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
+            } catch {
+                // Layer might not be ready
+            }
         }
     }
 
@@ -513,6 +567,18 @@ export class RoutingLayerController {
         });
     }
 
+    /** Re-apply layers and markers after style reload */
+    resync() {
+        const map = mapManager.getMap();
+        if (!map) return;
+        this.wire(map);
+        this.ensureLayers(map);
+        this.syncMarkers(map, this.currentAnchors);
+        if (this.currentPoints.length >= 2) {
+            this.setResult(this.currentPoints);
+        }
+    }
+
     /** Soft clear: drop markers and the result line, keep click listener wired */
     clear() {
         for (const marker of this.markers) marker.remove();
@@ -527,19 +593,17 @@ export class RoutingLayerController {
     /** Full teardown — called when the map itself goes away. */
     destroy() {
         this.clear();
+        this.unwire();
         const map = mapManager.getMap();
         if (map) {
-            if (this.clickHandler) map.off('click', this.clickHandler);
-            if (this.lineMouseMoveHandler) map.off('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
-            if (this.lineMouseLeaveHandler) map.off('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
-            if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
-            if (map.getLayer(LINE_CASING_LAYER_ID)) map.removeLayer(LINE_CASING_LAYER_ID);
-            if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+            try {
+                if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
+                if (map.getLayer(LINE_CASING_LAYER_ID)) map.removeLayer(LINE_CASING_LAYER_ID);
+                if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+            } catch {
+                // Ignore cleanup errors
+            }
         }
-        this.clickHandler = null;
-        this.lineMouseMoveHandler = null;
-        this.lineMouseLeaveHandler = null;
-        this.wired = false;
     }
 }
 

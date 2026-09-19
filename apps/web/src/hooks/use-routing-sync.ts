@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { route } from '@/lib/routing';
@@ -90,13 +90,13 @@ export function useRoutingSync() {
             });
     }, [anchors, profile, manualMode]);
 
-    // When the tool turns OFF, drop markers and the preview line. (Never
-    // destroy on mount: initial active=false must not unwind the wiring.)
-    const prevActive = useRef(false);
+    // When draw mode turns ON, ensure markers and route are synced to map layer
     useEffect(() => {
-        if (prevActive.current && !active) {
-            routingLayer.clear();
+        if (active) {
+            routingLayer.sync(anchors);
+            if (resultPoints.length >= 2) {
+                routingLayer.setResult(resultPoints);
+            }
         }
-        prevActive.current = active;
     }, [active]);
 }

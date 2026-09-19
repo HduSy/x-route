@@ -7,6 +7,7 @@ import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
 import { gpxLayers } from '@/lib/map/gpx-layer';
+import { routingLayer } from '@/lib/map/routing-layer';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
@@ -76,7 +77,11 @@ export function MapView() {
     useEffect(() => {
         if (!containerRef.current) return;
         const map = mapManager.init(containerRef.current);
-        const unwireStyleReload = mapManager.onStyleReload(() => gpxLayers.resync());
+        routingLayer.wire(map);
+        const unwireStyleReload = mapManager.onStyleReload(() => {
+            gpxLayers.resync();
+            routingLayer.resync();
+        });
 
         const popup = new MapLibrePopup({ closeButton: false, offset: 8 });
         const popupContainer = document.createElement('div');
@@ -110,6 +115,7 @@ export function MapView() {
             popup.remove();
             popupRef.current = null;
             popupContainerRef.current = null;
+            routingLayer.unwire();
             mapManager.destroy();
         };
     }, []);
@@ -161,7 +167,7 @@ export function MapView() {
             />
 
             {/* Strava style Vertical Map Controls (Draw mode, Zoom in, Zoom out, Compass) */}
-            <div className="absolute left-3 top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none">
+            <div className="absolute left-2 sm:left-3 top-13 sm:top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none">
                 {/* Route planning / creation mode toggle */}
                 <button
                     onClick={() => setActive(!active)}
@@ -226,7 +232,7 @@ export function MapView() {
             </div>
 
             {/* Bottom-left Map Style & 3D Controls (Stacked neatly above the scale bar) */}
-            <div className="absolute bottom-9 left-3 z-10 flex flex-col gap-1 select-none">
+            <div className="absolute bottom-8 sm:bottom-9 left-2 sm:left-3 z-10 flex flex-col gap-1 select-none">
                 {/* Basemap selector popover button */}
                 <div className="relative">
                     <button

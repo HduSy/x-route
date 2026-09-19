@@ -142,56 +142,56 @@ export function MapFloatingToolbar() {
     };
 
     return (
-        <div className="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-center justify-between select-none">
+        <div className="pointer-events-none absolute left-2 right-2 top-2 sm:left-3 sm:right-3 sm:top-3 z-10 flex items-center justify-between select-none">
             {/* Left toolbar group */}
-            <div className="pointer-events-auto flex items-center gap-2">
+            <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">
                 {/* Navigation / Action buttons card */}
-                <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm">
+                <div className="flex h-8 sm:h-9 items-center gap-0.5 rounded-lg border border-border bg-white dark:bg-card p-0.5 sm:p-1 shadow-sm">
                     <button
                         onClick={handleLocateMe}
                         disabled={isLocating}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer disabled:cursor-not-allowed"
+                        className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.locateMe}
                     >
                         {isLocating ? (
-                            <Loader2 className="size-4 animate-spin text-[#863BFF]" />
+                            <Loader2 className="size-3.5 sm:size-4 animate-spin text-[#863BFF]" />
                         ) : (
-                            <Crosshair className="size-4" />
+                            <Crosshair className="size-3.5 sm:size-4" />
                         )}
                     </button>
-                    <div className="h-4 w-px bg-border mx-0.5" />
+                    <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />
                     <button
                         onClick={reverseAnchors}
                         disabled={anchors.length < 2}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
+                        className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.reverseRoute}
                     >
-                        <ArrowLeftRight className="size-4" />
+                        <ArrowLeftRight className="size-3.5 sm:size-4" />
                     </button>
                     <button
                         onClick={undo}
                         disabled={!canUndo}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
+                        className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.undo}
                     >
-                        <Undo2 className="size-4" />
+                        <Undo2 className="size-3.5 sm:size-4" />
                     </button>
                     <button
                         onClick={redo}
                         disabled={!canRedo}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
+                        className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.redo}
                     >
-                        <Redo2 className="size-4" />
+                        <Redo2 className="size-3.5 sm:size-4" />
                     </button>
-                    <div className="h-4 w-px bg-border mx-0.5" />
+                    <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />
                     <button
                         onClick={handleClear}
                         disabled={anchors.length === 0}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-destructive disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
+                        className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-destructive disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.clearRoute}
                     >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-3.5 sm:size-4" />
                     </button>
                 </div>
 
@@ -200,19 +200,20 @@ export function MapFloatingToolbar() {
                     onClick={() => setSaveModalOpen(true)}
                     disabled={resultPoints.length < 2}
                     className={cn(
-                        'group flex h-9 items-center gap-1.5 rounded-lg px-4 text-xs font-bold tracking-tight transition-all duration-150 select-none',
+                        'group flex h-8 sm:h-9 items-center gap-1.5 rounded-lg px-2.5 sm:px-4 text-xs font-bold tracking-tight transition-all duration-150 select-none',
                         resultPoints.length >= 2
                             ? 'bg-[#863BFF] text-white shadow-sm hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
                             : 'bg-muted/80 text-muted-foreground/60 border border-border/50 cursor-not-allowed shadow-none'
                     )}
+                    title={t.saveRoute}
                 >
                     <BookmarkPlus
                         className={cn(
-                            'size-4 stroke-[2.2]',
+                            'size-3.5 sm:size-4 stroke-[2.2]',
                             resultPoints.length >= 2 && 'transition-transform group-hover:scale-110'
                         )}
                     />
-                    <span>{t.saveRoute}</span>
+                    <span className="hidden sm:inline">{t.saveRoute}</span>
                 </button>
 
                 {/* Heatmaps & Basemaps Dropdown */}
@@ -222,15 +223,16 @@ export function MapFloatingToolbar() {
                             setBasemapOpen(!basemapOpen);
                             setToolsOpen(false);
                         }}
-                        className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
+                        className="flex h-8 sm:h-9 items-center gap-1 sm:gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-2 sm:px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
+                        title={t.heatmaps}
                     >
                         <Flame className="size-3.5 text-[#863BFF]" />
-                        <span>{t.heatmaps}</span>
-                        <ChevronDown className="size-3 text-muted-foreground" />
+                        <span className="hidden md:inline">{t.heatmaps}</span>
+                        <ChevronDown className="size-3 text-muted-foreground hidden md:inline" />
                     </button>
 
                     {basemapOpen && (
-                        <div className="absolute left-0 top-11 z-50 min-w-44 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
+                        <div className="absolute left-0 top-10 sm:top-11 z-50 min-w-44 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
                             <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                 {t.basemap}
                             </div>
@@ -264,15 +266,16 @@ export function MapFloatingToolbar() {
                             setToolsOpen(!toolsOpen);
                             setBasemapOpen(false);
                         }}
-                        className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
+                        className="flex h-8 sm:h-9 items-center gap-1 sm:gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-2 sm:px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
+                        title={t.segments}
                     >
                         <Layers className="size-3.5 text-muted-foreground" />
-                        <span>{t.segments}</span>
-                        <ChevronDown className="size-3 text-muted-foreground" />
+                        <span className="hidden md:inline">{t.segments}</span>
+                        <ChevronDown className="size-3 text-muted-foreground hidden md:inline" />
                     </button>
 
                     {toolsOpen && (
-                        <div className="absolute left-0 top-11 z-50 min-w-48 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
+                        <div className="absolute left-0 top-10 sm:top-11 z-50 min-w-48 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
                             <button
                                 disabled={!selectedFileId}
                                 onClick={() =>
@@ -330,12 +333,13 @@ export function MapFloatingToolbar() {
             <div className="pointer-events-auto flex items-center gap-2">
                 <button
                     onClick={() => setMyRoutesOpen(true)}
-                    className="group flex h-9 items-center gap-2 rounded-lg border border-border bg-white dark:bg-card px-3.5 text-xs font-bold tracking-tight text-foreground shadow-sm transition-all duration-150 hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] hover:shadow-md cursor-pointer active:scale-98"
+                    className="group flex h-8 sm:h-9 items-center gap-1.5 sm:gap-2 rounded-lg border border-border bg-white dark:bg-card px-2.5 sm:px-3.5 text-xs font-bold tracking-tight text-foreground shadow-sm transition-all duration-150 hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] hover:shadow-md cursor-pointer active:scale-98"
+                    title={t.myRoutes}
                 >
-                    <Bookmark className="size-4 text-[#863BFF] transition-transform group-hover:scale-110" />
-                    <span>{t.myRoutes}</span>
+                    <Bookmark className="size-3.5 sm:size-4 text-[#863BFF] transition-transform group-hover:scale-110" />
+                    <span className="hidden sm:inline">{t.myRoutes}</span>
                     {fileCount > 0 && (
-                        <span className="rounded-full bg-[#863BFF]/15 px-2 py-0.5 text-[10px] font-black text-[#863BFF]">
+                        <span className="rounded-full bg-[#863BFF]/15 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black text-[#863BFF]">
                             {fileCount}
                         </span>
                     )}

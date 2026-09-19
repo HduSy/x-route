@@ -26,9 +26,9 @@ export function StravaNavbar() {
     };
 
     return (
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 select-none">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-2.5 sm:px-4 select-none">
             {/* Left brand & navigation */}
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-3 sm:gap-8">
                 {/* Site Logo using favicon.svg */}
                 <div
                     className="flex cursor-pointer items-center gap-2"
@@ -78,26 +78,26 @@ export function StravaNavbar() {
             </div>
 
             {/* Right controls */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
                 <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5 border-dashed text-xs font-semibold text-foreground hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
+                    className="h-8 px-2 sm:px-3 gap-1.5 border-dashed text-xs font-semibold text-foreground hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
                     onClick={triggerFileInput}
                     title="Import GPX / ZIP"
                 >
                     <FolderOpen className="size-3.5 text-[#863BFF]" />
-                    <span>{t.importBtn}</span>
+                    <span className="hidden sm:inline">{t.importBtn}</span>
                 </Button>
 
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 px-2 text-xs font-medium hover:text-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] cursor-pointer"
+                    className="h-8 px-1.5 sm:px-2 text-xs font-medium hover:text-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] cursor-pointer"
                     onClick={toggleLanguage}
                     title="Switch Language / 切换语言"
                 >
-                    <Languages className="mr-1 size-3.5" />
+                    <Languages className="mr-0.5 sm:mr-1 size-3.5" />
                     {lang === 'en' ? '中文' : 'EN'}
                 </Button>
 

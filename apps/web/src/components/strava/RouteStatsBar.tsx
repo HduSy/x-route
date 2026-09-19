@@ -20,7 +20,7 @@ interface ProfilePoint {
 }
 
 export function RouteStatsBar() {
-    const { t } = useT();
+    const { t, lang } = useT();
 
     // Store state
     const resultPoints = useRoutingStore((s) => s.resultPoints);
@@ -293,7 +293,7 @@ export function RouteStatsBar() {
             {/* Elevation Chart Drawer */}
             {elevationExpanded && pointsData.length >= 2 && (
                 <div
-                    className="relative h-28 w-full border-b border-border/80 px-4 py-1.5"
+                    className="relative h-24 sm:h-28 w-full border-b border-border/80 px-2 sm:px-4 py-1.5"
                     onMouseLeave={() => mapManager.setCursor(null)}
                 >
                     <canvas ref={canvasRef} />
@@ -301,20 +301,20 @@ export function RouteStatsBar() {
             )}
 
             {/* Bottom Stats Horizontal Bar (Strava Signature) */}
-            <div className="flex h-16 items-center justify-between px-6 py-2">
+            <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 py-1.5 sm:py-2">
                 {/* Left Stats Grid */}
-                <div className="flex items-center gap-8 md:gap-12">
+                <div className="flex items-center gap-3 sm:gap-6 md:gap-12">
                     {/* Activity Icon & Label */}
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex size-9 items-center justify-center rounded-full bg-accent text-[#863BFF]">
+                    <div className="flex items-center gap-2 sm:gap-2.5">
+                        <div className="flex size-7 sm:size-9 items-center justify-center rounded-full bg-accent text-[#863BFF]">
                             {profile === 'foot' ? (
-                                <Footprints className="size-5 text-[#863BFF]" />
+                                <Footprints className="size-4 sm:size-5 text-[#863BFF]" />
                             ) : (
-                                <Bike className="size-5 text-[#863BFF]" />
+                                <Bike className="size-4 sm:size-5 text-[#863BFF]" />
                             )}
                         </div>
                         <div className="hidden sm:block">
-                            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                                 {t.activity}
                             </div>
                             <div className="text-xs font-bold text-foreground">
@@ -325,40 +325,40 @@ export function RouteStatsBar() {
 
                     {/* Distance */}
                     <div>
-                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                             {t.distance}
                         </div>
-                        <div className="text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground">
                             {stats.distFormatted}
                         </div>
                     </div>
 
                     {/* Elevation Gain */}
                     <div>
-                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                             {t.elevationGain}
                         </div>
-                        <div className="text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground">
                             {stats.ascentFormatted}
                         </div>
                     </div>
 
                     {/* Elevation Loss */}
                     <div className="hidden sm:block">
-                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                             {t.elevationLoss}
                         </div>
-                        <div className="text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground">
                             {stats.descentFormatted}
                         </div>
                     </div>
 
                     {/* Est. Moving Time */}
                     <div className="hidden md:block">
-                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                             {t.estMovingTime}
                         </div>
-                        <div className="text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground">
                             {stats.timeFormatted}
                         </div>
                     </div>
@@ -369,12 +369,14 @@ export function RouteStatsBar() {
                     onClick={toggleElevation}
                     disabled={pointsData.length < 2}
                     className={cn(
-                        'flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer disabled:cursor-not-allowed',
+                        'flex items-center gap-1 rounded-lg border border-border px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-foreground transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer disabled:cursor-not-allowed',
                         pointsData.length < 2 && 'opacity-40 cursor-not-allowed hover:border-border hover:text-foreground hover:bg-transparent'
                     )}
+                    title={elevationExpanded ? t.hideElevation : t.showElevation}
                 >
-                    <span>{elevationExpanded ? t.hideElevation : t.showElevation}</span>
-                    {elevationExpanded ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+                    <span className="hidden sm:inline">{elevationExpanded ? t.hideElevation : t.showElevation}</span>
+                    <span className="sm:hidden">{lang === 'zh' ? (elevationExpanded ? '收起' : '海拔') : (elevationExpanded ? 'Hide' : 'Ele')}</span>
+                    {elevationExpanded ? <ChevronDown className="size-3 sm:size-3.5" /> : <ChevronUp className="size-3 sm:size-3.5" />}
                 </button>
             </div>
         </footer>
