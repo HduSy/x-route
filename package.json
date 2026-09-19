@@ -1,0 +1,16 @@
+{
+    "name": "x-route",
+    "version": "0.1.0",
+    "private": true,
+    "packageManager": "pnpm@10.23.0",
+    "engines": {
+        "node": ">=22"
+    },
+    "scripts": {
+        "dev": "pnpm --filter @x-route/web dev",
+        "build": "pnpm --filter @x-route/web build",
+        "preview": "pnpm --filter @x-route/web preview",
+        "test": "pnpm -r test",
+        "typecheck": "pnpm -r typecheck"
+    }
+}

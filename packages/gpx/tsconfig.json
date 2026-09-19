@@ -1,0 +1,12 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "strict": false,
+        "isolatedModules": false,
+        "types": ["node", "geojson"],
+        "verbatimModuleSyntax": false,
+        "noUncheckedIndexedAccess": false
+    },
+    "include": ["src", "test"]
+}
