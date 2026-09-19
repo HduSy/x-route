@@ -31,6 +31,18 @@ class MapManager {
     private userLocationCoords: { lon: number; lat: number } | null = null;
     private scaleControl: ScaleControl | null = null;
     private styleReloadCallbacks = new Set<() => void>();
+    private resizeObserver: ResizeObserver | null = null;
+    private resizeRaf: number | null = null;
+
+    private handleResize = () => {
+        if (!this.map) return;
+        if (this.resizeRaf) cancelAnimationFrame(this.resizeRaf);
+        this.resizeRaf = requestAnimationFrame(() => {
+            if (this.map) {
+                this.map.resize();
+            }
+        });
+    };
 
     /** Idempotent under React StrictMode double-mount: re-init with the same
      *  container is a no-op; a different container tears down and rebuilds. */
@@ -50,9 +62,15 @@ class MapManager {
             style: BASEMAPS[this.basemap].style,
             center: DEFAULT_CENTER,
             zoom: DEFAULT_ZOOM,
+            minZoom: 3.5,
+            maxZoom: 19,
             attributionControl: false,
         });
         map.addControl(new AttributionControl({ compact: true }));
+
+        // Damped scroll zoom rate to prevent runaway zoom on macOS trackpads and mouse wheels
+        map.scrollZoom.setWheelZoomRate(1 / 2000);
+        map.scrollZoom.setZoomRate(1 / 450);
 
         const scale = new ScaleControl({ maxWidth: 90, unit: 'metric' });
         map.addControl(scale, 'bottom-left');
@@ -61,12 +79,30 @@ class MapManager {
         this.map = map;
         this.container = container;
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = map; // debug/testing hook
+
+        // Automatically sync WebGL viewport with container dimensions (prevents marker/canvas desync)
+        this.resizeObserver = new ResizeObserver(() => {
+            this.handleResize();
+        });
+        this.resizeObserver.observe(container);
+
+        // Immediate and post-animation resize triggers to ensure settled canvas size
+        requestAnimationFrame(() => this.map?.resize());
+        setTimeout(() => this.map?.resize(), 100);
+        setTimeout(() => this.map?.resize(), 350);
+
         return map;
     }
 
     destroy() {
         if (!this.map) return;
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = undefined;
+        if (this.resizeRaf) {
+            cancelAnimationFrame(this.resizeRaf);
+            this.resizeRaf = null;
+        }
+        this.resizeObserver?.disconnect();
+        this.resizeObserver = null;
         this.cursorMarker?.remove();
         this.cursorMarker = null;
         this.userLocationMarker?.remove();
@@ -76,6 +112,10 @@ class MapManager {
         this.map.remove();
         this.map = null;
         this.container = null;
+    }
+
+    resize() {
+        this.map?.resize();
     }
 
     setScaleUnit(unit: 'metric' | 'imperial') {
@@ -110,7 +150,7 @@ class MapManager {
                 box-shadow: 0 0 0 3px rgba(134, 59, 255, 0.4), 0 2px 6px rgba(0,0,0,0.35);
                 pointer-events: none;
             `;
-            this.cursorMarker = new Marker({ element: el })
+            this.cursorMarker = new Marker({ element: el, subpixelPositioning: true })
                 .setLngLat([coords.lon, coords.lat])
                 .addTo(this.map);
         } else {
@@ -171,7 +211,11 @@ class MapManager {
             container.appendChild(pulse);
             container.appendChild(dot);
 
-            this.userLocationMarker = new Marker({ element: container, anchor: 'center' });
+            this.userLocationMarker = new Marker({
+                element: container,
+                anchor: 'center',
+                subpixelPositioning: true,
+            });
         }
 
         this.userLocationMarker.setLngLat([coords.lon, coords.lat]);

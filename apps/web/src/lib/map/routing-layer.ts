@@ -20,7 +20,10 @@ function anchorElement(kind: 'start' | 'end' | 'via', _index: number, _total: nu
     // Outer container: MapLibre manages transform: translate(...) here. NEVER modify el.style.transform directly!
     const el = document.createElement('div');
     el.className = `x-route-anchor-marker x-route-anchor-${kind}`;
+    const size = kind === 'via' ? 12 : MILESTONE_SIZE;
     el.style.cssText = `
+        width: ${size}px;
+        height: ${size}px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -86,11 +89,14 @@ function ghostAnchorElement(): HTMLElement {
     const el = document.createElement('div');
     el.className = 'x-route-ghost-marker';
     el.style.cssText = `
+        width: 14px;
+        height: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
         user-select: none;
+        box-sizing: border-box;
     `;
     const dot = document.createElement('div');
     dot.className = 'x-route-ghost-dot';
@@ -263,7 +269,12 @@ export class RoutingLayerController {
     private ensureGhostMarker(map: MapLibreMap) {
         if (this.ghostMarker) return;
         const el = ghostAnchorElement();
-        const marker = new Marker({ element: el, draggable: true, anchor: 'center' });
+        const marker = new Marker({
+            element: el,
+            draggable: true,
+            anchor: 'center',
+            subpixelPositioning: true,
+        });
 
         marker.on('dragstart', () => {
             this.isDraggingGhost = true;
@@ -303,6 +314,39 @@ export class RoutingLayerController {
         this.markers = anchors.map((anchor, index) =>
             this.createMarker(map, anchor, index, anchors.length)
         );
+        this.alignMarkersToRoute();
+    }
+
+    private alignMarkersToRoute() {
+        if (this.currentPoints.length < 2 || this.markers.length === 0) return;
+        const firstPt = this.currentPoints[0]!;
+        const lastPt = this.currentPoints[this.currentPoints.length - 1]!;
+
+        // Snap start marker directly to the route line's starting endpoint
+        this.markers[0]?.setLngLat([firstPt.attributes.lon, firstPt.attributes.lat]);
+
+        // Snap end marker directly to the route line's ending endpoint
+        if (this.markers.length > 1) {
+            this.markers[this.markers.length - 1]?.setLngLat([
+                lastPt.attributes.lon,
+                lastPt.attributes.lat,
+            ]);
+        }
+
+        // For intermediate waypoints, snap to the closest route coordinate
+        if (this.markers.length > 2) {
+            for (let i = 1; i < this.markers.length - 1; i++) {
+                const anchor = this.currentAnchors[i];
+                if (!anchor) continue;
+                const closest = getClosestLinePoint(this.currentPoints, anchor);
+                if (closest) {
+                    this.markers[i]?.setLngLat([
+                        closest.attributes.lon,
+                        closest.attributes.lat,
+                    ]);
+                }
+            }
+        }
     }
 
     private createMarker(
@@ -313,7 +357,12 @@ export class RoutingLayerController {
     ): Marker {
         const kind = index === 0 ? 'start' : index === total - 1 ? 'end' : 'via';
         const el = anchorElement(kind, index, total);
-        const marker = new Marker({ element: el, draggable: true, anchor: 'center' })
+        const marker = new Marker({
+            element: el,
+            draggable: true,
+            anchor: 'center',
+            subpixelPositioning: true,
+        })
             .setLngLat([anchor.lon, anchor.lat])
             .addTo(map);
 
@@ -414,7 +463,11 @@ export class RoutingLayerController {
                 const lat = c1.lat + (c2.lat - c1.lat) * fraction;
 
                 const el = distanceMarkerElement(String(markerCount));
-                const marker = new Marker({ element: el, anchor: 'center' })
+                const marker = new Marker({
+                    element: el,
+                    anchor: 'center',
+                    subpixelPositioning: true,
+                })
                     .setLngLat([lon, lat])
                     .addTo(map);
 
@@ -456,6 +509,7 @@ export class RoutingLayerController {
                 ],
             });
             this.updateDistanceMarkers();
+            this.alignMarkersToRoute();
         });
     }
 
