@@ -1,4 +1,4 @@
-import { TrackPoint, type Coordinates } from '@x-route/gpx';
+import { TrackPoint, distance, type Coordinates } from '@x-route/gpx';
 
 // Route planning service — mirrors gpx.studio's dual-engine setup (AD-5).
 // GraphHopper goes through the relay (strict CORS on the origin instance);
@@ -30,10 +30,48 @@ const graphhopperBlockPrivate: Record<string, object> = {
     foot: { priority: [{ if: 'foot_road_access == PRIVATE', multiply_by: '0.0' }] },
 };
 
+export function getManualRoute(points: Coordinates[]): TrackPoint[] {
+    const routePoints: TrackPoint[] = [];
+    for (let i = 0; i < points.length; i++) {
+        const pt = points[i]!;
+        if (i > 0) {
+            const prev = points[i - 1]!;
+            const d = distance(prev, pt);
+            // interpolate intermediate samples every ~100m so distance and profile look natural
+            const count = Math.max(1, Math.floor(d / 100));
+            for (let s = 1; s <= count; s++) {
+                const fraction = s / count;
+                const lat = prev.lat + (pt.lat - prev.lat) * fraction;
+                const lon = prev.lon + (pt.lon - prev.lon) * fraction;
+                routePoints.push(
+                    new TrackPoint({
+                        attributes: { lat, lon },
+                        ele: 0,
+                        extensions: {},
+                    })
+                );
+            }
+        } else {
+            routePoints.push(
+                new TrackPoint({
+                    attributes: { lat: pt.lat, lon: pt.lon },
+                    ele: 0,
+                    extensions: {},
+                })
+            );
+        }
+    }
+    return routePoints;
+}
+
 export async function route(
     points: Coordinates[],
-    profileKey: string
+    profileKey: string,
+    manualMode = false
 ): Promise<TrackPoint[]> {
+    if (manualMode) {
+        return getManualRoute(points);
+    }
     const profile = routingProfiles[profileKey] ?? routingProfiles.bike!;
     return profile.engine === 'graphhopper'
         ? getGraphHopperRoute(points, profile.profile)

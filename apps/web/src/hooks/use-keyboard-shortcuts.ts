@@ -43,12 +43,18 @@ export function useKeyboardShortcuts() {
                 }
             }
 
-            // Escape: Deactivate routing mode
+            // Escape: Close modals/drawers or deselect
             if (e.key === 'Escape') {
-                const { active, setActive } = useRoutingStore.getState();
-                if (active) {
+                const { saveModalOpen, setSaveModalOpen, myRoutesOpen, setMyRoutesOpen } =
+                    useRoutingStore.getState();
+                if (saveModalOpen) {
                     e.preventDefault();
-                    setActive(false);
+                    setSaveModalOpen(false);
+                    return;
+                }
+                if (myRoutesOpen) {
+                    e.preventDefault();
+                    setMyRoutesOpen(false);
                     return;
                 }
             }
@@ -56,19 +62,16 @@ export function useKeyboardShortcuts() {
             // Delete / Backspace: Remove last anchor in routing mode, or delete selected file
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 const { active, anchors, removeAnchor } = useRoutingStore.getState();
-                if (active) {
-                    if (anchors.length > 0) {
-                        e.preventDefault();
-                        removeAnchor(anchors.length - 1);
-                        return;
-                    }
-                } else {
-                    const { selectedFileId } = useSelectionStore.getState();
-                    if (selectedFileId) {
-                        e.preventDefault();
-                        void deleteFile(selectedFileId);
-                        return;
-                    }
+                if (active && anchors.length > 0) {
+                    e.preventDefault();
+                    removeAnchor(anchors.length - 1);
+                    return;
+                }
+                const { selectedFileId } = useSelectionStore.getState();
+                if (selectedFileId) {
+                    e.preventDefault();
+                    void deleteFile(selectedFileId);
+                    return;
                 }
             }
         };

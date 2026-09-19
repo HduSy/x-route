@@ -1,51 +1,116 @@
 import { Marker, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
 import { mapManager } from './MapManager';
-import type { RoutingAnchor } from '@/store/routing-slice';
+import type { RoutingAnchor, UnitType } from '@/store/routing-slice';
 import { TrackPoint, distance } from '@x-route/gpx';
 import { getClosestLinePoint, type ClosestPointDetails } from '@/lib/utils';
 
-// AD-6 imperative routing layer: anchor markers are plain DOM circles driven
-// by MapLibre Marker (drag support for free); the computed route renders as a
-// GeoJSON line source. All interaction lands in the store via callbacks.
+// Strava Route Builder imperative routing layer:
+// - Strava signature energetic orange route polyline with casing
+// - Crisp numbered/styled start, via, and finish markers
+// - Interactive ghost marker for mid-segment insertion
+// - Distance milestone badges (1km, 2km, ...) along the route
 
 const SOURCE_ID = 'x-route-routing';
+const LINE_CASING_LAYER_ID = 'x-route-routing-casing';
 const LINE_LAYER_ID = 'x-route-routing-line';
 
-function anchorElement(kind: 'start' | 'end' | 'via'): HTMLElement {
+function anchorElement(kind: 'start' | 'end' | 'via', _index: number, total: number): HTMLElement {
     const el = document.createElement('div');
-    const colors = { start: '#198836', end: '#D53F2C', via: '#3B82F6' };
-    el.style.cssText = `
-        width: ${kind === 'via' ? 12 : 15}px;
-        height: ${kind === 'via' ? 12 : 15}px;
-        border-radius: 9999px;
-        background-color: ${colors[kind]};
-        border: 2px solid #ffffff;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-        cursor: grab;
-    `;
+    el.className = 'x-route-anchor-marker';
+
+    if (kind === 'start') {
+        el.style.cssText = `
+            width: 22px;
+            height: 22px;
+            border-radius: 9999px;
+            background-color: #22c55e;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            user-select: none;
+            line-height: 1;
+        `;
+        el.innerText = '1';
+    } else if (kind === 'end') {
+        el.style.cssText = `
+            width: 22px;
+            height: 22px;
+            border-radius: 9999px;
+            background-color: #fc5200;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            user-select: none;
+            line-height: 1;
+        `;
+        el.innerText = String(total);
+    } else {
+        el.style.cssText = `
+            width: 14px;
+            height: 14px;
+            border-radius: 9999px;
+            background-color: #ffffff;
+            border: 3.5px solid #fc5200;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+            cursor: grab;
+            user-select: none;
+        `;
+    }
     return el;
 }
 
 function ghostAnchorElement(): HTMLElement {
     const el = document.createElement('div');
     el.style.cssText = `
-        width: 14px;
-        height: 14px;
+        width: 16px;
+        height: 16px;
         border-radius: 9999px;
-        background-color: rgba(59, 130, 246, 0.75);
-        border: 2px solid #ffffff;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+        background-color: rgba(252, 82, 0, 0.85);
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(252, 82, 0, 0.5);
         cursor: pointer;
-        transition: transform 0.1s ease;
+        transition: transform 0.12s ease;
     `;
     el.onmouseenter = () => {
-        el.style.transform = 'scale(1.25)';
-        el.style.backgroundColor = 'rgba(59, 130, 246, 1)';
+        el.style.transform = 'scale(1.3)';
+        el.style.backgroundColor = '#fc5200';
     };
     el.onmouseleave = () => {
         el.style.transform = 'scale(1.0)';
-        el.style.backgroundColor = 'rgba(59, 130, 246, 0.75)';
+        el.style.backgroundColor = 'rgba(252, 82, 0, 0.85)';
     };
+    return el;
+}
+
+function distanceMarkerElement(label: string): HTMLElement {
+    const el = document.createElement('div');
+    el.style.cssText = `
+        background-color: #ffffff;
+        color: #262626;
+        font-size: 10px;
+        font-weight: 700;
+        border-radius: 9999px;
+        padding: 1px 5px;
+        border: 1.5px solid #fc5200;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        pointer-events: none;
+        user-select: none;
+        white-space: nowrap;
+        line-height: 1.2;
+    `;
+    el.innerText = label;
     return el;
 }
 
@@ -90,11 +155,17 @@ function findInsertIndex(
 
 export class RoutingLayerController {
     private markers: Marker[] = [];
+    private distanceMarkers: Marker[] = [];
     private ghostMarker: Marker | null = null;
     private currentInsertIndex: number = 1;
     private isDraggingGhost = false;
     private currentAnchors: RoutingAnchor[] = [];
     private currentPoints: TrackPoint[] = [];
+
+    // Display options
+    private showDistanceMarkers = true;
+    private showRoutePath = true;
+    private units: UnitType = 'km';
 
     private clickHandler:
         | ((e: { lngLat: { lng: number; lat: number } }) => void)
@@ -161,6 +232,13 @@ export class RoutingLayerController {
         }
     }
 
+    private removeDistanceMarkers() {
+        for (const m of this.distanceMarkers) {
+            m.remove();
+        }
+        this.distanceMarkers = [];
+    }
+
     private ensureGhostMarker(map: MapLibreMap) {
         if (this.ghostMarker) return;
         const el = ghostAnchorElement();
@@ -200,8 +278,6 @@ export class RoutingLayerController {
     }
 
     private syncMarkers(map: MapLibreMap, anchors: RoutingAnchor[]) {
-        // Rebuild markers when the anchor count changed (last anchor restyles
-        // from via to end); otherwise just reposition existing ones.
         if (this.markers.length !== anchors.length) {
             for (const marker of this.markers) marker.remove();
             this.markers = anchors.map((anchor, index) =>
@@ -221,7 +297,7 @@ export class RoutingLayerController {
         total: number
     ): Marker {
         const kind = index === 0 ? 'start' : index === total - 1 ? 'end' : 'via';
-        const el = anchorElement(kind);
+        const el = anchorElement(kind, index, total);
         const marker = new Marker({ element: el, draggable: true })
             .setLngLat([anchor.lon, anchor.lat])
             .addTo(map);
@@ -245,6 +321,23 @@ export class RoutingLayerController {
                 data: { type: 'FeatureCollection', features: [] },
             });
         }
+
+        // Casing underlay for high contrast
+        if (!map.getLayer(LINE_CASING_LAYER_ID)) {
+            map.addLayer({
+                id: LINE_CASING_LAYER_ID,
+                type: 'line',
+                source: SOURCE_ID,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#FFFFFF',
+                    'line-width': 8,
+                    'line-opacity': this.showRoutePath ? 0.9 : 0,
+                },
+            });
+        }
+
+        // Strava signature orange route polyline
         if (!map.getLayer(LINE_LAYER_ID)) {
             map.addLayer({
                 id: LINE_LAYER_ID,
@@ -252,11 +345,70 @@ export class RoutingLayerController {
                 source: SOURCE_ID,
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
                 paint: {
-                    'line-color': '#3B82F6',
+                    'line-color': '#FC5200',
                     'line-width': 5,
-                    'line-opacity': 0.85,
+                    'line-opacity': this.showRoutePath ? 0.95 : 0,
                 },
             });
+        }
+    }
+
+    setOptions(options: { showDistanceMarkers?: boolean; showRoutePath?: boolean; units?: UnitType }) {
+        if (options.showDistanceMarkers !== undefined) {
+            this.showDistanceMarkers = options.showDistanceMarkers;
+        }
+        if (options.showRoutePath !== undefined) {
+            this.showRoutePath = options.showRoutePath;
+            mapManager.onReady((map) => {
+                if (map.getLayer(LINE_LAYER_ID)) {
+                    map.setPaintProperty(LINE_LAYER_ID, 'line-opacity', this.showRoutePath ? 0.95 : 0);
+                }
+                if (map.getLayer(LINE_CASING_LAYER_ID)) {
+                    map.setPaintProperty(LINE_CASING_LAYER_ID, 'line-opacity', this.showRoutePath ? 0.9 : 0);
+                }
+            });
+        }
+        if (options.units !== undefined) {
+            this.units = options.units;
+        }
+        this.updateDistanceMarkers();
+    }
+
+    private updateDistanceMarkers() {
+        this.removeDistanceMarkers();
+        if (!this.showDistanceMarkers || this.currentPoints.length < 2) return;
+
+        const map = mapManager.getMap();
+        if (!map) return;
+
+        const intervalKm = this.units === 'mi' ? 1.60934 : 1.0;
+        let accumulatedKm = 0;
+        let nextMarkerKm = intervalKm;
+        let markerCount = 1;
+
+        for (let i = 1; i < this.currentPoints.length; i++) {
+            const p1 = this.currentPoints[i - 1]!;
+            const p2 = this.currentPoints[i]!;
+            const c1 = { lat: p1.attributes.lat, lon: p1.attributes.lon };
+            const c2 = { lat: p2.attributes.lat, lon: p2.attributes.lon };
+            const segDistKm = distance(c1, c2) / 1000;
+
+            while (accumulatedKm + segDistKm >= nextMarkerKm) {
+                const fraction = (nextMarkerKm - accumulatedKm) / segDistKm;
+                const lon = c1.lon + (c2.lon - c1.lon) * fraction;
+                const lat = c1.lat + (c2.lat - c1.lat) * fraction;
+
+                const el = distanceMarkerElement(String(markerCount));
+                const marker = new Marker({ element: el, anchor: 'center' })
+                    .setLngLat([lon, lat])
+                    .addTo(map);
+
+                this.distanceMarkers.push(marker);
+                markerCount++;
+                nextMarkerKm += intervalKm;
+            }
+
+            accumulatedKm += segDistKm;
         }
     }
 
@@ -269,6 +421,7 @@ export class RoutingLayerController {
             if (points.length < 2) {
                 source.setData({ type: 'FeatureCollection', features: [] });
                 this.removeGhostMarker();
+                this.removeDistanceMarkers();
                 return;
             }
             source.setData({
@@ -287,17 +440,18 @@ export class RoutingLayerController {
                     },
                 ],
             });
+            this.updateDistanceMarkers();
         });
     }
 
-    /** Soft clear: drop markers and the result line, keep the click listener
-     *  wired so the tool can be re-activated without re-syncing. */
+    /** Soft clear: drop markers and the result line, keep click listener wired */
     clear() {
         for (const marker of this.markers) marker.remove();
         this.markers = [];
         this.currentPoints = [];
         this.currentAnchors = [];
         this.removeGhostMarker();
+        this.removeDistanceMarkers();
         this.setResult([]);
     }
 
@@ -310,6 +464,7 @@ export class RoutingLayerController {
             if (this.lineMouseMoveHandler) map.off('mousemove', LINE_LAYER_ID, this.lineMouseMoveHandler);
             if (this.lineMouseLeaveHandler) map.off('mouseleave', LINE_LAYER_ID, this.lineMouseLeaveHandler);
             if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
+            if (map.getLayer(LINE_CASING_LAYER_ID)) map.removeLayer(LINE_CASING_LAYER_ID);
             if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
         }
         this.clickHandler = null;

@@ -2,15 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Layers } from 'lucide-react';
+import { Compass, Minus, Plus } from 'lucide-react';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
-import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
+import { mapManager } from '@/lib/map/MapManager';
 import { gpxLayers } from '@/lib/map/gpx-layer';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
-import { cn } from '@/lib/utils';
 import { useT } from '@/store/i18n-slice';
 
 // --- Track info popup bridged into MapLibre's DOM via createPortal (AD-6) ---
@@ -28,37 +27,6 @@ function TrackPopupContent({ file }: { file: GPXFileType }) {
     );
 }
 
-// --- Basemap switcher ---
-
-function BasemapSwitcher({
-    current,
-    onChange,
-}: {
-    current: BasemapKey;
-    onChange: (key: BasemapKey) => void;
-}) {
-    const { t } = useT();
-    return (
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border bg-background/95 p-1 shadow-md backdrop-blur">
-            <Layers className="mx-1 size-4 text-muted-foreground" />
-            {(Object.keys(BASEMAPS) as BasemapKey[]).map((key) => (
-                <button
-                    key={key}
-                    className={cn(
-                        'rounded px-2 py-1 text-xs transition-colors',
-                        current === key ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-                    )}
-                    onClick={() => onChange(key)}
-                >
-                    {t.basemaps[key as keyof typeof t.basemaps] ?? BASEMAPS[key].label}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-// --- Map view ---
-
 const EMPTY_IDS: string[] = [];
 
 export function MapView() {
@@ -68,8 +36,8 @@ export function MapView() {
     const popupRef = useRef<MapLibrePopup | null>(null);
     const fileMapRef = useRef<Map<string, GPXFileType>>(new Map());
     const prevCountRef = useRef(0);
-    const [basemap, setBasemap] = useState<BasemapKey>('liberty');
     const [popupFile, setPopupFile] = useState<GPXFileType | null>(null);
+    const [is3D, setIs3D] = useState(false);
 
     const selectedFileId = useSelectionStore((state) => state.selectedFileId);
     const selectFile = useSelectionStore((state) => state.selectFile);
@@ -85,12 +53,10 @@ export function MapView() {
         return map;
     }, [files]);
 
-    // Keep the latest file map reachable from non-React map callbacks
     useEffect(() => {
         fileMapRef.current = fileMap;
     }, [fileMap]);
 
-    // Wire selection callback once
     useEffect(() => {
         gpxLayers.onFileClick = (fileId) => selectFile(fileId);
         return () => {
@@ -98,7 +64,6 @@ export function MapView() {
         };
     }, [selectFile]);
 
-    // Map lifecycle (idempotent singleton per AD-6)
     useEffect(() => {
         if (!containerRef.current) return;
         const map = mapManager.init(containerRef.current);
@@ -109,8 +74,6 @@ export function MapView() {
         popupContainerRef.current = popupContainer;
         popupRef.current = popup;
 
-        // Delegated click: show info popup for any rendered track under the
-        // cursor — suppressed while the routing tool is placing anchors
         const onMapClick = (e: MapMouseEvent) => {
             if (useRoutingStore.getState().active) return;
             const layerIds = gpxLayers.getLayerIds().filter((id) => map.getLayer(id));
@@ -136,14 +99,12 @@ export function MapView() {
         };
     }, []);
 
-    // Sync track layers whenever files change
     useEffect(() => {
         const layerFiles = fileIds
             .map((id) => ({ fileId: id, file: fileMap.get(id) }))
             .filter((entry): entry is { fileId: string; file: GPXFileType } => !!entry.file);
         gpxLayers.sync(layerFiles, selectedFileId);
 
-        // Fit bounds only when the file count grows (import) — not on selection changes
         if (layerFiles.length > prevCountRef.current) {
             const bounds = gpxLayers.getBounds(layerFiles);
             if (bounds) mapManager.fitBounds(bounds);
@@ -151,16 +112,63 @@ export function MapView() {
         prevCountRef.current = layerFiles.length;
     }, [fileIds, fileMap, selectedFileId]);
 
+    // Zoom & 3D handlers
+    const handleZoomIn = () => mapManager.getMap()?.zoomIn();
+    const handleZoomOut = () => mapManager.getMap()?.zoomOut();
+    const handleResetCompass = () => mapManager.getMap()?.resetNorthPitch();
+    const handleToggle3D = () => {
+        const map = mapManager.getMap();
+        if (!map) return;
+        if (is3D) {
+            map.easeTo({ pitch: 0, bearing: 0 });
+            setIs3D(false);
+        } else {
+            map.easeTo({ pitch: 60, bearing: -20 });
+            setIs3D(true);
+        }
+    };
+
     return (
         <div className="relative h-full w-full">
             <div ref={containerRef} className="h-full w-full" />
-            <BasemapSwitcher
-                current={basemap}
-                onChange={(key) => {
-                    setBasemap(key);
-                    mapManager.setBasemap(key);
-                }}
-            />
+
+            {/* Strava style Map Controls (Zoom in, Zoom out, Compass) */}
+            <div className="absolute left-3 top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-background/95 p-1 shadow-sm backdrop-blur select-none">
+                <button
+                    onClick={handleZoomIn}
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                    title="Zoom in"
+                >
+                    <Plus className="size-4" />
+                </button>
+                <button
+                    onClick={handleZoomOut}
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                    title="Zoom out"
+                >
+                    <Minus className="size-4" />
+                </button>
+                <div className="h-px w-full bg-border" />
+                <button
+                    onClick={handleResetCompass}
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition"
+                    title="Reset bearing"
+                >
+                    <Compass className="size-4" />
+                </button>
+            </div>
+
+            {/* 3D toggle button on bottom-left */}
+            <div className="absolute bottom-4 left-3 z-10 select-none">
+                <button
+                    onClick={handleToggle3D}
+                    className="flex h-8 items-center justify-center rounded-lg border border-border bg-background/95 px-2.5 text-xs font-bold text-foreground shadow-sm backdrop-blur transition hover:border-[#FC5200] hover:text-[#FC5200]"
+                    title="Toggle 2D / 3D tilt"
+                >
+                    {is3D ? '2D' : '3D'}
+                </button>
+            </div>
+
             {popupFile && popupContainerRef.current
                 ? createPortal(<TrackPopupContent file={popupFile} />, popupContainerRef.current)
                 : null}

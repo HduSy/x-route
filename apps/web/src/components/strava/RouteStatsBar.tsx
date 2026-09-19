@@ -1,0 +1,414 @@
+import { useMemo, useEffect, useRef } from 'react';
+import { Chart, registerables } from 'chart.js';
+import { Bike, ChevronDown, ChevronUp, Footprints } from 'lucide-react';
+import { useRoutingStore } from '@/store/routing-slice';
+import { useSelectionStore } from '@/store/selection-slice';
+import { useT } from '@/store/i18n-slice';
+import { distance, GPXFile } from '@x-route/gpx';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
+import { mapManager } from '@/lib/map/MapManager';
+import { cn } from '@/lib/utils';
+
+Chart.register(...registerables);
+
+interface ProfilePoint {
+    distanceKm: number;
+    ele: number;
+    lat: number;
+    lon: number;
+}
+
+export function RouteStatsBar() {
+    const { t } = useT();
+
+    // Store state
+    const resultPoints = useRoutingStore((s) => s.resultPoints);
+    const profile = useRoutingStore((s) => s.profile);
+    const units = useRoutingStore((s) => s.units);
+    const showSurfaceType = useRoutingStore((s) => s.showSurfaceType);
+    const elevationExpanded = useRoutingStore((s) => s.elevationExpanded);
+    const toggleElevation = useRoutingStore((s) => s.toggleElevation);
+    const selectedFileId = useSelectionStore((s) => s.selectedFileId);
+
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const chartRef = useRef<Chart | null>(null);
+
+    // Selected file from Dexie (if not planning or viewing saved file)
+    const selectedFile = useLiveQuery(
+        () => (selectedFileId ? db.files.get(selectedFileId) : undefined),
+        [selectedFileId]
+    );
+
+    // Build data points
+    const pointsData = useMemo<ProfilePoint[]>(() => {
+        if (resultPoints.length >= 2) {
+            const list: ProfilePoint[] = [];
+            let totalDist = 0;
+            for (let i = 0; i < resultPoints.length; i++) {
+                const pt = resultPoints[i]!;
+                const lat = pt.attributes.lat;
+                const lon = pt.attributes.lon;
+                if (i > 0) {
+                    const prev = resultPoints[i - 1]!;
+                    totalDist +=
+                        distance(
+                            { lat: prev.attributes.lat, lon: prev.attributes.lon },
+                            { lat, lon }
+                        ) / 1000;
+                }
+                list.push({
+                    distanceKm: totalDist,
+                    ele: Math.round(pt.ele ?? 0),
+                    lat,
+                    lon,
+                });
+            }
+            return list;
+        }
+
+        if (selectedFile) {
+            const file = new GPXFile(selectedFile);
+            const trkpts = file.getTrackPoints();
+            if (trkpts.length < 2) return [];
+
+            const list: ProfilePoint[] = [];
+            let totalDist = 0;
+            for (let i = 0; i < trkpts.length; i++) {
+                const pt = trkpts[i]!;
+                const coords = pt.getCoordinates();
+                if (i > 0) {
+                    const prev = trkpts[i - 1]!.getCoordinates();
+                    totalDist += distance(prev, coords) / 1000;
+                }
+                list.push({
+                    distanceKm: totalDist,
+                    ele: Math.round(pt.ele ?? 0),
+                    lat: coords.lat,
+                    lon: coords.lon,
+                });
+            }
+            return list;
+        }
+
+        return [];
+    }, [resultPoints, selectedFile]);
+
+    // Statistics computation
+    const stats = useMemo(() => {
+        if (pointsData.length < 2) {
+            return {
+                distKm: 0,
+                distFormatted: units === 'mi' ? '0 mi' : '0 km',
+                ascent: 0,
+                ascentFormatted: units === 'mi' ? '0 ft' : '0 m',
+                descent: 0,
+                descentFormatted: units === 'mi' ? '0 ft' : '0 m',
+                timeFormatted: '0s',
+                pavedPercent: 85,
+                dirtPercent: 15,
+            };
+        }
+
+        const totalKm = pointsData[pointsData.length - 1]!.distanceKm;
+        let ascent = 0;
+        let descent = 0;
+
+        for (let i = 1; i < pointsData.length; i++) {
+            const diff = pointsData[i]!.ele - pointsData[i - 1]!.ele;
+            if (diff > 0) ascent += diff;
+            else descent += Math.abs(diff);
+        }
+
+        // Speed estimates per activity profile
+        let speedKmh = 20; // Default ride
+        let pavedRatio = 0.85;
+        if (profile === 'racing_bike') {
+            speedKmh = 25;
+            pavedRatio = 0.95;
+        } else if (profile === 'gravel_bike') {
+            speedKmh = 18;
+            pavedRatio = 0.55;
+        } else if (profile === 'mountain_bike') {
+            speedKmh = 13;
+            pavedRatio = 0.25;
+        } else if (profile === 'foot') {
+            speedKmh = 9.5; // run
+            pavedRatio = 0.7;
+        }
+
+        const totalSecs = Math.round((totalKm / speedKmh) * 3600);
+        let timeStr = '0s';
+        if (totalSecs >= 3600) {
+            const h = Math.floor(totalSecs / 3600);
+            const m = Math.floor((totalSecs % 3600) / 60);
+            timeStr = `${h}h ${m}m`;
+        } else if (totalSecs >= 60) {
+            const m = Math.floor(totalSecs / 60);
+            const s = totalSecs % 60;
+            timeStr = `${m}m ${s}s`;
+        } else if (totalSecs > 0) {
+            timeStr = `${totalSecs}s`;
+        }
+
+        const distVal = units === 'mi' ? totalKm * 0.621371 : totalKm;
+        const distUnit = units === 'mi' ? 'mi' : 'km';
+        const eleGainVal = units === 'mi' ? Math.round(ascent * 3.28084) : Math.round(ascent);
+        const eleLossVal = units === 'mi' ? Math.round(descent * 3.28084) : Math.round(descent);
+        const eleUnit = units === 'mi' ? 'ft' : 'm';
+
+        return {
+            distKm: totalKm,
+            distFormatted: `${distVal.toFixed(1)} ${distUnit}`,
+            ascent,
+            ascentFormatted: `+${eleGainVal} ${eleUnit}`,
+            descent,
+            descentFormatted: `-${eleLossVal} ${eleUnit}`,
+            timeFormatted: timeStr,
+            pavedPercent: Math.round(pavedRatio * 100),
+            dirtPercent: 100 - Math.round(pavedRatio * 100),
+        };
+    }, [pointsData, profile, units]);
+
+    // Chart.js rendering
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        if (pointsData.length < 2 || !elevationExpanded) {
+            chartRef.current?.destroy();
+            chartRef.current = null;
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const step = Math.max(1, Math.floor(pointsData.length / 600));
+        const sampled = pointsData.filter(
+            (_, idx) => idx % step === 0 || idx === pointsData.length - 1
+        );
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 110);
+        gradient.addColorStop(0, 'rgba(252, 82, 0, 0.45)');
+        gradient.addColorStop(1, 'rgba(252, 82, 0, 0.02)');
+
+        if (chartRef.current) {
+            chartRef.current.data.labels = sampled.map((p) =>
+                units === 'mi' ? (p.distanceKm * 0.621371).toFixed(1) : p.distanceKm.toFixed(1)
+            );
+            chartRef.current.data.datasets[0]!.data = sampled.map((p) =>
+                units === 'mi' ? Math.round(p.ele * 3.28084) : p.ele
+            );
+            chartRef.current.update('none');
+            return;
+        }
+
+        chartRef.current = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: sampled.map((p) =>
+                    units === 'mi' ? (p.distanceKm * 0.621371).toFixed(1) : p.distanceKm.toFixed(1)
+                ),
+                datasets: [
+                    {
+                        label: 'Elevation',
+                        data: sampled.map((p) =>
+                            units === 'mi' ? Math.round(p.ele * 3.28084) : p.ele
+                        ),
+                        borderColor: '#FC5200',
+                        borderWidth: 2,
+                        fill: true,
+                        backgroundColor: gradient,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        pointHoverBackgroundColor: '#FC5200',
+                        pointHoverBorderColor: '#FFFFFF',
+                        pointHoverBorderWidth: 2,
+                        tension: 0.1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: true,
+                        callbacks: {
+                            title: (items) =>
+                                `${items[0]?.label ?? 0} ${units === 'mi' ? 'mi' : 'km'}`,
+                            label: (item) =>
+                                ` ${item.raw} ${units === 'mi' ? 'ft' : 'm'}`,
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        grid: { display: false },
+                        ticks: {
+                            maxTicksLimit: 10,
+                            font: { size: 10 },
+                            callback: (val) =>
+                                `${
+                                    units === 'mi'
+                                        ? ((sampled[Number(val)]?.distanceKm ?? 0) * 0.621371).toFixed(0)
+                                        : (sampled[Number(val)]?.distanceKm.toFixed(0) ?? val)
+                                }${units === 'mi' ? 'mi' : 'km'}`,
+                        },
+                    },
+                    y: {
+                        display: true,
+                        grid: { color: 'rgba(0,0,0,0.06)' },
+                        ticks: {
+                            maxTicksLimit: 4,
+                            font: { size: 10 },
+                            callback: (val) => `${val}${units === 'mi' ? 'ft' : 'm'}`,
+                        },
+                    },
+                },
+                onHover: (_event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0]!.index;
+                        const pt = sampled[index];
+                        if (pt) {
+                            mapManager.setCursor({ lon: pt.lon, lat: pt.lat });
+                        }
+                    } else {
+                        mapManager.setCursor(null);
+                    }
+                },
+            },
+        });
+
+        return () => {
+            chartRef.current?.destroy();
+            chartRef.current = null;
+        };
+    }, [pointsData, elevationExpanded, units]);
+
+    return (
+        <footer className="relative z-20 flex shrink-0 flex-col border-t border-border bg-background shadow-lg select-none">
+            {/* Elevation Chart Drawer */}
+            {elevationExpanded && pointsData.length >= 2 && (
+                <div
+                    className="relative h-28 w-full border-b border-border/80 px-4 py-1.5"
+                    onMouseLeave={() => mapManager.setCursor(null)}
+                >
+                    <canvas ref={canvasRef} />
+                </div>
+            )}
+
+            {/* Bottom Stats Horizontal Bar (Strava Signature) */}
+            <div className="flex h-16 items-center justify-between px-6 py-2">
+                {/* Left Stats Grid */}
+                <div className="flex items-center gap-8 md:gap-12">
+                    {/* Activity Icon & Label */}
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex size-9 items-center justify-center rounded-full bg-accent text-[#FC5200]">
+                            {profile === 'foot' ? (
+                                <Footprints className="size-5 text-[#FC5200]" />
+                            ) : (
+                                <Bike className="size-5 text-[#FC5200]" />
+                            )}
+                        </div>
+                        <div className="hidden sm:block">
+                            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                                {t.activity}
+                            </div>
+                            <div className="text-xs font-bold text-foreground">
+                                {profile === 'foot' ? t.run : t.ride}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Distance */}
+                    <div>
+                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            {t.distance}
+                        </div>
+                        <div className="text-base font-black text-foreground">
+                            {stats.distFormatted}
+                        </div>
+                    </div>
+
+                    {/* Elevation Gain */}
+                    <div>
+                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            {t.elevationGain}
+                        </div>
+                        <div className="text-base font-black text-foreground">
+                            {stats.ascentFormatted}
+                        </div>
+                    </div>
+
+                    {/* Elevation Loss */}
+                    <div className="hidden sm:block">
+                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            {t.elevationLoss}
+                        </div>
+                        <div className="text-base font-black text-foreground">
+                            {stats.descentFormatted}
+                        </div>
+                    </div>
+
+                    {/* Est. Moving Time */}
+                    <div className="hidden md:block">
+                        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                            {t.estMovingTime}
+                        </div>
+                        <div className="text-base font-black text-foreground">
+                            {stats.timeFormatted}
+                        </div>
+                    </div>
+
+                    {/* Surface Type Segment Bar */}
+                    {showSurfaceType && (
+                        <div className="hidden lg:block">
+                            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                                {t.surfaceType}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="h-2 w-32 overflow-hidden rounded-full bg-muted flex">
+                                    <div
+                                        style={{ width: `${stats.pavedPercent}%` }}
+                                        className="h-full bg-[#4A5568]"
+                                        title={`Paved: ${stats.pavedPercent}%`}
+                                    />
+                                    <div
+                                        style={{ width: `${stats.dirtPercent}%` }}
+                                        className="h-full bg-[#C69214]"
+                                        title={`Dirt: ${stats.dirtPercent}%`}
+                                    />
+                                </div>
+                                <div className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5">
+                                    <span>■ {stats.pavedPercent}% {t.paved}</span>
+                                    <span>■ {stats.dirtPercent}% {t.dirt}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Toggle Elevation Button */}
+                <button
+                    onClick={toggleElevation}
+                    disabled={pointsData.length < 2}
+                    className={cn(
+                        'flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-bold text-foreground transition hover:border-[#FC5200] hover:text-[#FC5200]',
+                        pointsData.length < 2 && 'opacity-40 cursor-not-allowed hover:border-border hover:text-foreground'
+                    )}
+                >
+                    <span>{elevationExpanded ? t.hideElevation : t.showElevation}</span>
+                    {elevationExpanded ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+                </button>
+            </div>
+        </footer>
+    );
+}

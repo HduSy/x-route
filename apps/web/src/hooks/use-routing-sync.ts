@@ -11,7 +11,11 @@ export function useRoutingSync() {
     const active = useRoutingStore((s) => s.active);
     const anchors = useRoutingStore((s) => s.anchors);
     const profile = useRoutingStore((s) => s.profile);
+    const manualMode = useRoutingStore((s) => s.manualMode);
     const resultPoints = useRoutingStore((s) => s.resultPoints);
+    const showDistanceMarkers = useRoutingStore((s) => s.showDistanceMarkers);
+    const showRoutePath = useRoutingStore((s) => s.showRoutePath);
+    const units = useRoutingStore((s) => s.units);
 
     // Map interactions -> store (wired once)
     useEffect(() => {
@@ -39,6 +43,15 @@ export function useRoutingSync() {
         };
     }, []);
 
+    // Sync display options to map layer
+    useEffect(() => {
+        routingLayer.setOptions({
+            showDistanceMarkers,
+            showRoutePath,
+            units,
+        });
+    }, [showDistanceMarkers, showRoutePath, units]);
+
     // Store -> map layer
     useEffect(() => {
         routingLayer.sync(anchors);
@@ -48,7 +61,7 @@ export function useRoutingSync() {
         routingLayer.setResult(resultPoints);
     }, [resultPoints]);
 
-    // Route computation on anchors/profile change
+    // Route computation on anchors/profile/manualMode change
     useEffect(() => {
         if (anchors.length < 2) {
             const state = useRoutingStore.getState();
@@ -61,7 +74,7 @@ export function useRoutingSync() {
         const state = useRoutingStore.getState();
         state.setRouting(true);
 
-        route(anchors, profile)
+        route(anchors, profile, manualMode)
             .then((points) => {
                 if (myRequest !== requestSeq) return;
                 useRoutingStore.getState().setResult(points, null);
@@ -75,7 +88,7 @@ export function useRoutingSync() {
                     useRoutingStore.getState().setRouting(false);
                 }
             });
-    }, [anchors, profile]);
+    }, [anchors, profile, manualMode]);
 
     // When the tool turns OFF, drop markers and the preview line. (Never
     // destroy on mount: initial active=false must not unwind the wiring.)
