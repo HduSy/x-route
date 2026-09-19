@@ -120,6 +120,16 @@ export async function saveGPXFile(file: GPXFile): Promise<string> {
     return id;
 }
 
+/** Update an existing route in-place (editing mode). Does NOT create a new UUID. */
+export async function updateGPXFile(fileId: string, file: GPXFile): Promise<void> {
+    file._data.id = fileId;
+    await db.transaction('rw', db.files, db.fileids, async () => {
+        await db.files.put(file, fileId);
+        // fileids entry already exists — no need to re-insert
+    });
+    useSelectionStore.getState().selectFile(fileId);
+}
+
 // --- Delete ---
 
 export async function deleteFile(fileId: string) {

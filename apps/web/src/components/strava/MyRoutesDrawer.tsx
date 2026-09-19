@@ -30,6 +30,7 @@ export function MyRoutesDrawer() {
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const clear = useRoutingStore((s) => s.clear);
     const loadRouteFromPoints = useRoutingStore((s) => s.loadRouteFromPoints);
+    const setEditingFileId = useRoutingStore((s) => s.setEditingFileId);
     const selectFile = useSelectionStore((s) => s.selectFile);
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
 
@@ -69,6 +70,7 @@ export function MyRoutesDrawer() {
         if (trkpts.length >= 2) {
             const coords = trkpts.map((pt) => pt.getCoordinates());
             loadRouteFromPoints(coords);
+            setEditingFileId(fileId);
         }
         setMyRoutesOpen(false);
     };

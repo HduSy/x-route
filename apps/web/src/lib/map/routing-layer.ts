@@ -119,6 +119,9 @@ const MILESTONES_LAYER_ID = 'x-route-milestones-symbol';
 const BADGE_IMAGE_ID = 'x-route-milestone-badge';
 const BADGE_IMAGE_WIDE_ID = 'x-route-milestone-badge-wide';
 
+const RUBBER_BAND_SOURCE_ID = 'x-route-rubber-band';
+const RUBBER_BAND_LAYER_ID = 'x-route-rubber-band-line';
+
 function drawRoundedRect(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -271,6 +274,8 @@ export class RoutingLayerController {
     private ghostMarker: Marker | null = null;
     private currentInsertIndex: number = 1;
     private isDraggingGhost = false;
+    /** Set to true for one tick after a ghost drag ends, to suppress the click that fires on mouseup. */
+    private justFinishedGhostDrag = false;
     private currentAnchors: RoutingAnchor[] = [];
     private currentPoints: TrackPoint[] = [];
 
@@ -278,6 +283,7 @@ export class RoutingLayerController {
     private showDistanceMarkers = true;
     private showRoutePath = true;
     private units: UnitType = 'km';
+    private isDrawMode = false;
 
     private clickHandler:
         | ((e: { lngLat: { lng: number; lat: number } }) => void)
@@ -302,11 +308,17 @@ export class RoutingLayerController {
 
         this.clickHandler = (e) => {
             if (!this.onMapClick) return;
+            // Suppress the click that MapLibre fires right after a ghost drag ends
+            if (this.justFinishedGhostDrag) {
+                this.justFinishedGhostDrag = false;
+                return;
+            }
             this.onMapClick({ lon: e.lngLat.lng, lat: e.lngLat.lat });
         };
         map.on('click', this.clickHandler);
 
         this.lineMouseMoveHandler = (e: any) => {
+            // Ghost marker on line hover works in both Draw mode and Browse mode
             if (this.isDraggingGhost) return;
             if (map.isMoving() || map.isZooming()) return;
             if (this.currentPoints.length < 2) return;
@@ -376,6 +388,92 @@ export class RoutingLayerController {
         }
     }
 
+    private showDragTooltip(marker: Marker, index: number, total: number) {
+        const el = marker.getElement();
+        let label = '📌 调整途经点';
+        if (index === 0) label = '📍 调整起点';
+        else if (index === total - 1) label = '🏁 调整终点';
+
+        const tip = document.createElement('div');
+        tip.className = 'x-route-drag-tip';
+        tip.style.cssText = `
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            background: #18181b;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+            z-index: 1000;
+        `;
+        tip.innerText = label;
+        el.appendChild(tip);
+    }
+
+    private showGhostTooltip(marker: Marker) {
+        const el = marker.getElement();
+        const tip = document.createElement('div');
+        tip.className = 'x-route-drag-tip';
+        tip.style.cssText = `
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            background: #863bff;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(134,59,255,0.4);
+            pointer-events: none;
+            z-index: 1000;
+        `;
+        tip.innerText = '➕ 插入新途经点';
+        el.appendChild(tip);
+    }
+
+    private hideDragTooltip(marker: Marker) {
+        const el = marker.getElement();
+        const tip = el.querySelector('.x-route-drag-tip');
+        tip?.remove();
+    }
+
+    private setRubberBand(coords: [number, number][]) {
+        const map = mapManager.getMap();
+        if (!map) return;
+        const source = map.getSource(RUBBER_BAND_SOURCE_ID) as GeoJSONSource | undefined;
+        if (!source) return;
+        if (coords.length < 2) {
+            source.setData({ type: 'FeatureCollection', features: [] });
+            return;
+        }
+        source.setData({
+            type: 'FeatureCollection',
+            features: [
+                {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: coords,
+                    },
+                },
+            ],
+        });
+    }
+
+    private clearRubberBand() {
+        this.setRubberBand([]);
+    }
+
     private ensureGhostMarker(map: MapLibreMap) {
         if (this.ghostMarker) return;
         const el = ghostAnchorElement();
@@ -388,10 +486,33 @@ export class RoutingLayerController {
 
         marker.on('dragstart', () => {
             this.isDraggingGhost = true;
+            this.showGhostTooltip(marker);
+        });
+
+        marker.on('drag', () => {
+            const lngLat = marker.getLngLat();
+            const targetIndex = this.currentInsertIndex;
+            const coords: [number, number][] = [];
+            if (targetIndex > 0 && this.currentAnchors[targetIndex - 1]) {
+                const prev = this.currentAnchors[targetIndex - 1]!;
+                coords.push([prev.lon, prev.lat]);
+            }
+            coords.push([lngLat.lng, lngLat.lat]);
+            if (targetIndex < this.currentAnchors.length && this.currentAnchors[targetIndex]) {
+                const next = this.currentAnchors[targetIndex]!;
+                coords.push([next.lon, next.lat]);
+            }
+            this.setRubberBand(coords);
         });
 
         marker.on('dragend', () => {
             this.isDraggingGhost = false;
+            // In Draw mode the map click fires after dragend — suppress it so we don't add an extra anchor
+            if (this.isDrawMode) {
+                this.justFinishedGhostDrag = true;
+            }
+            this.hideDragTooltip(marker);
+            this.clearRubberBand();
             const pos = marker.getLngLat();
             const targetIndex = this.currentInsertIndex;
             this.removeGhostMarker();
@@ -424,7 +545,7 @@ export class RoutingLayerController {
         this.markers = anchors.map((anchor, index) =>
             this.createMarker(map, anchor, index, anchors.length)
         );
-        this.alignMarkersToRoute();
+        // Note: alignMarkersToRoute() is called in setResult() after route geometry has arrived
     }
 
     private alignMarkersToRoute() {
@@ -469,14 +590,35 @@ export class RoutingLayerController {
         const el = anchorElement(kind, index, total);
         const marker = new Marker({
             element: el,
-            draggable: true,
+            draggable: !this.isDrawMode,
             anchor: 'center',
             subpixelPositioning: true,
         })
             .setLngLat([anchor.lon, anchor.lat])
             .addTo(map);
 
+        marker.on('dragstart', () => {
+            this.showDragTooltip(marker, index, total);
+        });
+
+        marker.on('drag', () => {
+            const lngLat = marker.getLngLat();
+            const coords: [number, number][] = [];
+            if (index > 0 && this.currentAnchors[index - 1]) {
+                const prev = this.currentAnchors[index - 1]!;
+                coords.push([prev.lon, prev.lat]);
+            }
+            coords.push([lngLat.lng, lngLat.lat]);
+            if (index < this.currentAnchors.length - 1 && this.currentAnchors[index + 1]) {
+                const next = this.currentAnchors[index + 1]!;
+                coords.push([next.lon, next.lat]);
+            }
+            this.setRubberBand(coords);
+        });
+
         marker.on('dragend', () => {
+            this.hideDragTooltip(marker);
+            this.clearRubberBand();
             const lngLat = marker.getLngLat();
             this.onMarkerDrag?.(index, { lon: lngLat.lng, lat: lngLat.lat });
         });
@@ -538,6 +680,29 @@ export class RoutingLayerController {
             map.addSource(MILESTONES_SOURCE_ID, {
                 type: 'geojson',
                 data: { type: 'FeatureCollection', features: [] },
+            });
+        }
+
+        // Live rubber-band preview line during drag
+        if (!map.getSource(RUBBER_BAND_SOURCE_ID)) {
+            map.addSource(RUBBER_BAND_SOURCE_ID, {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] },
+            });
+        }
+
+        if (!map.getLayer(RUBBER_BAND_LAYER_ID)) {
+            map.addLayer({
+                id: RUBBER_BAND_LAYER_ID,
+                type: 'line',
+                source: RUBBER_BAND_SOURCE_ID,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': '#863BFF',
+                    'line-width': 3,
+                    'line-dasharray': [3, 2],
+                    'line-opacity': 0.85,
+                },
             });
         }
 
@@ -609,7 +774,22 @@ export class RoutingLayerController {
         }
     }
 
-    setOptions(options: { showDistanceMarkers?: boolean; showRoutePath?: boolean; units?: UnitType }) {
+    setOptions(options: {
+        showDistanceMarkers?: boolean;
+        showRoutePath?: boolean;
+        units?: UnitType;
+        isDrawMode?: boolean;
+    }) {
+        if (options.isDrawMode !== undefined && this.isDrawMode !== options.isDrawMode) {
+            this.isDrawMode = options.isDrawMode;
+            if (this.isDrawMode) {
+                this.removeGhostMarker();
+                this.clearRubberBand();
+            }
+            for (const marker of this.markers) {
+                marker.setDraggable(!this.isDrawMode);
+            }
+        }
         if (options.showDistanceMarkers !== undefined) {
             this.showDistanceMarkers = options.showDistanceMarkers;
         }
@@ -815,6 +995,7 @@ export class RoutingLayerController {
         this.currentPoints = [];
         this.currentAnchors = [];
         this.removeGhostMarker();
+        this.clearRubberBand();
         this.setResult([]);
     }
 
@@ -825,9 +1006,11 @@ export class RoutingLayerController {
         const map = mapManager.getMap();
         if (map) {
             try {
+                if (map.getLayer(RUBBER_BAND_LAYER_ID)) map.removeLayer(RUBBER_BAND_LAYER_ID);
                 if (map.getLayer(MILESTONES_LAYER_ID)) map.removeLayer(MILESTONES_LAYER_ID);
                 if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
                 if (map.getLayer(LINE_CASING_LAYER_ID)) map.removeLayer(LINE_CASING_LAYER_ID);
+                if (map.getSource(RUBBER_BAND_SOURCE_ID)) map.removeSource(RUBBER_BAND_SOURCE_ID);
                 if (map.getSource(MILESTONES_SOURCE_ID)) map.removeSource(MILESTONES_SOURCE_ID);
                 if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
                 if (map.hasImage(BADGE_IMAGE_ID)) map.removeImage(BADGE_IMAGE_ID);

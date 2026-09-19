@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
+    AlertTriangle,
     ArrowLeftRight,
     Bookmark,
     BookmarkPlus,
+    BoxSelect,
     Check,
     ChevronDown,
     Crosshair,
@@ -30,6 +32,7 @@ export function MapFloatingToolbar() {
     // Store state
     const anchors = useRoutingStore((s) => s.anchors);
     const resultPoints = useRoutingStore((s) => s.resultPoints);
+    const active = useRoutingStore((s) => s.active);
     const undo = useRoutingStore((s) => s.undo);
     const redo = useRoutingStore((s) => s.redo);
     const canUndo = useRoutingStore((s) => s.past.length > 0);
@@ -45,6 +48,8 @@ export function MapFloatingToolbar() {
     const [currentBasemap, setCurrentBasemap] = useState<BasemapKey>('bright');
     const [toolsOpen, setToolsOpen] = useState(false);
     const [toolActionStatus, setToolActionStatus] = useState<string | null>(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [lassoMode, setLassoMode] = useState(false);
 
     const fileCount = useLiveQuery(() => db.fileids.count()) ?? 0;
     const [isLocating, setIsLocating] = useState(false);
@@ -127,10 +132,26 @@ export function MapFloatingToolbar() {
     }, []);
 
     const handleClear = () => {
+        setConfirmOpen(true);
+    };
+
+    const handleConfirmClear = () => {
+        setConfirmOpen(false);
+        setLassoMode(false);
         clear();
         mapManager.clearUserLocation();
         setIsLocated(false);
     };
+
+    // Sync lassoMode React state → singleton so MapView can subscribe
+    useEffect(() => {
+        lassoModeStore.set(lassoMode);
+    }, [lassoMode]);
+
+    // Exit lasso mode when routing becomes inactive
+    useEffect(() => {
+        if (!active) setLassoMode(false);
+    }, [active]);
 
     const handleTrackAction = async (name: string, fn: () => Promise<void>) => {
         try {
@@ -199,6 +220,23 @@ export function MapFloatingToolbar() {
                     >
                         <Trash2 className="size-3.5 sm:size-4" />
                     </button>
+                    {active && (
+                        <>
+                            <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />
+                            <button
+                                onClick={() => setLassoMode((m) => !m)}
+                                className={cn(
+                                    'flex size-6 sm:size-7 items-center justify-center rounded-md transition cursor-pointer',
+                                    lassoMode
+                                        ? 'bg-[#863BFF]/15 text-[#863BFF]'
+                                        : 'text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF]'
+                                )}
+                                title={t.lassoMode}
+                            >
+                                <BoxSelect className="size-3.5 sm:size-4" />
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Save Route Button */}
@@ -351,6 +389,52 @@ export function MapFloatingToolbar() {
                     )}
                 </button>
             </div>
+
+            {/* Confirm clear dialog */}
+            {confirmOpen && (
+                <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                    <div className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-white dark:bg-card p-6 shadow-2xl">
+                        <div className="flex items-start gap-3">
+                            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                                <AlertTriangle className="size-5 text-destructive" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-foreground">{t.confirmClearTitle}</h3>
+                                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{t.confirmClearBody}</p>
+                            </div>
+                        </div>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <button
+                                onClick={() => setConfirmOpen(false)}
+                                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
+                            >
+                                {t.cancel}
+                            </button>
+                            <button
+                                onClick={handleConfirmClear}
+                                className="rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-white hover:bg-red-600 transition cursor-pointer"
+                            >
+                                {t.confirm}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
+/** Expose lasso mode state to MapView via a simple singleton.
+ *  MapView reads this to know whether to activate box-select behavior. */
+export const lassoModeStore = {
+    active: false,
+    listeners: new Set<(v: boolean) => void>(),
+    set(v: boolean) {
+        this.active = v;
+        this.listeners.forEach((fn) => fn(v));
+    },
+    subscribe(fn: (v: boolean) => void) {
+        this.listeners.add(fn);
+        return () => this.listeners.delete(fn);
+    },
+};

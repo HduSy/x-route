@@ -93,6 +93,7 @@ export const translations = {
         locateMe: 'Locate my position',
         reverseRoute: 'Reverse route direction',
         clearRoute: 'Clear current route',
+        fitRoute: 'Fit to route',
         heatmaps: 'Heatmaps & Basemaps',
         segments: 'Track Tools',
         loadRoute: 'Load route',
@@ -101,6 +102,11 @@ export const translations = {
         maps: 'Maps',
         challenges: 'Challenges',
         noRoutesSaved: 'No routes saved yet. Click the map to start creating!',
+        confirmClearTitle: 'Clear Route?',
+        confirmClearBody: 'This will permanently remove all waypoints and the drawn route. Are you sure?',
+        confirm: 'Clear',
+        updateRoute: 'Update Route',
+        lassoMode: 'Box select (drag to remove waypoints)',
 
         profiles: {
             bike: 'Bike',
@@ -207,6 +213,7 @@ export const translations = {
         locateMe: '定位到当前位置',
         reverseRoute: '反转路线起点终点',
         clearRoute: '清空当前绘制',
+        fitRoute: '聚焦路线',
         heatmaps: '底图与图层',
         segments: '轨迹工具箱',
         loadRoute: '载入至规划器',
@@ -215,6 +222,11 @@ export const translations = {
         maps: '地图路线',
         challenges: '挑战',
         noRoutesSaved: '暂无保存路线。在地图上点击即可开始创建属于你的路线！',
+        confirmClearTitle: '清空当前路线？',
+        confirmClearBody: '这将删除所有途经节点和已绘制路线，操作不可撤销，确定继续？',
+        confirm: '确认清空',
+        updateRoute: '更新路线',
+        lassoMode: '框选删除节点（拖拽框选区域）',
 
         profiles: {
             bike: '标准骑行',

@@ -55,6 +55,7 @@ export function RoutingToolbar() {
             },
         });
         await saveGPXFile(file);
+        useRoutingStore.getState().clear(true);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
     };
@@ -74,7 +75,7 @@ export function RoutingToolbar() {
             {active && (
                 <>
                     <select
-                        className="h-8 rounded-md border bg-background px-2 text-xs"
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                         value={profile}
                         onChange={(e) => setProfile(e.target.value)}
                         title={t.profiles[profile as keyof typeof t.profiles] ?? 'Profile'}
@@ -92,7 +93,7 @@ export function RoutingToolbar() {
                     <Button variant="ghost" size="icon" className="size-8" disabled={!canRedo} onClick={redo} title={t.redo}>
                         <Redo2 className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="size-8" disabled={anchors.length === 0} onClick={clear} title={t.clear}>
+                    <Button variant="ghost" size="icon" className="size-8" disabled={anchors.length === 0} onClick={() => clear()} title={t.clear}>
                         <Trash2 className="size-4" />
                     </Button>
 

@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { Bookmark, Check, Mountain, Route, X } from 'lucide-react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useT } from '@/store/i18n-slice';
-import { saveGPXFile } from '@/lib/file-actions';
+import { saveGPXFile, updateGPXFile } from '@/lib/file-actions';
+import { routingLayer } from '@/lib/map/routing-layer';
 import { GPXFile, Track, TrackSegment, distance } from '@x-route/gpx';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,7 @@ export function SaveRouteModal() {
     const resultPoints = useRoutingStore((s) => s.resultPoints);
     const units = useRoutingStore((s) => s.units);
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
+    const editingFileId = useRoutingStore((s) => s.editingFileId);
 
     const defaultName = useMemo(() => {
         const today = new Date().toISOString().slice(0, 10);
@@ -79,11 +81,18 @@ export function SaveRouteModal() {
                 },
             });
 
-            await saveGPXFile(file);
+            if (editingFileId) {
+                await updateGPXFile(editingFileId, file);
+            } else {
+                await saveGPXFile(file);
+            }
             setSavedSuccess(true);
             setTimeout(() => {
                 setSavedSuccess(false);
                 setSaveModalOpen(false);
+                // Automatically clear drawn nodes and route from map after saving
+                useRoutingStore.getState().clear(true);
+                routingLayer.clear();
                 setMyRoutesOpen(true);
             }, 800);
         } catch (err) {

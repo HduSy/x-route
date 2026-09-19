@@ -27,6 +27,7 @@ interface RoutingState {
     elevationExpanded: boolean;
     myRoutesOpen: boolean;
     saveModalOpen: boolean;
+    editingFileId: string | null;
 
     setActive: (active: boolean) => void;
     setProfile: (profile: string) => void;
@@ -37,7 +38,7 @@ interface RoutingState {
     moveAnchor: (index: number, to: Coordinates) => void;
     removeAnchor: (index: number) => void;
     reverseAnchors: () => void;
-    clear: () => void;
+    clear: (resetHistory?: boolean) => void;
     setResult: (points: TrackPoint[], error: string | null) => void;
     setRouting: (routing: boolean) => void;
     undo: () => void;
@@ -54,6 +55,7 @@ interface RoutingState {
     toggleElevation: () => void;
     setMyRoutesOpen: (open: boolean) => void;
     setSaveModalOpen: (open: boolean) => void;
+    setEditingFileId: (id: string | null) => void;
     loadRouteFromPoints: (points: Coordinates[]) => void;
 }
 
@@ -77,6 +79,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     elevationExpanded: true,
     myRoutesOpen: false,
     saveModalOpen: false,
+    editingFileId: null,
 
     setActive: (active) => set({ active }),
     setProfile: (profile) => set({ profile }),
@@ -123,14 +126,15 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         set({ anchors: next, past: [...past, anchors], future: [] });
     },
 
-    clear: () => {
+    clear: (resetHistory = false) => {
         const { anchors, past } = get();
         set({
             active: false,
             anchors: [],
             resultPoints: [],
             error: null,
-            past: [...past, anchors],
+            editingFileId: null,
+            past: resetHistory ? [] : [...past, anchors],
             future: [],
         });
     },
@@ -170,6 +174,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     toggleElevation: () => set((s) => ({ elevationExpanded: !s.elevationExpanded })),
     setMyRoutesOpen: (myRoutesOpen) => set({ myRoutesOpen }),
     setSaveModalOpen: (saveModalOpen) => set({ saveModalOpen }),
+    setEditingFileId: (editingFileId) => set({ editingFileId }),
 
     loadRouteFromPoints: (points) => {
         if (points.length < 2) return;

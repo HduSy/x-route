@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check, Compass, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
+import { Check, Compass, Layers, Maximize2, Minus, Plus, Route, Spline } from 'lucide-react';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
 import { gpxLayers } from '@/lib/map/gpx-layer';
 import { routingLayer } from '@/lib/map/routing-layer';
+import { lassoModeStore } from '@/components/strava/MapFloatingToolbar';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
@@ -43,6 +44,9 @@ export function MapView() {
     const [is3D, setIs3D] = useState(false);
     const [bearing, setBearing] = useState(0);
     const [basemapOpen, setBasemapOpen] = useState(false);
+    const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+    const lassoStartRef = useRef<{ x: number; y: number } | null>(null);
+    const isLassoActiveRef = useRef(false);
 
     const active = useRoutingStore((s) => s.active);
     const setActive = useRoutingStore((s) => s.setActive);
@@ -133,18 +137,157 @@ export function MapView() {
 
         if (layerFiles.length > prevCountRef.current) {
             const bounds = gpxLayers.getBounds(layerFiles);
-            if (bounds) mapManager.fitBounds(bounds);
+            // Only auto-fit while the viewport is still pristine (hydration /
+            // first import). Never yank the camera away from a user who is
+            // inspecting their route — that turned 100m views into 100km.
+            if (bounds && !mapManager.hasUserInteracted()) {
+                mapManager.fitBounds(bounds, 60, true);
+            }
         }
         prevCountRef.current = layerFiles.length;
     }, [fileIds, fileMap, selectedFileId]);
 
-    // Zoom & 3D handlers
+    // Lasso box-select: attach canvas events when lassoMode is active
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        let unsubscribe: (() => void) | null = null;
+
+        const onLassoChange = (enabled: boolean) => {
+            isLassoActiveRef.current = enabled;
+            // Toggle MapLibre's built-in drag-pan when lasso is active
+            const map = mapManager.getMap();
+            if (map) {
+                if (enabled) {
+                    map.dragPan.disable();
+                } else {
+                    map.dragPan.enable();
+                }
+            }
+        };
+
+        unsubscribe = lassoModeStore.subscribe(onLassoChange);
+
+        const onMouseDown = (e: MouseEvent) => {
+            if (!isLassoActiveRef.current) return;
+            // Only left-button and only on map canvas itself
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = container.getBoundingClientRect();
+            lassoStartRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            setLassoRect({ x: e.clientX - rect.left, y: e.clientY - rect.top, w: 0, h: 0 });
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!isLassoActiveRef.current || !lassoStartRef.current) return;
+            const rect = container.getBoundingClientRect();
+            const curX = e.clientX - rect.left;
+            const curY = e.clientY - rect.top;
+            const x = Math.min(lassoStartRef.current.x, curX);
+            const y = Math.min(lassoStartRef.current.y, curY);
+            const w = Math.abs(curX - lassoStartRef.current.x);
+            const h = Math.abs(curY - lassoStartRef.current.y);
+            setLassoRect({ x, y, w, h });
+        };
+
+        const onMouseUp = (e: MouseEvent) => {
+            if (!isLassoActiveRef.current || !lassoStartRef.current) return;
+            e.preventDefault();
+            const rect = container.getBoundingClientRect();
+            const curX = e.clientX - rect.left;
+            const curY = e.clientY - rect.top;
+            const x0 = Math.min(lassoStartRef.current.x, curX);
+            const y0 = Math.min(lassoStartRef.current.y, curY);
+            const x1 = Math.max(lassoStartRef.current.x, curX);
+            const y1 = Math.max(lassoStartRef.current.y, curY);
+
+            lassoStartRef.current = null;
+            setLassoRect(null);
+
+            // Only proceed if the box has a meaningful size (not just a click)
+            if (x1 - x0 < 5 || y1 - y0 < 5) return;
+
+            const map = mapManager.getMap();
+            if (!map) return;
+
+            // Convert pixel corners to geographic coordinates
+            const sw = map.unproject([x0, y1]);
+            const ne = map.unproject([x1, y0]);
+            const minLon = sw.lng;
+            const maxLon = ne.lng;
+            const minLat = sw.lat;
+            const maxLat = ne.lat;
+
+            // Remove anchors that fall within the box
+            const { anchors, removeAnchor } = useRoutingStore.getState();
+            const toRemove: number[] = [];
+            for (let i = 0; i < anchors.length; i++) {
+                const a = anchors[i]!;
+                if (a.lon >= minLon && a.lon <= maxLon && a.lat >= minLat && a.lat <= maxLat) {
+                    toRemove.push(i);
+                }
+            }
+            // Remove in reverse order so indices stay stable
+            for (let i = toRemove.length - 1; i >= 0; i--) {
+                removeAnchor(toRemove[i]!);
+            }
+        };
+
+        container.addEventListener('mousedown', onMouseDown, { capture: true });
+        container.addEventListener('mousemove', onMouseMove, { capture: true });
+        container.addEventListener('mouseup', onMouseUp, { capture: true });
+
+        return () => {
+            unsubscribe?.();
+            container.removeEventListener('mousedown', onMouseDown, { capture: true });
+            container.removeEventListener('mousemove', onMouseMove, { capture: true });
+            container.removeEventListener('mouseup', onMouseUp, { capture: true });
+            // Always re-enable drag pan on cleanup
+            mapManager.getMap()?.dragPan.enable();
+        };
+    }, []);
+
+
     const handleZoomIn = () => mapManager.getMap()?.zoomIn();
     const handleZoomOut = () => mapManager.getMap()?.zoomOut();
     const handleResetCompass = () => {
         const map = mapManager.getMap();
         map?.resetNorthPitch({ duration: 600 });
         setBearing(0);
+    };
+    const handleFitRoute = () => {
+        const map = mapManager.getMap();
+        if (!map) return;
+        const resultPoints = useRoutingStore.getState().resultPoints;
+        const anchors = useRoutingStore.getState().anchors;
+
+        if (resultPoints.length >= 2) {
+            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+            for (const pt of resultPoints) {
+                const lon = pt.attributes.lon;
+                const lat = pt.attributes.lat;
+                if (lon < minLon) minLon = lon;
+                if (lat < minLat) minLat = lat;
+                if (lon > maxLon) maxLon = lon;
+                if (lat > maxLat) maxLat = lat;
+            }
+            mapManager.fitBounds([minLon, minLat, maxLon, maxLat], 80);
+        } else if (anchors.length > 0) {
+            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+            for (const a of anchors) {
+                if (a.lon < minLon) minLon = a.lon;
+                if (a.lat < minLat) minLat = a.lat;
+                if (a.lon > maxLon) maxLon = a.lon;
+                if (a.lat > maxLat) maxLat = a.lat;
+            }
+            if (minLon === maxLon && minLat === maxLat) {
+                map.flyTo({ center: [minLon, minLat], zoom: 15, duration: 600 });
+            } else {
+                mapManager.fitBounds([minLon, minLat, maxLon, maxLat], 80);
+            }
+        }
     };
     const handleToggle3D = () => {
         const map = mapManager.getMap();
@@ -166,6 +309,22 @@ export function MapView() {
                 ref={containerRef}
                 className={cn('h-full w-full', active && 'route-building-cursor', !sidebarCollapsed && 'sidebar-open')}
             />
+
+            {/* Lasso selection rectangle overlay */}
+            {lassoRect && lassoRect.w > 2 && lassoRect.h > 2 && (
+                <div
+                    className="pointer-events-none absolute z-20"
+                    style={{
+                        left: lassoRect.x,
+                        top: lassoRect.y,
+                        width: lassoRect.w,
+                        height: lassoRect.h,
+                        border: '2px dashed #863BFF',
+                        background: 'rgba(134,59,255,0.08)',
+                        borderRadius: '3px',
+                    }}
+                />
+            )}
 
             {/* Strava style Vertical Map Controls (Draw mode, Zoom in, Zoom out, Compass) */}
             <div
@@ -225,6 +384,13 @@ export function MapView() {
                     <Minus className="size-4" />
                 </button>
                 <div className="h-px w-full bg-border" />
+                <button
+                    onClick={handleFitRoute}
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
+                    title={t.fitRoute}
+                >
+                    <Maximize2 className="size-4" />
+                </button>
                 <button
                     onClick={handleResetCompass}
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"

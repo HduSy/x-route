@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
-import { route } from '@/lib/routing';
+import { route, getManualRoute } from '@/lib/routing';
 
 // Stale-response guard: only the latest request may write its result.
 let requestSeq = 0;
@@ -49,12 +49,17 @@ export function useRoutingSync() {
             showDistanceMarkers,
             showRoutePath,
             units,
+            isDrawMode: active,
         });
-    }, [showDistanceMarkers, showRoutePath, units]);
+    }, [showDistanceMarkers, showRoutePath, units, active]);
 
     // Store -> map layer
     useEffect(() => {
-        routingLayer.sync(anchors);
+        if (anchors.length === 0) {
+            routingLayer.clear();
+        } else {
+            routingLayer.sync(anchors);
+        }
     }, [anchors]);
 
     useEffect(() => {
@@ -81,7 +86,10 @@ export function useRoutingSync() {
             })
             .catch((error: Error) => {
                 if (myRequest !== requestSeq) return;
-                useRoutingStore.getState().setResult([], error.message);
+                console.warn('Routing error, falling back to straight-line segments:', error);
+                // Fallback to straight lines so the route line NEVER vanishes
+                const fallbackPoints = getManualRoute(anchors);
+                useRoutingStore.getState().setResult(fallbackPoints, error.message);
             })
             .finally(() => {
                 if (myRequest === requestSeq) {

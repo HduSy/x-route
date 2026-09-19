@@ -1,10 +1,57 @@
-import { AttributionControl, Map as MapLibreMap, Marker, ScaleControl, setWorkerUrl, type LngLatBoundsLike } from 'maplibre-gl';
+import {
+    AttributionControl,
+    type AttributionControlOptions,
+    Map as MapLibreMap,
+    Marker,
+    ScaleControl,
+    setWorkerUrl,
+    type LngLatBoundsLike,
+} from 'maplibre-gl';
 // maplibre v6 is ESM-only and loads its worker from a separate runtime file;
 // Vite cannot rewrite that URL automatically — route it through the bundler.
 // https://www.maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 
 setWorkerUrl(workerUrl);
+
+/**
+ * CompactAttributionControl starts in collapsed state (only the circular 'i' icon is visible)
+ * rather than expanding text across the bottom on initial map load.
+ */
+class CompactAttributionControl extends AttributionControl {
+    constructor(options?: AttributionControlOptions) {
+        super({ compact: true, ...options });
+
+        this._updateCompact = () => {
+            if (!this._map) return;
+            if (this._map.getCanvasContainer().offsetWidth <= 640 || this._compact) {
+                if (this._compact === false) {
+                    this._container.setAttribute('open', '');
+                } else if (
+                    !this._container.classList.contains('maplibregl-compact') &&
+                    !this._container.classList.contains('maplibregl-attrib-empty')
+                ) {
+                    this._container.setAttribute('open', '');
+                    this._container.classList.add('maplibregl-compact');
+                    // Always default to collapsed: do not add 'maplibregl-compact-show'
+                    this._container.classList.remove('maplibregl-compact-show');
+                }
+            } else {
+                this._container.setAttribute('open', '');
+                if (this._container.classList.contains('maplibregl-compact')) {
+                    this._container.classList.remove('maplibregl-compact', 'maplibregl-compact-show');
+                }
+            }
+        };
+    }
+
+    override onAdd(map: MapLibreMap): HTMLElement {
+        const container = super.onAdd(map);
+        container.classList.add('maplibregl-compact');
+        container.classList.remove('maplibregl-compact-show');
+        return container;
+    }
+}
 
 // AD-6: imperative MapLibre singleton. React only owns the container div;
 // all map operations go through this manager (vanilla access from anywhere,
@@ -32,6 +79,7 @@ class MapManager {
     private scaleControl: ScaleControl | null = null;
     private styleReloadCallbacks = new Set<() => void>();
     private wheelGuardHandler: ((e: WheelEvent) => void) | null = null;
+    private userInteracted = false;
 
     /** Idempotent under React StrictMode double-mount: re-init with the same
      *  container is a no-op; a different container tears down and rebuilds. */
@@ -51,15 +99,21 @@ class MapManager {
             style: BASEMAPS[this.basemap].style,
             center: DEFAULT_CENTER,
             zoom: DEFAULT_ZOOM,
-            minZoom: 3.5,
+            minZoom: 5.0,
             maxZoom: 19,
             attributionControl: false,
         });
-        map.addControl(new AttributionControl({ compact: true }));
+        const attribControl = new CompactAttributionControl({ compact: true });
+        map.addControl(attribControl);
 
-        // Responsive scroll and pinch zoom rates: smooth and snappy without runaway zoom
-        map.scrollZoom.setWheelZoomRate(1 / 1200);
-        map.scrollZoom.setZoomRate(1 / 200);
+        // Guarantee collapsed state after initial style load
+        map.once('load', () => {
+            attribControl._container?.classList.remove('maplibregl-compact-show');
+        });
+
+        // Responsive scroll and pinch zoom rates: snappy but controllable
+        map.scrollZoom.setWheelZoomRate(1 / 900);
+        map.scrollZoom.setZoomRate(1 / 150);
 
         // Guard against runaway wheel delta bursts during free-spinning mouse wheels or lag spikes
         let lastWheelTime = 0;
@@ -79,6 +133,15 @@ class MapManager {
             }
         };
         container.addEventListener('wheel', this.wheelGuardHandler, { capture: true, passive: false });
+
+        // Track whether the user has driven the camera (pan/zoom/pinch/click).
+        // Auto-fitBounds must never yank the viewport away from an inspecting user.
+        const markInteracted = () => {
+            this.userInteracted = true;
+        };
+        for (const evt of ['mousedown', 'wheel', 'touchstart', 'dblclick'] as const) {
+            container.addEventListener(evt, markInteracted, { capture: true, passive: true });
+        }
 
         const scale = new ScaleControl({ maxWidth: 90, unit: 'metric' });
         map.addControl(scale, 'bottom-left');
@@ -255,9 +318,15 @@ class MapManager {
         }
     }
 
-    fitBounds(bounds: LngLatBoundsLike, padding = 60) {
+    /** True once the user has panned/zoomed/clicked the map. Camera-affecting
+     *  auto-behaviors (hydration fit, import fit) must respect their viewport. */
+    hasUserInteracted(): boolean {
+        return this.userInteracted;
+    }
+
+    fitBounds(bounds: LngLatBoundsLike, padding = 60, instant = false) {
         if (!this.map) return;
-        this.map.fitBounds(bounds, { padding, duration: 600, maxZoom: 16 });
+        this.map.fitBounds(bounds, { padding, duration: instant ? 0 : 600, maxZoom: 16 });
     }
 
     /** Run `callback` as soon as the style can accept addSource/addLayer.
