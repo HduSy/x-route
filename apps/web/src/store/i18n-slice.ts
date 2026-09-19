@@ -112,10 +112,10 @@ export const translations = {
             railway: 'Railway',
         },
         basemaps: {
+            bright: 'Bright',
             liberty: 'Liberty',
             positron: 'Positron',
             dark: 'Dark',
-            bright: 'Bright',
         },
     },
     zh: {
@@ -226,10 +226,10 @@ export const translations = {
             railway: '铁路轨迹',
         },
         basemaps: {
+            bright: '明亮高对比',
             liberty: '彩色底图',
             positron: '浅色浅灰',
             dark: '深色暗夜',
-            bright: '明亮高对比',
         },
     },
 } as const;

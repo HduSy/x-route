@@ -16,15 +16,15 @@ export default function App() {
             <StravaNavbar />
 
             {/* Main Workbench Area */}
-            <div className="relative flex min-h-0 flex-1 overflow-hidden">
-                {/* Left Route Builder Sidebar */}
-                <RouteBuilderSidebar />
-
-                {/* Map Area */}
-                <main className="relative flex-1 min-w-0 h-full overflow-hidden">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+                {/* Map Area — Full bleed, constant dimensions to eliminate WebGL buffer resize flicker */}
+                <main className="absolute inset-0 overflow-hidden">
                     <MapView />
                     <MapFloatingToolbar />
                 </main>
+
+                {/* Left Route Builder Sidebar */}
+                <RouteBuilderSidebar />
 
                 {/* Right My Routes Drawer */}
                 <MyRoutesDrawer />

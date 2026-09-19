@@ -46,6 +46,7 @@ export function MapView() {
 
     const active = useRoutingStore((s) => s.active);
     const setActive = useRoutingStore((s) => s.setActive);
+    const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
     const units = useRoutingStore((s) => s.units);
@@ -163,11 +164,16 @@ export function MapView() {
         <div className="relative h-full w-full">
             <div
                 ref={containerRef}
-                className={cn('h-full w-full', active && 'route-building-cursor')}
+                className={cn('h-full w-full', active && 'route-building-cursor', !sidebarCollapsed && 'sidebar-open')}
             />
 
             {/* Strava style Vertical Map Controls (Draw mode, Zoom in, Zoom out, Compass) */}
-            <div className="absolute left-2 sm:left-3 top-13 sm:top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none">
+            <div
+                className={cn(
+                    'absolute top-13 sm:top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none transition-[left] duration-200 ease-in-out',
+                    sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
+                )}
+            >
                 {/* Route planning / creation mode toggle */}
                 <button
                     onClick={() => setActive(!active)}
@@ -232,7 +238,12 @@ export function MapView() {
             </div>
 
             {/* Bottom-left Map Style & 3D Controls (Stacked neatly above the scale bar) */}
-            <div className="absolute bottom-8 sm:bottom-9 left-2 sm:left-3 z-10 flex flex-col gap-1 select-none">
+            <div
+                className={cn(
+                    'absolute bottom-8 sm:bottom-9 z-10 flex flex-col gap-1 select-none transition-[left] duration-200 ease-in-out',
+                    sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
+                )}
+            >
                 {/* Basemap selector popover button */}
                 <div className="relative">
                     <button

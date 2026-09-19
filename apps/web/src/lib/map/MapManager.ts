@@ -10,13 +10,13 @@ setWorkerUrl(workerUrl);
 // all map operations go through this manager (vanilla access from anywhere,
 // no hooks rules inside map event callbacks).
 
-export type BasemapKey = 'liberty' | 'positron' | 'dark' | 'bright';
+export type BasemapKey = 'bright' | 'liberty' | 'positron' | 'dark';
 
 export const BASEMAPS: Record<BasemapKey, { label: string; style: string }> = {
+    bright: { label: 'Bright', style: 'https://tiles.openfreemap.org/styles/bright' },
     liberty: { label: 'Liberty', style: 'https://tiles.openfreemap.org/styles/liberty' },
     positron: { label: 'Positron', style: 'https://tiles.openfreemap.org/styles/positron' },
     dark: { label: 'Dark', style: 'https://tiles.openfreemap.org/styles/dark' },
-    bright: { label: 'Bright', style: 'https://tiles.openfreemap.org/styles/bright' },
 };
 
 const DEFAULT_CENTER: [number, number] = [4.4049, 50.7908]; // Brussels test area
@@ -25,7 +25,7 @@ const DEFAULT_ZOOM = 10;
 class MapManager {
     private map: MapLibreMap | null = null;
     private container: HTMLElement | null = null;
-    private basemap: BasemapKey = 'liberty';
+    private basemap: BasemapKey = 'bright';
     private cursorMarker: Marker | null = null;
     private userLocationMarker: Marker | null = null;
     private userLocationCoords: { lon: number; lat: number } | null = null;
@@ -56,9 +56,9 @@ class MapManager {
         });
         map.addControl(new AttributionControl({ compact: true }));
 
-        // Damped scroll zoom rate to prevent runaway zoom on macOS trackpads and mouse wheels
-        map.scrollZoom.setWheelZoomRate(1 / 2000);
-        map.scrollZoom.setZoomRate(1 / 450);
+        // Responsive scroll and pinch zoom rates: smooth and snappy without runaway zoom
+        map.scrollZoom.setWheelZoomRate(1 / 800);
+        map.scrollZoom.setZoomRate(1 / 150);
 
         const scale = new ScaleControl({ maxWidth: 90, unit: 'metric' });
         map.addControl(scale, 'bottom-left');

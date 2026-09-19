@@ -38,10 +38,11 @@ export function MapFloatingToolbar() {
     const clear = useRoutingStore((s) => s.clear);
     const setSaveModalOpen = useRoutingStore((s) => s.setSaveModalOpen);
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
+    const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
 
     const [basemapOpen, setBasemapOpen] = useState(false);
-    const [currentBasemap, setCurrentBasemap] = useState<BasemapKey>('liberty');
+    const [currentBasemap, setCurrentBasemap] = useState<BasemapKey>('bright');
     const [toolsOpen, setToolsOpen] = useState(false);
     const [toolActionStatus, setToolActionStatus] = useState<string | null>(null);
 
@@ -142,7 +143,12 @@ export function MapFloatingToolbar() {
     };
 
     return (
-        <div className="pointer-events-none absolute left-2 right-2 top-2 sm:left-3 sm:right-3 sm:top-3 z-10 flex items-center justify-between select-none">
+        <div
+            className={cn(
+                'pointer-events-none absolute right-2 top-2 sm:right-3 sm:top-3 z-10 flex items-center justify-between select-none transition-[left] duration-200 ease-in-out',
+                sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
+            )}
+        >
             {/* Left toolbar group */}
             <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">
                 {/* Navigation / Action buttons card */}
