@@ -186,12 +186,18 @@ export function MapFloatingToolbar() {
                     onClick={() => setSaveModalOpen(true)}
                     disabled={resultPoints.length < 2}
                     className={cn(
-                        'group flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-4 text-xs font-extrabold tracking-wide text-white shadow-md shadow-[#863BFF]/25 transition-all duration-200 hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97 cursor-pointer disabled:cursor-not-allowed',
-                        resultPoints.length < 2 &&
-                            'cursor-not-allowed bg-muted text-muted-foreground opacity-50 shadow-none hover:from-muted hover:to-muted hover:shadow-none'
+                        'group flex h-9 items-center gap-1.5 rounded-lg px-4 text-xs font-bold tracking-tight transition-all duration-150 select-none',
+                        resultPoints.length >= 2
+                            ? 'bg-[#863BFF] text-white shadow-sm hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
+                            : 'bg-muted/80 text-muted-foreground/60 border border-border/50 cursor-not-allowed shadow-none'
                     )}
                 >
-                    <BookmarkPlus className="size-4 stroke-[2.5] transition-transform group-hover:scale-110" />
+                    <BookmarkPlus
+                        className={cn(
+                            'size-4 stroke-[2.2]',
+                            resultPoints.length >= 2 && 'transition-transform group-hover:scale-110'
+                        )}
+                    />
                     <span>{t.saveRoute}</span>
                 </button>
 

@@ -113,7 +113,7 @@ export function MyRoutesDrawer() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleNewRoute}
-                            className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:from-[#7829F5] hover:to-[#6517EA] active:scale-97 cursor-pointer"
+                            className="flex items-center gap-1 rounded-lg bg-[#863BFF] px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#7424F8] hover:shadow-sm active:scale-98 active:bg-[#6517EA] cursor-pointer"
                         >
                             <Plus className="size-3.5 stroke-[3]" />
                             <span>{t.newRoute}</span>

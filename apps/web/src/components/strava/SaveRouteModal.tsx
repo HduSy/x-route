@@ -4,6 +4,7 @@ import { useRoutingStore } from '@/store/routing-slice';
 import { useT } from '@/store/i18n-slice';
 import { saveGPXFile } from '@/lib/file-actions';
 import { GPXFile, Track, TrackSegment, distance } from '@x-route/gpx';
+import { cn } from '@/lib/utils';
 
 export function SaveRouteModal() {
     const { t } = useT();
@@ -185,7 +186,12 @@ export function SaveRouteModal() {
                         <button
                             type="submit"
                             disabled={saving || savedSuccess}
-                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#863BFF] to-[#7424F8] px-5 py-2 text-xs font-bold text-white shadow-md shadow-[#863BFF]/25 transition hover:from-[#7829F5] hover:to-[#6517EA] hover:shadow-lg hover:shadow-[#863BFF]/35 active:scale-97 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                            className={cn(
+                                'flex items-center gap-1.5 rounded-xl px-5 py-2 text-xs font-bold text-white transition-all duration-150 shadow-sm',
+                                saving || savedSuccess
+                                    ? 'bg-muted text-muted-foreground cursor-not-allowed shadow-none'
+                                    : 'bg-[#863BFF] hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
+                            )}
                         >
                             {savedSuccess ? (
                                 <>
