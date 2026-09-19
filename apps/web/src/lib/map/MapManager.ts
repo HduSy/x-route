@@ -42,6 +42,9 @@ class MapManager {
             this.destroy();
         }
 
+        this.cursorMarker?.remove();
+        this.cursorMarker = null;
+
         const map = new MapLibreMap({
             container,
             style: BASEMAPS[this.basemap].style,
@@ -83,13 +86,21 @@ class MapManager {
 
     setCursor(coords: { lon: number; lat: number } | null) {
         if (!this.map) return;
-        if (!coords) {
+        if (
+            !coords ||
+            typeof coords.lon !== 'number' ||
+            typeof coords.lat !== 'number' ||
+            !Number.isFinite(coords.lon) ||
+            !Number.isFinite(coords.lat)
+        ) {
             this.cursorMarker?.remove();
             this.cursorMarker = null;
             return;
         }
+
         if (!this.cursorMarker) {
             const el = document.createElement('div');
+            el.className = 'x-route-cursor-marker';
             el.style.cssText = `
                 width: 14px;
                 height: 14px;
@@ -99,9 +110,12 @@ class MapManager {
                 box-shadow: 0 0 0 3px rgba(134, 59, 255, 0.4), 0 2px 6px rgba(0,0,0,0.35);
                 pointer-events: none;
             `;
-            this.cursorMarker = new Marker({ element: el }).addTo(this.map);
+            this.cursorMarker = new Marker({ element: el })
+                .setLngLat([coords.lon, coords.lat])
+                .addTo(this.map);
+        } else {
+            this.cursorMarker.setLngLat([coords.lon, coords.lat]);
         }
-        this.cursorMarker.setLngLat([coords.lon, coords.lat]);
     }
 
     setUserLocation(coords: { lon: number; lat: number } | null) {

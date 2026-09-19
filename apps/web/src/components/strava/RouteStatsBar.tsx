@@ -26,7 +26,6 @@ export function RouteStatsBar() {
     const resultPoints = useRoutingStore((s) => s.resultPoints);
     const profile = useRoutingStore((s) => s.profile);
     const units = useRoutingStore((s) => s.units);
-    const showSurfaceType = useRoutingStore((s) => s.showSurfaceType);
     const elevationExpanded = useRoutingStore((s) => s.elevationExpanded);
     const toggleElevation = useRoutingStore((s) => s.toggleElevation);
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
@@ -105,8 +104,6 @@ export function RouteStatsBar() {
                 descent: 0,
                 descentFormatted: units === 'mi' ? '0 ft' : '0 m',
                 timeFormatted: '0s',
-                pavedPercent: 85,
-                dirtPercent: 15,
             };
         }
 
@@ -122,19 +119,14 @@ export function RouteStatsBar() {
 
         // Speed estimates per activity profile
         let speedKmh = 20; // Default ride
-        let pavedRatio = 0.85;
         if (profile === 'racing_bike') {
             speedKmh = 25;
-            pavedRatio = 0.95;
         } else if (profile === 'gravel_bike') {
             speedKmh = 18;
-            pavedRatio = 0.55;
         } else if (profile === 'mountain_bike') {
             speedKmh = 13;
-            pavedRatio = 0.25;
         } else if (profile === 'foot') {
             speedKmh = 9.5; // run
-            pavedRatio = 0.7;
         }
 
         const totalSecs = Math.round((totalKm / speedKmh) * 3600);
@@ -165,8 +157,6 @@ export function RouteStatsBar() {
             descent,
             descentFormatted: `-${eleLossVal} ${eleUnit}`,
             timeFormatted: timeStr,
-            pavedPercent: Math.round(pavedRatio * 100),
-            dirtPercent: 100 - Math.round(pavedRatio * 100),
         };
     }, [pointsData, profile, units]);
 
@@ -176,6 +166,7 @@ export function RouteStatsBar() {
         if (!canvas) return;
 
         if (pointsData.length < 2 || !elevationExpanded) {
+            mapManager.setCursor(null);
             chartRef.current?.destroy();
             chartRef.current = null;
             return;
@@ -274,27 +265,31 @@ export function RouteStatsBar() {
                     },
                 },
                 onHover: (_event, elements) => {
-                    if (elements.length > 0) {
+                    if (elements && elements.length > 0) {
                         const index = elements[0]!.index;
                         const pt = sampled[index];
-                        if (pt) {
+                        if (pt && Number.isFinite(pt.lon) && Number.isFinite(pt.lat)) {
                             mapManager.setCursor({ lon: pt.lon, lat: pt.lat });
+                            return;
                         }
-                    } else {
-                        mapManager.setCursor(null);
                     }
+                    mapManager.setCursor(null);
                 },
             },
         });
 
         return () => {
+            mapManager.setCursor(null);
             chartRef.current?.destroy();
             chartRef.current = null;
         };
     }, [pointsData, elevationExpanded, units]);
 
     return (
-        <footer className="relative z-20 flex shrink-0 flex-col border-t border-border bg-background shadow-lg select-none">
+        <footer
+            onMouseLeave={() => mapManager.setCursor(null)}
+            className="relative z-20 flex shrink-0 flex-col border-t border-border bg-background shadow-lg select-none"
+        >
             {/* Elevation Chart Drawer */}
             {elevationExpanded && pointsData.length >= 2 && (
                 <div
@@ -367,39 +362,6 @@ export function RouteStatsBar() {
                             {stats.timeFormatted}
                         </div>
                     </div>
-
-                    {/* Surface Type Segment Bar */}
-                    {showSurfaceType && (
-                        <div className="hidden lg:block">
-                            <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                                {t.surfaceType}
-                            </div>
-                            <div className="flex items-center gap-2.5">
-                                <div className="h-2 w-36 overflow-hidden rounded-full bg-muted/60 flex border border-border/50 shadow-2xs">
-                                    <div
-                                        style={{ width: `${stats.pavedPercent}%` }}
-                                        className="h-full bg-[#4A5568] transition-all duration-300"
-                                        title={`Paved: ${stats.pavedPercent}%`}
-                                    />
-                                    <div
-                                        style={{ width: `${stats.dirtPercent}%` }}
-                                        className="h-full bg-[#C69214] transition-all duration-300"
-                                        title={`Dirt: ${stats.dirtPercent}%`}
-                                    />
-                                </div>
-                                <div className="text-[10px] font-semibold text-muted-foreground flex items-center gap-2.5">
-                                    <span className="flex items-center gap-1">
-                                        <span className="inline-block size-2 rounded-2xs bg-[#4A5568]" />
-                                        {stats.pavedPercent}% {t.paved}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <span className="inline-block size-2 rounded-2xs bg-[#C69214]" />
-                                        {stats.dirtPercent}% {t.dirt}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Right Toggle Elevation Button */}

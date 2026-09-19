@@ -14,60 +14,64 @@ const SOURCE_ID = 'x-route-routing';
 const LINE_CASING_LAYER_ID = 'x-route-routing-casing';
 const LINE_LAYER_ID = 'x-route-routing-line';
 
-function anchorElement(kind: 'start' | 'end' | 'via', _index: number, total: number): HTMLElement {
+function anchorElement(kind: 'start' | 'end' | 'via', _index: number, _total: number): HTMLElement {
     const el = document.createElement('div');
     el.className = 'x-route-anchor-marker';
 
     if (kind === 'start') {
+        // Strava signature green starting node
         el.style.cssText = `
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             border-radius: 9999px;
-            background-color: #22c55e;
+            background-color: #00B548;
             border: 2.5px solid #ffffff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
             cursor: grab;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ffffff;
-            font-size: 11px;
-            font-weight: 800;
             user-select: none;
-            line-height: 1;
+            transition: transform 0.1s ease;
         `;
-        el.innerText = '1';
     } else if (kind === 'end') {
+        // Strava signature checkered finish line flag node 🏁
         el.style.cssText = `
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             border-radius: 9999px;
-            background-color: #863bff;
+            background: repeating-conic-gradient(#18181b 0% 25%, #ffffff 0% 50%) 50% / 6px 6px;
             border: 2.5px solid #ffffff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.45);
             cursor: grab;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ffffff;
-            font-size: 11px;
-            font-weight: 800;
             user-select: none;
-            line-height: 1;
+            transition: transform 0.1s ease;
         `;
-        el.innerText = String(total);
     } else {
+        // Intermediate waypoint node
         el.style.cssText = `
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             border-radius: 9999px;
             background-color: #ffffff;
-            border: 3.5px solid #863bff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.35);
+            border: 3px solid #863bff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.35);
             cursor: grab;
             user-select: none;
+            transition: transform 0.1s ease;
         `;
     }
+
+    el.addEventListener('mouseenter', () => {
+        el.style.transform = 'scale(1.18)';
+    });
+    el.addEventListener('mouseleave', () => {
+        el.style.transform = 'scale(1.0)';
+    });
+    el.addEventListener('mousedown', () => {
+        el.style.cursor = 'grabbing';
+    });
+    el.addEventListener('mouseup', () => {
+        el.style.cursor = 'grab';
+    });
+
     return el;
 }
 
@@ -278,16 +282,10 @@ export class RoutingLayerController {
     }
 
     private syncMarkers(map: MapLibreMap, anchors: RoutingAnchor[]) {
-        if (this.markers.length !== anchors.length) {
-            for (const marker of this.markers) marker.remove();
-            this.markers = anchors.map((anchor, index) =>
-                this.createMarker(map, anchor, index, anchors.length)
-            );
-        } else {
-            anchors.forEach((anchor, index) => {
-                this.markers[index]?.setLngLat([anchor.lon, anchor.lat]);
-            });
-        }
+        for (const marker of this.markers) marker.remove();
+        this.markers = anchors.map((anchor, index) =>
+            this.createMarker(map, anchor, index, anchors.length)
+        );
     }
 
     private createMarker(

@@ -6,7 +6,6 @@ import {
     ChevronRight,
     Compass,
     Footprints,
-    Layers,
     MapPin,
     Mountain,
     Search,
@@ -33,8 +32,6 @@ export function RouteBuilderSidebar() {
     const setProfile = useRoutingStore((s) => s.setProfile);
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
-    const showSurfaceType = useRoutingStore((s) => s.showSurfaceType);
-    const setShowSurfaceType = useRoutingStore((s) => s.setShowSurfaceType);
     const showDistanceMarkers = useRoutingStore((s) => s.showDistanceMarkers);
     const setShowDistanceMarkers = useRoutingStore((s) => s.setShowDistanceMarkers);
     const showRoutePath = useRoutingStore((s) => s.showRoutePath);
@@ -249,22 +246,6 @@ export function RouteBuilderSidebar() {
                         </div>
                     </div>
 
-                    {/* Surface Type */}
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold text-foreground">{t.anySurface}</label>
-                        <div className="relative">
-                            <select
-                                className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
-                            >
-                                <option>{t.anySurface}</option>
-                                <option>{t.pavedOnly}</option>
-                                <option>{t.dirtPreferred}</option>
-                            </select>
-                            <Layers className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
-                            <ChevronDown className="pointer-events-none absolute right-2.5 top-3 size-3.5 text-muted-foreground" />
-                        </div>
-                    </div>
-
                     {/* Manual Mode Toggle Switch */}
                     <div className="flex items-center justify-between rounded-lg border border-border p-3">
                         <div className="flex items-center gap-2.5">
@@ -302,28 +283,6 @@ export function RouteBuilderSidebar() {
                 <div className="space-y-3 px-4 py-3">
                     <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                         {t.mapDisplay}
-                    </div>
-
-                    {/* Surface Type Switch */}
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-foreground">{t.surfaceType}</span>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={showSurfaceType}
-                            onClick={() => setShowSurfaceType(!showSurfaceType)}
-                            className={cn(
-                                'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                                showSurfaceType ? 'bg-[#863BFF]' : 'bg-muted'
-                            )}
-                        >
-                            <span
-                                className={cn(
-                                    'pointer-events-none inline-block size-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out',
-                                    showSurfaceType ? 'translate-x-4' : 'translate-x-0'
-                                )}
-                            />
-                        </button>
                     </div>
 
                     {/* Distance Markers Switch */}
