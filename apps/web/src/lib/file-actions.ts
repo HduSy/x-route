@@ -134,3 +134,97 @@ export async function deleteFile(fileId: string) {
         select.selectFile(remaining[0] ?? null);
     }
 }
+
+// --- Track Editing Operations (Phase 4) ---
+
+import { ramerDouglasPeucker, Waypoint, type Coordinates } from '@x-route/gpx';
+
+export async function reverseTrack(fileId: string) {
+    const data = await db.files.get(fileId);
+    if (!data) return;
+
+    const file = new GPXFile(data as GPXFileType);
+    file.reverse();
+    file._data.id = fileId;
+    await db.files.put(file, fileId);
+}
+
+export async function simplifyTrack(fileId: string, toleranceMeters = 15) {
+    const data = await db.files.get(fileId);
+    if (!data) return;
+
+    const file = new GPXFile(data as GPXFileType);
+    file.forEachSegment((segment) => {
+        if (segment.trkpt.length > 2) {
+            const simplified = ramerDouglasPeucker(segment.trkpt, toleranceMeters);
+            segment.trkpt = simplified.map((s) => s.point);
+        }
+    });
+    file._data.id = fileId;
+    await db.files.put(file, fileId);
+}
+
+export async function closeLoop(fileId: string) {
+    const data = await db.files.get(fileId);
+    if (!data) return;
+
+    const file = new GPXFile(data as GPXFileType);
+    const segments = file.getSegments();
+    if (segments.length > 0 && segments[0]!.trkpt.length > 1) {
+        const firstPt = segments[0]!.trkpt[0]!;
+        const lastSeg = segments[segments.length - 1]!;
+        lastSeg.trkpt.push(firstPt.clone());
+    }
+    file._data.id = fileId;
+    await db.files.put(file, fileId);
+}
+
+export async function splitTrackAtMiddle(fileId: string) {
+    const data = await db.files.get(fileId);
+    if (!data) return;
+
+    const file = new GPXFile(data as GPXFileType);
+    const totalPts = file.getNumberOfTrackPoints();
+    if (totalPts < 4) return;
+
+    const mid = Math.floor(totalPts / 2);
+
+    // Part 1: keep first half
+    file.crop(0, mid);
+    file._data.id = fileId;
+    await db.files.put(file, fileId);
+
+    // Part 2: second half as new file
+    const file2 = new GPXFile(data as GPXFileType);
+    file2.crop(mid, totalPts - 1);
+    const id2 = crypto.randomUUID();
+    file2._data.id = id2;
+    file2.metadata.name = `${file.metadata?.name ?? 'track'} (part 2)`;
+
+    await db.transaction('rw', db.files, db.fileids, async () => {
+        await db.files.put(file2, id2);
+        await db.fileids.put(id2, id2);
+    });
+    useSelectionStore.getState().selectFile(id2);
+}
+
+export async function addWaypointToFile(
+    fileId: string,
+    name: string,
+    coords: Coordinates,
+    sym = 'Waypoint'
+) {
+    const data = await db.files.get(fileId);
+    if (!data) return;
+
+    const file = new GPXFile(data as GPXFileType);
+    const wpt = new Waypoint({
+        attributes: { lat: coords.lat, lon: coords.lon },
+        name,
+        sym,
+    });
+    file.wpt.push(wpt);
+    file._data.id = fileId;
+    await db.files.put(file, fileId);
+}
+

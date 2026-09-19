@@ -1,4 +1,4 @@
-import { AttributionControl, Map as MapLibreMap, setWorkerUrl, type LngLatBoundsLike } from 'maplibre-gl';
+import { AttributionControl, Map as MapLibreMap, Marker, setWorkerUrl, type LngLatBoundsLike } from 'maplibre-gl';
 // maplibre v6 is ESM-only and loads its worker from a separate runtime file;
 // Vite cannot rewrite that URL automatically — route it through the bundler.
 // https://www.maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide
@@ -10,13 +10,14 @@ setWorkerUrl(workerUrl);
 // all map operations go through this manager (vanilla access from anywhere,
 // no hooks rules inside map event callbacks).
 
-export const BASEMAPS = {
-    liberty: { label: 'Liberty', style: 'https://tiles.openfreemap.org/styles/liberty' },
-    positron: { label: 'Minimal', style: 'https://tiles.openfreemap.org/styles/positron' },
-    dark: { label: 'Dark', style: 'https://tiles.openfreemap.org/styles/dark' },
-} as const;
+export type BasemapKey = 'liberty' | 'positron' | 'dark' | 'bright';
 
-export type BasemapKey = keyof typeof BASEMAPS;
+export const BASEMAPS: Record<BasemapKey, { label: string; style: string }> = {
+    liberty: { label: 'Liberty', style: 'https://tiles.openfreemap.org/styles/liberty' },
+    positron: { label: 'Positron', style: 'https://tiles.openfreemap.org/styles/positron' },
+    dark: { label: 'Dark', style: 'https://tiles.openfreemap.org/styles/dark' },
+    bright: { label: 'Bright', style: 'https://tiles.openfreemap.org/styles/bright' },
+};
 
 const DEFAULT_CENTER: [number, number] = [4.4049, 50.7908]; // Brussels test area
 const DEFAULT_ZOOM = 10;
@@ -25,6 +26,7 @@ class MapManager {
     private map: MapLibreMap | null = null;
     private container: HTMLElement | null = null;
     private basemap: BasemapKey = 'liberty';
+    private cursorMarker: Marker | null = null;
     private styleReloadCallbacks = new Set<() => void>();
 
     /** Idempotent under React StrictMode double-mount: re-init with the same
@@ -55,9 +57,34 @@ class MapManager {
     destroy() {
         if (!this.map) return;
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = undefined;
+        this.cursorMarker?.remove();
+        this.cursorMarker = null;
         this.map.remove();
         this.map = null;
         this.container = null;
+    }
+
+    setCursor(coords: { lon: number; lat: number } | null) {
+        if (!this.map) return;
+        if (!coords) {
+            this.cursorMarker?.remove();
+            this.cursorMarker = null;
+            return;
+        }
+        if (!this.cursorMarker) {
+            const el = document.createElement('div');
+            el.style.cssText = `
+                width: 14px;
+                height: 14px;
+                border-radius: 9999px;
+                background-color: #ef4444;
+                border: 2px solid #ffffff;
+                box-shadow: 0 1px 5px rgba(0,0,0,0.6);
+                pointer-events: none;
+            `;
+            this.cursorMarker = new Marker({ element: el }).addTo(this.map);
+        }
+        this.cursorMarker.setLngLat([coords.lon, coords.lat]);
     }
 
     getMap(): MapLibreMap | null {
