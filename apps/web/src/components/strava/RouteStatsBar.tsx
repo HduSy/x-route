@@ -374,22 +374,28 @@ export function RouteStatsBar() {
                             <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
                                 {t.surfaceType}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="h-2 w-32 overflow-hidden rounded-full bg-muted flex">
+                            <div className="flex items-center gap-2.5">
+                                <div className="h-2 w-36 overflow-hidden rounded-full bg-muted/60 flex border border-border/50 shadow-2xs">
                                     <div
                                         style={{ width: `${stats.pavedPercent}%` }}
-                                        className="h-full bg-[#4A5568]"
+                                        className="h-full bg-[#4A5568] transition-all duration-300"
                                         title={`Paved: ${stats.pavedPercent}%`}
                                     />
                                     <div
                                         style={{ width: `${stats.dirtPercent}%` }}
-                                        className="h-full bg-[#C69214]"
+                                        className="h-full bg-[#C69214] transition-all duration-300"
                                         title={`Dirt: ${stats.dirtPercent}%`}
                                     />
                                 </div>
-                                <div className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5">
-                                    <span>■ {stats.pavedPercent}% {t.paved}</span>
-                                    <span>■ {stats.dirtPercent}% {t.dirt}</span>
+                                <div className="text-[10px] font-semibold text-muted-foreground flex items-center gap-2.5">
+                                    <span className="flex items-center gap-1">
+                                        <span className="inline-block size-2 rounded-2xs bg-[#4A5568]" />
+                                        {stats.pavedPercent}% {t.paved}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <span className="inline-block size-2 rounded-2xs bg-[#C69214]" />
+                                        {stats.dirtPercent}% {t.dirt}
+                                    </span>
                                 </div>
                             </div>
                         </div>

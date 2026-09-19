@@ -1,4 +1,4 @@
-import { AttributionControl, Map as MapLibreMap, Marker, setWorkerUrl, type LngLatBoundsLike } from 'maplibre-gl';
+import { AttributionControl, Map as MapLibreMap, Marker, ScaleControl, setWorkerUrl, type LngLatBoundsLike } from 'maplibre-gl';
 // maplibre v6 is ESM-only and loads its worker from a separate runtime file;
 // Vite cannot rewrite that URL automatically — route it through the bundler.
 // https://www.maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide
@@ -29,6 +29,7 @@ class MapManager {
     private cursorMarker: Marker | null = null;
     private userLocationMarker: Marker | null = null;
     private userLocationCoords: { lon: number; lat: number } | null = null;
+    private scaleControl: ScaleControl | null = null;
     private styleReloadCallbacks = new Set<() => void>();
 
     /** Idempotent under React StrictMode double-mount: re-init with the same
@@ -50,6 +51,10 @@ class MapManager {
         });
         map.addControl(new AttributionControl({ compact: true }));
 
+        const scale = new ScaleControl({ maxWidth: 90, unit: 'metric' });
+        map.addControl(scale, 'bottom-left');
+        this.scaleControl = scale;
+
         this.map = map;
         this.container = container;
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = map; // debug/testing hook
@@ -64,9 +69,16 @@ class MapManager {
         this.userLocationMarker?.remove();
         this.userLocationMarker = null;
         this.userLocationCoords = null;
+        this.scaleControl = null;
         this.map.remove();
         this.map = null;
         this.container = null;
+    }
+
+    setScaleUnit(unit: 'metric' | 'imperial') {
+        if (this.scaleControl) {
+            this.scaleControl.setUnit(unit);
+        }
     }
 
     setCursor(coords: { lon: number; lat: number } | null) {
@@ -82,9 +94,9 @@ class MapManager {
                 width: 14px;
                 height: 14px;
                 border-radius: 9999px;
-                background-color: #ef4444;
-                border: 2px solid #ffffff;
-                box-shadow: 0 1px 5px rgba(0,0,0,0.6);
+                background-color: #863BFF;
+                border: 2.5px solid #ffffff;
+                box-shadow: 0 0 0 3px rgba(134, 59, 255, 0.4), 0 2px 6px rgba(0,0,0,0.35);
                 pointer-events: none;
             `;
             this.cursorMarker = new Marker({ element: el }).addTo(this.map);
