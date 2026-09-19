@@ -31,18 +31,6 @@ class MapManager {
     private userLocationCoords: { lon: number; lat: number } | null = null;
     private scaleControl: ScaleControl | null = null;
     private styleReloadCallbacks = new Set<() => void>();
-    private resizeObserver: ResizeObserver | null = null;
-    private resizeRaf: number | null = null;
-
-    private handleResize = () => {
-        if (!this.map) return;
-        if (this.resizeRaf) cancelAnimationFrame(this.resizeRaf);
-        this.resizeRaf = requestAnimationFrame(() => {
-            if (this.map) {
-                this.map.resize();
-            }
-        });
-    };
 
     /** Idempotent under React StrictMode double-mount: re-init with the same
      *  container is a no-op; a different container tears down and rebuilds. */
@@ -80,16 +68,9 @@ class MapManager {
         this.container = container;
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = map; // debug/testing hook
 
-        // Automatically sync WebGL viewport with container dimensions (prevents marker/canvas desync)
-        this.resizeObserver = new ResizeObserver(() => {
-            this.handleResize();
-        });
-        this.resizeObserver.observe(container);
-
-        // Immediate and post-animation resize triggers to ensure settled canvas size
+        // Initial settlement kicks
         requestAnimationFrame(() => this.map?.resize());
         setTimeout(() => this.map?.resize(), 100);
-        setTimeout(() => this.map?.resize(), 350);
 
         return map;
     }
@@ -97,12 +78,6 @@ class MapManager {
     destroy() {
         if (!this.map) return;
         (globalThis as { __xroute_map?: MapLibreMap }).__xroute_map = undefined;
-        if (this.resizeRaf) {
-            cancelAnimationFrame(this.resizeRaf);
-            this.resizeRaf = null;
-        }
-        this.resizeObserver?.disconnect();
-        this.resizeObserver = null;
         this.cursorMarker?.remove();
         this.cursorMarker = null;
         this.userLocationMarker?.remove();

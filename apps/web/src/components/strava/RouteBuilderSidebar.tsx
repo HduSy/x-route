@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import {
     Bike,
     ChevronDown,
-    ChevronLeft,
-    ChevronRight,
     Compass,
     Crosshair,
     Footprints,
@@ -43,7 +41,7 @@ export function RouteBuilderSidebar() {
     const units = useRoutingStore((s) => s.units);
     const setUnits = useRoutingStore((s) => s.setUnits);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
-    const toggleSidebar = useRoutingStore((s) => s.toggleSidebar);
+    const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
     const addAnchor = useRoutingStore((s) => s.addAnchor);
 
     // Geocoding search
@@ -99,42 +97,29 @@ export function RouteBuilderSidebar() {
         setShowDropdown(false);
     };
 
+    if (sidebarCollapsed) return null;
+
     return (
-        <aside
-            className={cn(
-                'relative z-20 flex h-full flex-col transition-[width] duration-300 ease-in-out select-none',
-                sidebarCollapsed ? 'w-0' : 'w-80 min-w-80 shadow-md'
-            )}
-        >
-            {/* Collapse toggle tab button sitting on the map edge — NEVER clipped */}
-            <button
-                type="button"
-                className="absolute -right-6 top-16 z-30 flex h-10 w-6 items-center justify-center rounded-r-md border border-l-0 border-border bg-background shadow-md transition hover:bg-accent text-muted-foreground hover:text-foreground cursor-pointer"
-                onClick={toggleSidebar}
-                title={sidebarCollapsed ? (lang === 'zh' ? '展开面板' : 'Expand sidebar') : (lang === 'zh' ? '折叠面板' : 'Collapse sidebar')}
-            >
-                {sidebarCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
-            </button>
+        <aside className="relative z-20 flex h-full w-80 min-w-80 flex-col border-r border-border bg-background shadow-md select-none">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
+                <h2 className="text-base font-bold tracking-tight text-foreground">
+                    {t.buildYourRoute}
+                </h2>
+                <button
+                    className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+                    onClick={() => {
+                        setSidebarCollapsed(true);
+                        setActive(false);
+                    }}
+                    title={lang === 'zh' ? '关闭面板' : 'Close'}
+                >
+                    <X className="size-4" />
+                </button>
+            </div>
 
             {/* Sidebar content */}
-            <div
-                className={cn(
-                    'flex h-full w-80 min-w-80 flex-col overflow-y-auto border-r border-border bg-background transition-opacity duration-200',
-                    sidebarCollapsed ? 'opacity-0 pointer-events-none overflow-hidden' : 'opacity-100'
-                )}
-            >
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
-                    <h2 className="text-base font-bold tracking-tight text-foreground">
-                        {t.buildYourRoute}
-                    </h2>
-                    <button
-                        className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
-                        onClick={toggleSidebar}
-                    >
-                        <X className="size-4" />
-                    </button>
-                </div>
+            <div className="flex h-full flex-col overflow-y-auto">
 
                 {/* Route Mode Segmented Control (Browse vs Draw) */}
                 <div className="mx-4 mt-3 select-none">
