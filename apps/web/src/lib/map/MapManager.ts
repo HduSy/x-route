@@ -155,7 +155,7 @@ function getSavedBasemap(): BasemapKey {
         const val = localStorage.getItem(BASEMAP_STORAGE_KEY);
         if (val && val in BASEMAPS) return val as BasemapKey;
     } catch {}
-    return 'liberty';
+    return 'bright';
 }
 
 function saveSavedBasemap(key: BasemapKey) {

@@ -47,13 +47,13 @@ function getSlopeBracket(slope: number): SlopeBracket {
     if (slope < -15.5) {
         return { id: -5, label: '< -15%', borderColor: '#0369A1', backgroundColor: 'rgba(3, 105, 161, 0.16)' };
     } else if (slope < -9.5) {
-        return { id: -4, label: '-10 ~ -15%', borderColor: '#0284C7', backgroundColor: 'rgba(2, 132, 199, 0.16)' };
+        return { id: -4, label: '-10 ~ 15%', borderColor: '#0284C7', backgroundColor: 'rgba(2, 132, 199, 0.16)' };
     } else if (slope < -6.5) {
-        return { id: -3, label: '-7 ~ -9%', borderColor: '#0EA5E9', backgroundColor: 'rgba(14, 165, 233, 0.16)' };
+        return { id: -3, label: '-7 ~ 9%', borderColor: '#0EA5E9', backgroundColor: 'rgba(14, 165, 233, 0.16)' };
     } else if (slope < -3.5) {
-        return { id: -2, label: '-4 ~ -6%', borderColor: '#38BDF8', backgroundColor: 'rgba(56, 189, 248, 0.16)' };
+        return { id: -2, label: '-4 ~ 6%', borderColor: '#38BDF8', backgroundColor: 'rgba(56, 189, 248, 0.16)' };
     } else if (slope < -1.0) {
-        return { id: -1, label: '-1 ~ -3%', borderColor: '#60A5FA', backgroundColor: 'rgba(96, 165, 250, 0.16)' };
+        return { id: -1, label: '-1 ~ 3%', borderColor: '#60A5FA', backgroundColor: 'rgba(96, 165, 250, 0.16)' };
     } else if (slope <= 1.0) {
         return { id: 0, label: '0%', borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.16)' };
     } else if (slope <= 3.5) {
@@ -574,7 +574,7 @@ export function RouteStatsBar() {
                                 </div>
                                 <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
                                     <span class="text-zinc-400 font-normal">${curT.slope}:</span>
-                                    <span class="font-bold text-white">${bracket.label} (${seg.slope >= 0 ? '+' : ''}${seg.slope.toFixed(1)}%)</span>
+                                    <span class="font-bold text-white">${bracket.label}</span>
                                 </div>
                             `;
 
