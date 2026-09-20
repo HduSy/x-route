@@ -18,17 +18,37 @@ export const routingProfiles: Record<string, RoutingProfile> = {
     gravel_bike: { engine: 'graphhopper', profile: 'gravelbike', label: 'Gravel bike' },
     mountain_bike: { engine: 'graphhopper', profile: 'mtb', label: 'MTB' },
     foot: { engine: 'graphhopper', profile: 'foot', label: 'Foot' },
+    hike: { engine: 'brouter', profile: 'hiking-mountain', label: 'Hike' },
     water: { engine: 'brouter', profile: 'river', label: 'Water' },
     railway: { engine: 'brouter', profile: 'rail', label: 'Railway' },
 };
 
-const graphhopperBlockPrivate: Record<string, object> = {
+const graphhopperBlockPrivate: Record<string, { priority: { if: string; multiply_by: string }[] }> = {
     bike: { priority: [{ if: 'bike_road_access == PRIVATE', multiply_by: '0.0' }] },
     racingbike: { priority: [{ if: 'bike_road_access == PRIVATE', multiply_by: '0.0' }] },
     gravelbike: { priority: [{ if: 'bike_road_access == PRIVATE', multiply_by: '0.0' }] },
     mtb: { priority: [{ if: 'bike_road_access == PRIVATE', multiply_by: '0.0' }] },
     foot: { priority: [{ if: 'foot_road_access == PRIVATE', multiply_by: '0.0' }] },
 };
+
+function buildGraphHopperCustomModel(profile: string, elevationPreference: 'any' | 'min' | 'max'): object {
+    const base = graphhopperBlockPrivate[profile];
+    const priorities: { if: string; multiply_by: string }[] = base?.priority ? [...base.priority] : [];
+
+    if (elevationPreference === 'min') {
+        priorities.push(
+            { if: 'average_slope > 4 || average_slope < -4', multiply_by: '0.2' },
+            { if: 'average_slope > 8 || average_slope < -8', multiply_by: '0.1' }
+        );
+    } else if (elevationPreference === 'max') {
+        priorities.push(
+            { if: 'average_slope > 2 || average_slope < -2', multiply_by: '1.8' },
+            { if: 'average_slope > 5 || average_slope < -5', multiply_by: '2.5' }
+        );
+    }
+
+    return priorities.length > 0 ? { priority: priorities } : {};
+}
 
 export function getManualRoute(points: Coordinates[]): TrackPoint[] {
     const routePoints: TrackPoint[] = [];
@@ -67,20 +87,32 @@ export function getManualRoute(points: Coordinates[]): TrackPoint[] {
 export async function route(
     points: Coordinates[],
     profileKey: string,
-    manualMode = false
+    manualMode = false,
+    elevationPreference: 'any' | 'min' | 'max' = 'any'
 ): Promise<TrackPoint[]> {
     if (manualMode) {
         return getManualRoute(points);
     }
     const profile = routingProfiles[profileKey] ?? routingProfiles.bike!;
-    return profile.engine === 'graphhopper'
-        ? getGraphHopperRoute(points, profile.profile)
-        : getBRouterRoute(points, profile.profile);
+    try {
+        if (profile.engine === 'graphhopper') {
+            return await getGraphHopperRoute(points, profile.profile, elevationPreference);
+        } else {
+            const bProfile = (profileKey === 'hike' && elevationPreference === 'min') ? 'hiking' : profile.profile;
+            return await getBRouterRoute(points, bProfile);
+        }
+    } catch (err) {
+        if (profile.engine === 'brouter' && profileKey === 'hike') {
+            return getGraphHopperRoute(points, 'foot', elevationPreference);
+        }
+        throw err;
+    }
 }
 
 async function getGraphHopperRoute(
     points: Coordinates[],
-    profile: string
+    profile: string,
+    elevationPreference: 'any' | 'min' | 'max' = 'any'
 ): Promise<TrackPoint[]> {
     const response = await fetch('/api/graphhopper/route', {
         method: 'POST',
@@ -90,7 +122,7 @@ async function getGraphHopperRoute(
             profile,
             elevation: true,
             points_encoded: false,
-            custom_model: graphhopperBlockPrivate[profile] ?? {},
+            custom_model: buildGraphHopperCustomModel(profile, elevationPreference),
         }),
     });
 

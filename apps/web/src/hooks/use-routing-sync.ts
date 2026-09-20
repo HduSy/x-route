@@ -17,6 +17,7 @@ export function useRoutingSync() {
     const showDistanceMarkers = useRoutingStore((s) => s.showDistanceMarkers);
     const showRoutePath = useRoutingStore((s) => s.showRoutePath);
     const units = useRoutingStore((s) => s.units);
+    const elevationPreference = useRoutingStore((s) => s.elevationPreference);
 
     // Map interactions -> store (wired once)
     useEffect(() => {
@@ -83,7 +84,7 @@ export function useRoutingSync() {
         const state = useRoutingStore.getState();
         state.setRouting(true);
 
-        route(anchors, profile, manualMode)
+        route(anchors, profile, manualMode, elevationPreference)
             .then((points) => {
                 if (myRequest !== requestSeq) return;
                 useRoutingStore.getState().setResult(points, null);
@@ -100,7 +101,7 @@ export function useRoutingSync() {
                     useRoutingStore.getState().setRouting(false);
                 }
             });
-    }, [anchors, profile, manualMode]);
+    }, [anchors, profile, manualMode, elevationPreference]);
 
     // When draw mode turns ON, ensure markers and route are synced to map layer
     useEffect(() => {

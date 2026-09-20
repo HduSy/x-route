@@ -58,8 +58,10 @@ export const translations = {
         mountainBike: 'Mountain bike',
         run: 'Run',
         walk: 'Walk',
+        hike: 'Hike',
         followPopular: 'Follow most popular',
         minElevation: 'Minimize elevation',
+        maxElevation: 'Maximize elevation',
         directRoute: 'Direct route',
         anyElevation: 'Any elevation',
         anySurface: 'Any surface type',
@@ -144,12 +146,17 @@ export const translations = {
         dragGhostHoverTip: '📍 Click or drag to adjust route',
         dragGhostActiveTip: '🎯 Release to insert waypoint',
 
+        // Lasso delete confirmation
+        confirmDeleteLassoTitle: 'Delete {count} selected waypoint(s)?',
+        confirmDeleteLassoBody: 'This will remove the selected waypoints from the route. Are you sure?',
+
         profiles: {
             bike: 'Bike',
             racing_bike: 'Road bike',
             gravel_bike: 'Gravel bike',
             mountain_bike: 'MTB',
-            foot: 'Foot',
+            foot: 'Run',
+            hike: 'Hike',
             water: 'Water',
             railway: 'Railway',
         },
@@ -214,8 +221,10 @@ export const translations = {
         mountainBike: '山地越野 (MTB)',
         run: '跑步走线',
         walk: '徒步健走',
+        hike: '徒步 (户外登山)',
         followPopular: '热门推荐路线',
         minElevation: '平缓路线 (爬升最少)',
+        maxElevation: '爬升优先 (挑战坡度)',
         directRoute: '直接直线连线',
         anyElevation: '任意爬升高度',
         anySurface: '任意路面类型',
@@ -300,12 +309,17 @@ export const translations = {
         dragGhostHoverTip: '📍 点击或拖拽以调整路线',
         dragGhostActiveTip: '🎯 释放以新增途经点',
 
+        // 框选删除二次确认
+        confirmDeleteLassoTitle: '确认删除框选的 {count} 个节点？',
+        confirmDeleteLassoBody: '这将从路线中移除选中的节点，操作不可撤销，确定继续？',
+
         profiles: {
             bike: '标准骑行',
             racing_bike: '公路车 (铺装路)',
             gravel_bike: '砾石公路 (Gravel)',
             mountain_bike: '山地越野 (MTB)',
-            foot: '徒步走线',
+            foot: '跑步走线',
+            hike: '徒步登山',
             water: '水路航线',
             railway: '铁路轨迹',
         },

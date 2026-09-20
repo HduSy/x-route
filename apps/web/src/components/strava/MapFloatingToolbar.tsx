@@ -51,7 +51,6 @@ export function MapFloatingToolbar() {
 
     const fileCount = useLiveQuery(() => db.fileids.count()) ?? 0;
     const [isLocating, setIsLocating] = useState(false);
-    const [isLocated, setIsLocated] = useState(false);
 
     const handleLocateMe = (isManual = false) => {
         if (!('geolocation' in navigator)) return;
@@ -76,7 +75,6 @@ export function MapFloatingToolbar() {
                     duration: 800,
                 });
             }
-            setIsLocated(true);
         }
 
         // Always request the freshest position from navigator.geolocation
@@ -108,7 +106,6 @@ export function MapFloatingToolbar() {
                 });
             }
             setIsLocating(false);
-            setIsLocated(true);
         };
 
         const tryLowAccuracy = () => {
@@ -160,7 +157,6 @@ export function MapFloatingToolbar() {
         setLassoMode(false);
         clear();
         mapManager.clearUserLocation();
-        setIsLocated(false);
     };
 
     // Sync lassoMode React state → singleton so MapView can subscribe
@@ -202,7 +198,7 @@ export function MapFloatingToolbar() {
                         {isLocating ? (
                             <Loader2 className="size-3.5 sm:size-4 animate-spin text-[#863BFF]" />
                         ) : (
-                            <Crosshair className={cn('size-3.5 sm:size-4', isLocated && 'text-[#863BFF]')} />
+                            <Crosshair className="size-3.5 sm:size-4" />
                         )}
                     </button>
                     <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />

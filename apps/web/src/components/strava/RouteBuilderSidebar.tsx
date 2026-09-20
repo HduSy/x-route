@@ -12,7 +12,7 @@ import {
     Spline,
     X,
 } from 'lucide-react';
-import { useRoutingStore, type UnitType } from '@/store/routing-slice';
+import { useRoutingStore, type UnitType, type ElevationPreference, type RoutingPreference } from '@/store/routing-slice';
 import { useT } from '@/store/i18n-slice';
 import { mapManager } from '@/lib/map/MapManager';
 import { cn } from '@/lib/utils';
@@ -32,6 +32,10 @@ export function RouteBuilderSidebar() {
     const setActive = useRoutingStore((s) => s.setActive);
     const profile = useRoutingStore((s) => s.profile);
     const setProfile = useRoutingStore((s) => s.setProfile);
+    const routingPreference = useRoutingStore((s) => s.routingPreference);
+    const setRoutingPreference = useRoutingStore((s) => s.setRoutingPreference);
+    const elevationPreference = useRoutingStore((s) => s.elevationPreference);
+    const setElevationPreference = useRoutingStore((s) => s.setElevationPreference);
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
     const showDistanceMarkers = useRoutingStore((s) => s.showDistanceMarkers);
@@ -243,9 +247,10 @@ export function RouteBuilderSidebar() {
                                 <option value="gravel_bike">{t.gravelBike}</option>
                                 <option value="mountain_bike">{t.mountainBike}</option>
                                 <option value="foot">{t.run}</option>
+                                <option value="hike">{t.hike}</option>
                             </select>
                             <div className="pointer-events-none absolute left-3 top-2.5 text-muted-foreground">
-                                {profile === 'foot' ? (
+                                {profile === 'foot' || profile === 'hike' ? (
                                     <Footprints className="size-4 text-[#863BFF]" />
                                 ) : (
                                     <Bike className="size-4 text-[#863BFF]" />
@@ -257,15 +262,17 @@ export function RouteBuilderSidebar() {
 
                     {/* Optimization Route Mode */}
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-foreground">{t.followPopular}</label>
+                        <label className="text-xs font-semibold text-foreground">
+                            {routingPreference === 'popular' ? t.followPopular : t.directRoute}
+                        </label>
                         <div className="relative">
                             <select
-                                value={profile}
-                                onChange={(e) => setProfile(e.target.value)}
+                                value={routingPreference}
+                                onChange={(e) => setRoutingPreference(e.target.value as RoutingPreference)}
                                 className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
-                                <option value="bike">{t.followPopular}</option>
-                                <option value="racing_bike">{t.minElevation}</option>
+                                <option value="popular">{t.followPopular}</option>
+                                <option value="direct">{t.directRoute}</option>
                             </select>
                             <Compass className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
                             <ChevronDown className="pointer-events-none absolute right-2.5 top-3 size-3.5 text-muted-foreground" />
@@ -274,13 +281,22 @@ export function RouteBuilderSidebar() {
 
                     {/* Elevation Preference */}
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-foreground">{t.anyElevation}</label>
+                        <label className="text-xs font-semibold text-foreground">
+                            {elevationPreference === 'any'
+                                ? t.anyElevation
+                                : elevationPreference === 'min'
+                                ? t.minElevation
+                                : t.maxElevation}
+                        </label>
                         <div className="relative">
                             <select
+                                value={elevationPreference}
+                                onChange={(e) => setElevationPreference(e.target.value as ElevationPreference)}
                                 className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
-                                <option>{t.anyElevation}</option>
-                                <option>{t.minElevation}</option>
+                                <option value="any">{t.anyElevation}</option>
+                                <option value="min">{t.minElevation}</option>
+                                <option value="max">{t.maxElevation}</option>
                             </select>
                             <Mountain className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
                             <ChevronDown className="pointer-events-none absolute right-2.5 top-3 size-3.5 text-muted-foreground" />

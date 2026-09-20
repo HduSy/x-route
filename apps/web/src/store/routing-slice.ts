@@ -5,12 +5,14 @@ export interface RoutingAnchor extends Coordinates {}
 
 export type UnitType = 'km' | 'mi';
 export type RoutingPreference = 'popular' | 'flat' | 'direct';
+export type ElevationPreference = 'any' | 'min' | 'max';
 
 interface RoutingState {
     active: boolean;
     anchors: RoutingAnchor[];
     profile: string;
     routingPreference: RoutingPreference;
+    elevationPreference: ElevationPreference;
     manualMode: boolean;
     resultPoints: TrackPoint[];
     routing: boolean;
@@ -32,11 +34,13 @@ interface RoutingState {
     setActive: (active: boolean) => void;
     setProfile: (profile: string) => void;
     setRoutingPreference: (pref: RoutingPreference) => void;
+    setElevationPreference: (pref: ElevationPreference) => void;
     setManualMode: (manualMode: boolean) => void;
     addAnchor: (anchor: RoutingAnchor) => void;
     insertAnchor: (index: number, anchor: RoutingAnchor) => void;
     moveAnchor: (index: number, to: Coordinates) => void;
     removeAnchor: (index: number) => void;
+    removeAnchors: (indices: number[]) => void;
     reverseAnchors: () => void;
     clear: (resetHistory?: boolean) => void;
     setResult: (points: TrackPoint[], error: string | null) => void;
@@ -64,6 +68,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     anchors: [],
     profile: 'bike',
     routingPreference: 'popular',
+    elevationPreference: 'any',
     manualMode: false,
     resultPoints: [],
     routing: false,
@@ -84,6 +89,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     setActive: (active) => set({ active }),
     setProfile: (profile) => set({ profile }),
     setRoutingPreference: (routingPreference) => set({ routingPreference }),
+    setElevationPreference: (elevationPreference) => set({ elevationPreference }),
     setManualMode: (manualMode) => set({ manualMode }),
 
     addAnchor: (anchor) => {
@@ -117,6 +123,30 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
             future: [],
             active: true,
         });
+    },
+
+    removeAnchors: (indices: number[]) => {
+        const { anchors, past } = get();
+        const indexSet = new Set(indices);
+        const next = anchors.filter((_, i) => !indexSet.has(i));
+        if (next.length === 0) {
+            set({
+                active: true,
+                anchors: [],
+                resultPoints: [],
+                error: null,
+                editingFileId: null,
+                past: [...past, anchors],
+                future: [],
+            });
+        } else {
+            set({
+                anchors: next,
+                past: [...past, anchors],
+                future: [],
+                active: true,
+            });
+        }
     },
 
     reverseAnchors: () => {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check, Compass, Focus, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
+import { AlertTriangle, Check, Compass, Focus, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
@@ -47,6 +47,7 @@ export function MapView() {
     const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
     const lassoStartRef = useRef<{ x: number; y: number } | null>(null);
     const isLassoActiveRef = useRef(false);
+    const [lassoConfirmIndices, setLassoConfirmIndices] = useState<number[] | null>(null);
 
     const active = useRoutingStore((s) => s.active);
     const setActive = useRoutingStore((s) => s.setActive);
@@ -212,26 +213,55 @@ export function MapView() {
             const map = mapManager.getMap();
             if (!map) return;
 
-            // Convert pixel corners to geographic coordinates
-            const sw = map.unproject([x0, y1]);
-            const ne = map.unproject([x1, y0]);
-            const minLon = sw.lng;
-            const maxLon = ne.lng;
-            const minLat = sw.lat;
-            const maxLat = ne.lat;
-
-            // Remove anchors that fall within the box
-            const { anchors, removeAnchor } = useRoutingStore.getState();
+            // Project anchors to screen pixel space (handles rotation, pitch, and road snapping accurately)
+            const { anchors, resultPoints } = useRoutingStore.getState();
             const toRemove: number[] = [];
+            const MARGIN = 12;
+
             for (let i = 0; i < anchors.length; i++) {
                 const a = anchors[i]!;
-                if (a.lon >= minLon && a.lon <= maxLon && a.lat >= minLat && a.lat <= maxLat) {
+                const p = map.project([a.lon, a.lat]);
+                let inside = (
+                    p.x >= x0 - MARGIN &&
+                    p.x <= x1 + MARGIN &&
+                    p.y >= y0 - MARGIN &&
+                    p.y <= y1 + MARGIN
+                );
+
+                // Also check road-snapped position for start and end markers
+                if (!inside && resultPoints.length > 0) {
+                    if (i === 0) {
+                        const first = resultPoints[0]!;
+                        const pStart = map.project([first.attributes.lon, first.attributes.lat]);
+                        if (
+                            pStart.x >= x0 - MARGIN &&
+                            pStart.x <= x1 + MARGIN &&
+                            pStart.y >= y0 - MARGIN &&
+                            pStart.y <= y1 + MARGIN
+                        ) {
+                            inside = true;
+                        }
+                    } else if (i === anchors.length - 1 && anchors.length > 1) {
+                        const last = resultPoints[resultPoints.length - 1]!;
+                        const pEnd = map.project([last.attributes.lon, last.attributes.lat]);
+                        if (
+                            pEnd.x >= x0 - MARGIN &&
+                            pEnd.x <= x1 + MARGIN &&
+                            pEnd.y >= y0 - MARGIN &&
+                            pEnd.y <= y1 + MARGIN
+                        ) {
+                            inside = true;
+                        }
+                    }
+                }
+
+                if (inside) {
                     toRemove.push(i);
                 }
             }
-            // Remove in reverse order so indices stay stable
-            for (let i = toRemove.length - 1; i >= 0; i--) {
-                removeAnchor(toRemove[i]!);
+
+            if (toRemove.length > 0) {
+                setLassoConfirmIndices(toRemove);
             }
         };
 
@@ -567,6 +597,50 @@ export function MapView() {
             {popupFile && popupContainerRef.current
                 ? createPortal(<TrackPopupContent file={popupFile} />, popupContainerRef.current)
                 : null}
+
+            {/* Lasso delete confirmation modal */}
+            {lassoConfirmIndices && (
+                <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                    <div className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-white dark:bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95">
+                        <div className="flex items-start gap-3">
+                            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                                <AlertTriangle className="size-5 text-destructive" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-foreground">
+                                    {t.confirmDeleteLassoTitle.replace('{count}', String(lassoConfirmIndices.length))}
+                                </h3>
+                                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                    {t.confirmDeleteLassoBody}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="mt-5 flex justify-end gap-2">
+                            <button
+                                onClick={() => setLassoConfirmIndices(null)}
+                                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
+                            >
+                                {t.cancel}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const { removeAnchors, clear } = useRoutingStore.getState();
+                                    const currentAnchors = useRoutingStore.getState().anchors;
+                                    if (lassoConfirmIndices.length >= currentAnchors.length) {
+                                        clear();
+                                    } else {
+                                        removeAnchors(lassoConfirmIndices);
+                                    }
+                                    setLassoConfirmIndices(null);
+                                }}
+                                className="rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-white hover:bg-red-600 transition cursor-pointer"
+                            >
+                                {t.delete}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
