@@ -74,7 +74,7 @@ export const BASEMAPS: Record<BasemapKey, { label: string; style: string | Style
     positron: { label: 'Positron', style: 'https://tiles.openfreemap.org/styles/positron' },
     dark: { label: 'Dark', style: 'https://tiles.openfreemap.org/styles/dark' },
     esriSatellite: {
-        label: 'Satellite (Esri)',
+        label: 'Satellite',
         style: {
             version: 8,
             sources: {
