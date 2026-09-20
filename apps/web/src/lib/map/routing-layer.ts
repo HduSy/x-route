@@ -329,20 +329,44 @@ export class RoutingLayerController {
             }
         }
 
-        // 2. Iterate each segment and find the closest segment in screen space
+        const HIT_RADIUS = 18; // pixels for comfortable, responsive snapping
+
+        // 2. Fast GPU-backed layer check if layers exist to avoid expensive projection loops on large polylines
+        try {
+            if (map.getLayer(LINE_HIT_AREA_LAYER_ID) || map.getLayer(LINE_LAYER_ID)) {
+                const queryLayers: string[] = [];
+                if (map.getLayer(LINE_HIT_AREA_LAYER_ID)) queryLayers.push(LINE_HIT_AREA_LAYER_ID);
+                if (map.getLayer(LINE_LAYER_ID)) queryLayers.push(LINE_LAYER_ID);
+
+                const bbox: [[number, number], [number, number]] = [
+                    [screenX - HIT_RADIUS, screenY - HIT_RADIUS],
+                    [screenX + HIT_RADIUS, screenY + HIT_RADIUS],
+                ];
+                const hits = map.queryRenderedFeatures(bbox, { layers: queryLayers });
+                if (hits.length === 0) {
+                    return null;
+                }
+            }
+        } catch {
+            // Fallback to geometric check if queryRenderedFeatures encounters any transient style issue
+        }
+
+        // 3. Iterate segments with screen-space bounding box to find the exact closest coordinate & insertIndex
         let bestDistSq = Infinity;
         let bestSegmentIndex = 0;
         let bestT = 0;
-        const HIT_RADIUS = 16; // pixels
         const HIT_RADIUS_SQ = HIT_RADIUS * HIT_RADIUS;
 
         const pts = this.currentPoints;
-        for (let i = 0; i < pts.length - 1; i++) {
-            const p1 = pts[i]!;
-            const p2 = pts[i + 1]!;
+        let prevScreenPt = map.project([pts[0]!.attributes.lon, pts[0]!.attributes.lat]);
 
-            const s1 = map.project([p1.attributes.lon, p1.attributes.lat]);
-            const s2 = map.project([p2.attributes.lon, p2.attributes.lat]);
+        for (let i = 0; i < pts.length - 1; i++) {
+            const nextPt = pts[i + 1]!;
+            const nextScreenPt = map.project([nextPt.attributes.lon, nextPt.attributes.lat]);
+
+            const s1 = prevScreenPt;
+            const s2 = nextScreenPt;
+            prevScreenPt = nextScreenPt;
 
             // Quick AABB reject per segment with margin
             const minX = Math.min(s1.x, s2.x) - HIT_RADIUS;
@@ -429,6 +453,9 @@ export class RoutingLayerController {
             if (hit) {
                 this.isHoveringLine = true;
                 this.ensureGhostMarker(map, hit.closestLngLat);
+                if (this.ghostMarker) {
+                    this.showGhostTooltip(this.ghostMarker, 'hover');
+                }
                 map.getCanvas().style.cursor = 'grab';
             } else if (this.isHoveringLine) {
                 this.isHoveringLine = false;
@@ -444,7 +471,7 @@ export class RoutingLayerController {
             map.getCanvas().style.cursor = '';
         };
 
-        // Strava-grade Route Dragging:
+        // Strava-grade Route Dragging & Direct Line Click:
         // Captures pointerdown AND mousedown on the map container when clicking on the route line.
         // Synchronously stops propagation and disables map dragPan BEFORE MapLibre can initiate a map pan!
         this.containerPointerDownHandler = (e: MouseEvent | PointerEvent) => {
@@ -533,6 +560,9 @@ export class RoutingLayerController {
                 const curRect = canvas.getBoundingClientRect();
                 const curLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
                 this.ghostMarker?.setLngLat([curLngLat.lng, curLngLat.lat]);
+                if (this.ghostMarker) {
+                    this.showGhostTooltip(this.ghostMarker, 'drag');
+                }
                 this.setRubberBand(getRubberBandCoords(curLngLat));
             };
 
@@ -547,11 +577,16 @@ export class RoutingLayerController {
                 const curRect = canvas.getBoundingClientRect();
                 const finalLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
 
-                // Only insert if dragged by at least 6px (deliberate drag, not an accidental micro-jitter)
+                // Calculate move distance in pixels
                 const moveDist = Math.hypot(we.clientX - startClientX, we.clientY - startClientY);
+                this.justFinishedGhostDrag = true;
+
                 if (moveDist >= 6) {
-                    this.justFinishedGhostDrag = true;
+                    // Dragged to a new location on the map: insert custom waypoint at released map location
                     this.onInsertAnchor?.(this.dragInsertIndex, { lon: finalLngLat.lng, lat: finalLngLat.lat });
+                } else {
+                    // Direct click/selection on route line: insert waypoint right at clicked line position
+                    this.onInsertAnchor?.(this.dragInsertIndex, { lon: hit.closestLngLat.lng, lat: hit.closestLngLat.lat });
                 }
 
                 cleanupState();
@@ -572,7 +607,7 @@ export class RoutingLayerController {
             try {
                 this.ensureGhostMarker(map, hit.closestLngLat);
                 if (this.ghostMarker) {
-                    this.showGhostTooltip(this.ghostMarker);
+                    this.showGhostTooltip(this.ghostMarker, 'hover');
                 }
                 this.setRubberBand(getRubberBandCoords(hit.closestLngLat));
 
@@ -666,8 +701,9 @@ export class RoutingLayerController {
         el.appendChild(tip);
     }
 
-    private showGhostTooltip(marker: Marker) {
+    private showGhostTooltip(marker: Marker, mode: 'hover' | 'drag' = 'hover') {
         const el = marker.getElement();
+        this.hideDragTooltip(marker);
         const tip = document.createElement('div');
         tip.className = 'x-route-drag-tip';
         tip.style.cssText = `
@@ -675,7 +711,7 @@ export class RoutingLayerController {
             bottom: calc(100% + 8px);
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(37, 99, 235, 0.95);
+            background: ${mode === 'drag' ? 'rgba(37, 99, 235, 0.95)' : 'rgba(15, 23, 42, 0.92)'};
             color: #fff;
             padding: 4px 8px;
             border-radius: 6px;
@@ -683,13 +719,13 @@ export class RoutingLayerController {
             font-weight: 600;
             white-space: nowrap;
             pointer-events: none;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
             z-index: 100;
             backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             animation: x-route-tip-in 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         `;
-        tip.textContent = '📍 拖拽调整路线';
+        tip.textContent = mode === 'drag' ? '🎯 释放以新增途经点' : '📍 点击或拖拽以调整路线';
         el.appendChild(tip);
     }
 
