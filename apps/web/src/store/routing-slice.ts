@@ -66,7 +66,7 @@ interface RoutingState {
 export const useRoutingStore = create<RoutingState>()((set, get) => ({
     active: true, // Default is route creation mode (crosshair cursor); allows instant click-to-route on refresh
     anchors: [],
-    profile: 'bike',
+    profile: 'racing_bike',
     routingPreference: 'popular',
     elevationPreference: 'any',
     manualMode: false,

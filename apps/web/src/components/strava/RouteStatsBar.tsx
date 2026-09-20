@@ -500,7 +500,7 @@ export function RouteStatsBar() {
                     {/* Activity Icon & Label */}
                     <div className="flex items-center gap-2 sm:gap-2.5">
                         <div className="flex size-7 sm:size-9 items-center justify-center rounded-full bg-accent text-[#863BFF]">
-                            {profile === 'foot' ? (
+                            {profile === 'foot' || profile === 'hike' ? (
                                 <Footprints className="size-4 sm:size-5 text-[#863BFF]" />
                             ) : (
                                 <Bike className="size-4 sm:size-5 text-[#863BFF]" />
@@ -511,7 +511,7 @@ export function RouteStatsBar() {
                                 {t.activity}
                             </div>
                             <div className="text-xs font-bold text-foreground">
-                                {profile === 'foot' ? t.run : t.ride}
+                                {profile === 'foot' ? t.run : profile === 'hike' ? t.hike : t.ride}
                             </div>
                         </div>
                     </div>

@@ -262,7 +262,6 @@ export function RouteBuilderSidebar() {
                                 onChange={(e) => setProfile(e.target.value)}
                                 className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
-                                <option value="bike">{t.ride}</option>
                                 <option value="racing_bike">{t.roadBike}</option>
                                 <option value="gravel_bike">{t.gravelBike}</option>
                                 <option value="mountain_bike">{t.mountainBike}</option>
