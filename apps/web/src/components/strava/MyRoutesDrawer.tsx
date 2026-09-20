@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
-    ArrowLeft,
     ArrowRight,
     Bookmark,
     Clock,
@@ -96,11 +95,11 @@ export function MyRoutesDrawer() {
                 />
             )}
 
-            {/* Left side panel — aligned with RouteBuilderSidebar */}
+            {/* Right side panel — matches RouteBuilderSidebar's non-modal sidebar interaction */}
             <aside
                 className={cn(
-                    'fixed inset-y-0 left-0 z-40 w-[85vw] max-w-xs sm:absolute sm:inset-y-0 sm:left-0 sm:z-25 sm:w-80 sm:min-w-80 sm:max-w-none flex h-full flex-col border-r border-border bg-background shadow-2xl sm:shadow-md select-none transition-transform duration-200 ease-in-out',
-                    myRoutesOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
+                    'fixed inset-y-0 right-0 z-40 w-[85vw] max-w-xs sm:absolute sm:inset-y-0 sm:right-0 sm:z-20 sm:w-80 sm:min-w-80 sm:max-w-none flex h-full flex-col border-l border-border bg-background shadow-2xl sm:shadow-md select-none transition-transform duration-200 ease-in-out',
+                    myRoutesOpen ? 'translate-x-0 pointer-events-auto' : 'translate-x-full pointer-events-none'
                 )}
             >
                 {/* Top Accent Gradient Line */}
@@ -108,20 +107,9 @@ export function MyRoutesDrawer() {
 
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-border/80 px-4 py-3.5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setMyRoutesOpen(false);
-                                setSidebarCollapsed(false);
-                            }}
-                            className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer -ml-1 transition"
-                            title={t.backToRouteBuilder}
-                        >
-                            <ArrowLeft className="size-4" />
-                        </button>
+                    <div className="flex items-center gap-2 min-w-0">
                         <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#863BFF]/10 text-[#863BFF]">
-                            <Bookmark className="size-3.5 fill-[#863BFF]/20" />
+                            <Bookmark className="size-4 fill-[#863BFF]/20" />
                         </div>
                         <h2 className="text-base font-bold tracking-tight text-foreground truncate">
                             {t.myRoutes}

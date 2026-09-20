@@ -115,11 +115,9 @@ export function RouteBuilderSidebar() {
             )}
 
             <aside
-                aria-hidden={sidebarCollapsed || myRoutesOpen}
                 className={cn(
                     'fixed inset-y-0 left-0 z-40 w-[85vw] max-w-xs sm:absolute sm:inset-y-0 sm:left-0 sm:z-20 sm:w-80 sm:min-w-80 sm:max-w-none flex h-full flex-col border-r border-border bg-background shadow-2xl sm:shadow-md select-none transition-transform duration-200 ease-in-out',
-                    sidebarCollapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0 pointer-events-auto',
-                    myRoutesOpen && 'pointer-events-none'
+                    sidebarCollapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0 pointer-events-auto'
                 )}
             >
                 {/* Header */}
@@ -130,11 +128,16 @@ export function RouteBuilderSidebar() {
                     <div className="flex items-center gap-1">
                         <button
                             type="button"
-                            onClick={() => setMyRoutesOpen(true)}
-                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-accent hover:text-[#863BFF] cursor-pointer"
+                            onClick={() => setMyRoutesOpen(!myRoutesOpen)}
+                            className={cn(
+                                'flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition cursor-pointer',
+                                myRoutesOpen
+                                    ? 'bg-[#863BFF]/15 text-[#863BFF]'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-[#863BFF]'
+                            )}
                             title={t.myRoutes}
                         >
-                            <Bookmark className="size-3.5 text-[#863BFF]" />
+                            <Bookmark className={cn('size-3.5', myRoutesOpen ? 'text-[#863BFF] fill-[#863BFF]' : 'text-[#863BFF]')} />
                             <span className="text-[11px] font-medium">{t.myRoutes}</span>
                         </button>
                         <button

@@ -247,6 +247,16 @@
   }
 }
 
+/* Smoothly shift attribution control when my-routes panel expands on desktop */
+.maplibregl-ctrl-bottom-right {
+  transition: transform 0.2s ease-in-out;
+}
+@media (min-width: 640px) {
+  .my-routes-open .maplibregl-ctrl-bottom-right {
+    transform: translateX(-326px);
+  }
+}
+
 /* Smooth scale control width transitions to prevent jittering */
 .maplibregl-ctrl-scale {
   transition: width 0.15s ease-out;

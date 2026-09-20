@@ -43,7 +43,6 @@ export function MapFloatingToolbar() {
     const myRoutesOpen = useRoutingStore((s) => s.myRoutesOpen);
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
-    const isLeftPanelOpen = !sidebarCollapsed || myRoutesOpen;
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
 
     const [toolsOpen, setToolsOpen] = useState(false);
@@ -184,8 +183,9 @@ export function MapFloatingToolbar() {
     return (
         <div
             className={cn(
-                'pointer-events-none absolute right-2 top-2 sm:right-3 sm:top-3 z-10 flex items-center justify-between select-none transition-[left] duration-200 ease-in-out',
-                !isLeftPanelOpen ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
+                'pointer-events-none absolute top-2 sm:top-3 z-10 flex items-center justify-between select-none transition-[left,right] duration-200 ease-in-out',
+                sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]',
+                myRoutesOpen ? 'right-2 sm:right-[332px]' : 'right-2 sm:right-3'
             )}
         >
             {/* Left toolbar group */}
