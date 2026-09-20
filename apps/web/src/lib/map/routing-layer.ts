@@ -1,6 +1,6 @@
 import { Marker, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
 import { mapManager } from './MapManager';
-import type { RoutingAnchor, UnitType } from '@/store/routing-slice';
+import { useRoutingStore, type RoutingAnchor, type UnitType } from '@/store/routing-slice';
 import { TrackPoint, distance } from '@x-route/gpx';
 import { getClosestLinePoint } from '@/lib/utils';
 import { translations, useI18nStore } from '@/store/i18n-slice';
@@ -818,7 +818,12 @@ export class RoutingLayerController {
 
     sync(anchors: RoutingAnchor[]) {
         this.currentAnchors = anchors;
+        if (anchors.length === 0) {
+            this.clear();
+            return;
+        }
         mapManager.onReady((map) => {
+            if (this.currentAnchors !== anchors) return;
             this.wire(map);
             this.syncMarkers(map, anchors);
             this.ensureLayers(map);
@@ -826,7 +831,23 @@ export class RoutingLayerController {
     }
 
     private syncMarkers(map: MapLibreMap, anchors: RoutingAnchor[]) {
-        for (const marker of this.markers) marker.remove();
+        for (const marker of this.markers) {
+            try {
+                marker.remove();
+            } catch {}
+        }
+        this.markers = [];
+        if (anchors.length === 0) {
+            if (map) {
+                try {
+                    const container = map.getContainer();
+                    container.querySelectorAll('.x-route-anchor-marker, .x-route-drag-tip').forEach((el) => {
+                        el.remove();
+                    });
+                } catch {}
+            }
+            return;
+        }
         this.markers = anchors.map((anchor, index) =>
             this.createMarker(map, anchor, index, anchors.length)
         );
@@ -943,17 +964,48 @@ export class RoutingLayerController {
 
     private ensureLayers(map: MapLibreMap) {
         if (!map.isStyleLoaded()) {
-            map.once('styledata', () => this.ensureLayers(map));
+            map.once('style.load', () => this.ensureLayers(map));
+            map.once('styledata', () => {
+                if (map.isStyleLoaded()) this.ensureLayers(map);
+            });
             return;
         }
 
         ensureBadgeImages(map);
 
+        const currentPoints =
+            this.currentPoints.length >= 2
+                ? this.currentPoints
+                : useRoutingStore.getState().resultPoints;
+
+        const initialRouteData: GeoJSON.FeatureCollection<GeoJSON.LineString> =
+            currentPoints.length >= 2
+                ? {
+                      type: 'FeatureCollection',
+                      features: [
+                          {
+                              type: 'Feature',
+                              properties: {},
+                              geometry: {
+                                  type: 'LineString',
+                                  coordinates: currentPoints.map((p) => [
+                                      p.attributes.lon,
+                                      p.attributes.lat,
+                                  ]),
+                              },
+                          },
+                      ],
+                  }
+                : { type: 'FeatureCollection', features: [] };
+
         if (!map.getSource(SOURCE_ID)) {
             map.addSource(SOURCE_ID, {
                 type: 'geojson',
-                data: { type: 'FeatureCollection', features: [] },
+                data: initialRouteData,
             });
+        } else {
+            const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+            src?.setData(initialRouteData);
         }
 
         // Casing underlay for high contrast
@@ -1080,6 +1132,8 @@ export class RoutingLayerController {
                 },
             });
         }
+
+        this.updateDistanceMarkers();
     }
 
     setOptions(options: {
@@ -1247,6 +1301,13 @@ export class RoutingLayerController {
     setResult(points: TrackPoint[]) {
         this.currentPoints = points;
         mapManager.onReady((map) => {
+            if (!map.isStyleLoaded()) {
+                map.once('style.load', () => this.setResult(points));
+                map.once('styledata', () => {
+                    if (map.isStyleLoaded()) this.setResult(points);
+                });
+                return;
+            }
             this.ensureLayers(map);
             const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
             if (!source) return;
@@ -1281,12 +1342,39 @@ export class RoutingLayerController {
     resync() {
         const map = mapManager.getMap();
         if (!map) return;
-        this.wire(map);
-        this.ensureLayers(map);
-        this.syncMarkers(map, this.currentAnchors);
-        if (this.currentPoints.length >= 2) {
-            this.setResult(this.currentPoints);
+
+        const doResync = () => {
+            if (!map.isStyleLoaded()) {
+                map.once('style.load', doResync);
+                return;
+            }
+            this.wire(map);
+            this.ensureLayers(map);
+
+            const currentAnchors =
+                this.currentAnchors.length > 0
+                    ? this.currentAnchors
+                    : useRoutingStore.getState().anchors;
+            this.syncMarkers(map, currentAnchors);
+
+            const currentPoints =
+                this.currentPoints.length >= 2
+                    ? this.currentPoints
+                    : useRoutingStore.getState().resultPoints;
+            if (currentPoints.length >= 2) {
+                this.setResult(currentPoints);
+            }
+        };
+
+        if (!map.isStyleLoaded()) {
+            map.once('style.load', doResync);
+            map.once('styledata', () => {
+                if (map.isStyleLoaded()) doResync();
+            });
+            return;
         }
+
+        doResync();
     }
 
     /** Soft clear: drop markers and the result line, keep click listener wired */
@@ -1295,7 +1383,11 @@ export class RoutingLayerController {
         map?.dragPan.enable();
         this.isDraggingLine = false;
         this.isHoveringLine = false;
-        for (const marker of this.markers) marker.remove();
+        for (const marker of this.markers) {
+            try {
+                marker.remove();
+            } catch {}
+        }
         this.markers = [];
         this.currentPoints = [];
         this.currentAnchors = [];
@@ -1303,6 +1395,15 @@ export class RoutingLayerController {
         this.clearRubberBand();
         this.hideDragTooltip();
         this.setResult([]);
+
+        if (map) {
+            try {
+                const container = map.getContainer();
+                container.querySelectorAll('.x-route-anchor-marker, .x-route-drag-tip').forEach((el) => {
+                    el.remove();
+                });
+            } catch {}
+        }
     }
 
     /** Full teardown — called when the map itself goes away. */

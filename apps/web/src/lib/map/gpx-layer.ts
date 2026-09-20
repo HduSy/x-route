@@ -77,6 +77,13 @@ class GPXLayerController {
         this.lastFiles = files;
         this.lastSelected = selectedFileId;
         mapManager.onReady((map) => {
+            if (!map.isStyleLoaded()) {
+                map.once('style.load', () => this.sync(files, selectedFileId));
+                map.once('styledata', () => {
+                    if (map.isStyleLoaded()) this.sync(files, selectedFileId);
+                });
+                return;
+            }
             this.removeStaleLayers(map, files);
             for (const { fileId, file } of files) {
                 this.syncFileLayer(map, fileId, file, selectedFileId === fileId);

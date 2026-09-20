@@ -155,7 +155,7 @@ function getSavedBasemap(): BasemapKey {
         const val = localStorage.getItem(BASEMAP_STORAGE_KEY);
         if (val && val in BASEMAPS) return val as BasemapKey;
     } catch {}
-    return 'bright';
+    return 'liberty';
 }
 
 function saveSavedBasemap(key: BasemapKey) {
@@ -487,16 +487,21 @@ class MapManager {
         saveSavedBasemap(key);
         if (this.map) {
             this.map.setStyle(BASEMAPS[key].style as any);
-            // Dynamic sources/layers are wiped by setStyle. Wait out the style
-            // diff window first: right after setStyle, getSource()/getLayer()
-            // still return the PREVIOUS style's objects, so an immediate re-add
-            // would no-op against dead objects and vanish once the new style
-            // settles. A short delay plus readiness retry is the robust combo.
+            let fired = false;
+            const fireReload = () => {
+                if (fired) return;
+                fired = true;
+                this.styleReloadCallbacks.forEach((cb) => cb());
+            };
+            this.map.once('style.load', fireReload);
+            this.map.once('styledata', () => {
+                if (this.map?.isStyleLoaded()) fireReload();
+            });
             setTimeout(() => {
                 this.onReady(() => {
-                    this.styleReloadCallbacks.forEach((cb) => cb());
+                    fireReload();
                 });
-            }, 500);
+            }, 600);
         }
     }
 

@@ -20,6 +20,7 @@ import { useRoutingStore } from '@/store/routing-slice';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useT } from '@/store/i18n-slice';
 import { mapManager } from '@/lib/map/MapManager';
+import { routingLayer } from '@/lib/map/routing-layer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { reverseTrack, simplifyTrack, splitTrackAtMiddle, closeLoop } from '@/lib/file-actions';
@@ -156,6 +157,8 @@ export function MapFloatingToolbar() {
         setConfirmOpen(false);
         setLassoMode(false);
         clear();
+        routingLayer.clear();
+        useSelectionStore.getState().selectFile(null);
         mapManager.clearUserLocation();
     };
 

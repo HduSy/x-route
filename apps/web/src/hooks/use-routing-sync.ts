@@ -73,6 +73,7 @@ export function useRoutingSync() {
 
     // Route computation on anchors/profile/manualMode change
     useEffect(() => {
+        const myRequest = ++requestSeq;
         if (anchors.length < 2) {
             const state = useRoutingStore.getState();
             state.setResult([], null);
@@ -80,7 +81,6 @@ export function useRoutingSync() {
             return;
         }
 
-        const myRequest = ++requestSeq;
         const state = useRoutingStore.getState();
         state.setRouting(true);
 
@@ -105,7 +105,7 @@ export function useRoutingSync() {
 
     // When draw mode turns ON, ensure markers and route are synced to map layer
     useEffect(() => {
-        if (active) {
+        if (active && anchors.length > 0) {
             routingLayer.sync(anchors);
             if (resultPoints.length >= 2) {
                 routingLayer.setResult(resultPoints);
