@@ -225,7 +225,7 @@ export const translations = {
         routingPreferences: '路线规划偏好',
         activity: '运动类型',
         ride: '骑行',
-        roadBike: '公路车 (铺装路)',
+        roadBike: '公路车 (Road)',
         gravelBike: '瓜车 (Gravel)',
         mountainBike: '山地越野 (MTB)',
         run: '跑步',
@@ -261,7 +261,7 @@ export const translations = {
         elevationLoss: '累计下降',
         elevation: '海拔',
         segmentLength: '分段长度',
-        type: '类型',
+        type: '坡度',
         slope: '坡度',
         paved: '铺装路面',
         dirt: '土路/砂石',
@@ -329,7 +329,7 @@ export const translations = {
 
         profiles: {
             bike: '标准骑行',
-            racing_bike: '公路车 (铺装路)',
+            racing_bike: '公路车 (Road)',
             gravel_bike: '砾石公路 (Gravel)',
             mountain_bike: '山地越野 (MTB)',
             foot: '跑步',

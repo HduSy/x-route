@@ -58,47 +58,120 @@ function getSlopeBracket(slope: number): SlopeBracket {
     }
 }
 
-function getIntervalBracket(pts: ProfilePoint[], intervalIdx: number): SlopeBracket {
-    const p0 = pts[intervalIdx];
-    const p1 = pts[intervalIdx + 1];
-    if (!p0 || !p1) {
-        return getSlopeBracket(0);
-    }
-    const distMeters = (p1.distanceKm - p0.distanceKm) * 1000;
-    const eleDiff = p1.ele - p0.ele;
-    const slope = distMeters > 0.5 ? (eleDiff / distMeters) * 100 : 0;
-    return getSlopeBracket(slope);
+interface SegmentInfo {
+    lengthKm: number;
+    bracket: SlopeBracket;
+    slope: number;
 }
 
-function getSegmentDetails(pts: ProfilePoint[], idx: number): { lengthKm: number; bracket: SlopeBracket } {
+function buildSegmentMap(pts: ProfilePoint[]): SegmentInfo[] {
     if (pts.length < 2) {
-        return {
-            lengthKm: 0,
-            bracket: getSlopeBracket(0),
-        };
+        return pts.map(() => ({ lengthKm: 0.1, bracket: getSlopeBracket(0), slope: 0 }));
     }
 
-    const k = Math.min(Math.max(0, idx), pts.length - 2);
-    const targetBracket = getIntervalBracket(pts, k);
+    // 1. Calculate smoothed slope at each point using ~150m baseline window (±75m)
+    const pointSlopes = pts.map((p, i) => {
+        const curDist = p.distanceKm;
+        let p0 = p;
+        let p1 = p;
+        for (let j = i; j >= 0; j--) {
+            if ((curDist - pts[j]!.distanceKm) * 1000 >= 75) {
+                p0 = pts[j]!;
+                break;
+            }
+            p0 = pts[0]!;
+        }
+        for (let j = i; j < pts.length; j++) {
+            if ((pts[j]!.distanceKm - curDist) * 1000 >= 75) {
+                p1 = pts[j]!;
+                break;
+            }
+            p1 = pts[pts.length - 1]!;
+        }
+        const dMeters = (p1.distanceKm - p0.distanceKm) * 1000;
+        const slope = dMeters > 10 ? ((p1.ele - p0.ele) / dMeters) * 100 : 0;
+        return { slope, bracket: getSlopeBracket(slope) };
+    });
 
-    let startIdx = k;
-    while (startIdx > 0 && getIntervalBracket(pts, startIdx - 1).id === targetBracket.id) {
-        startIdx--;
+    // 2. Initial contiguous runs
+    interface RawSeg {
+        startIdx: number;
+        endIdx: number;
+        bracket: SlopeBracket;
+        lenMeters: number;
     }
 
-    let endIdx = k;
-    while (endIdx < pts.length - 2 && getIntervalBracket(pts, endIdx + 1).id === targetBracket.id) {
-        endIdx++;
+    const segs: RawSeg[] = [];
+    let segStart = 0;
+    for (let i = 0; i < pts.length; i++) {
+        if (i === pts.length - 1 || pointSlopes[i]!.bracket.id !== pointSlopes[i + 1]!.bracket.id) {
+            segs.push({
+                startIdx: segStart,
+                endIdx: i,
+                bracket: pointSlopes[i]!.bracket,
+                lenMeters: (pts[i]!.distanceKm - pts[segStart]!.distanceKm) * 1000,
+            });
+            segStart = i + 1;
+        }
     }
 
-    const startDist = pts[startIdx]!.distanceKm;
-    const endDist = pts[endIdx + 1]!.distanceKm;
-    const lengthKm = Math.max(0.01, endDist - startDist);
+    // 3. Merge short transitional blips (< 120m) into adjacent neighbors
+    let changed = true;
+    let iterations = 0;
+    while (changed && segs.length > 1 && iterations < 50) {
+        changed = false;
+        iterations++;
+        for (let i = 0; i < segs.length; i++) {
+            if (segs[i]!.lenMeters < 120) {
+                const target = i > 0 ? i - 1 : i + 1;
+                segs[target]!.startIdx = Math.min(segs[target]!.startIdx, segs[i]!.startIdx);
+                segs[target]!.endIdx = Math.max(segs[target]!.endIdx, segs[i]!.endIdx);
+                segs[target]!.lenMeters =
+                    (pts[segs[target]!.endIdx]!.distanceKm - pts[segs[target]!.startIdx]!.distanceKm) * 1000;
+                segs.splice(i, 1);
+                changed = true;
+                break;
+            }
+        }
+    }
 
-    return {
-        lengthKm,
-        bracket: targetBracket,
-    };
+    // 4. Coalesce adjacent segments with matching bracket IDs
+    const coalesced: RawSeg[] = [];
+    for (const seg of segs) {
+        if (coalesced.length > 0 && coalesced[coalesced.length - 1]!.bracket.id === seg.bracket.id) {
+            const last = coalesced[coalesced.length - 1]!;
+            last.endIdx = seg.endIdx;
+            last.lenMeters = (pts[seg.endIdx]!.distanceKm - pts[last.startIdx]!.distanceKm) * 1000;
+        } else {
+            coalesced.push({ ...seg });
+        }
+    }
+
+    // 5. Build point-to-segment map
+    const map: SegmentInfo[] = new Array(pts.length);
+    for (const seg of coalesced) {
+        const lengthKm = Math.max(0.1, pts[seg.endIdx]!.distanceKm - pts[seg.startIdx]!.distanceKm);
+        for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+            map[i] = {
+                lengthKm,
+                bracket: seg.bracket,
+                slope: pointSlopes[i]?.slope ?? 0,
+            };
+        }
+    }
+
+    // Fallback fill for any unassigned indices
+    for (let i = 0; i < pts.length; i++) {
+        if (!map[i]) {
+            map[i] = {
+                lengthKm: 0.1,
+                bracket: pointSlopes[i]?.bracket || getSlopeBracket(0),
+                slope: pointSlopes[i]?.slope ?? 0,
+            };
+        }
+    }
+
+    return map;
 }
 
 export function RouteStatsBar() {
@@ -115,6 +188,7 @@ export function RouteStatsBar() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const chartRef = useRef<Chart | null>(null);
     const sampledRef = useRef<ProfilePoint[]>([]);
+    const segmentMapRef = useRef<SegmentInfo[]>([]);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const tooltipRef = useRef<HTMLDivElement | null>(null);
     const tooltipArrowRef = useRef<HTMLDivElement | null>(null);
@@ -293,6 +367,7 @@ export function RouteStatsBar() {
             (_, idx) => idx % step === 0 || idx === pointsData.length - 1
         );
         sampledRef.current = sampled;
+        segmentMapRef.current = buildSegmentMap(sampled);
 
         if (chartRef.current) {
             chartRef.current.data.labels = sampled.map((p) =>
@@ -323,24 +398,12 @@ export function RouteStatsBar() {
                         backgroundColor: 'rgba(134, 59, 255, 0.14)',
                         segment: {
                             borderColor: (ctx) => {
-                                const pts = sampledRef.current;
-                                const p0 = pts[ctx.p0DataIndex];
-                                const p1 = pts[ctx.p1DataIndex];
-                                if (!p0 || !p1) return '#863BFF';
-                                const distMeters = (p1.distanceKm - p0.distanceKm) * 1000;
-                                const eleDiff = p1.ele - p0.ele;
-                                const slope = distMeters > 0.5 ? (eleDiff / distMeters) * 100 : 0;
-                                return getSlopeBracket(slope).borderColor;
+                                const seg = segmentMapRef.current[ctx.p0DataIndex];
+                                return seg?.bracket.borderColor ?? '#863BFF';
                             },
                             backgroundColor: (ctx) => {
-                                const pts = sampledRef.current;
-                                const p0 = pts[ctx.p0DataIndex];
-                                const p1 = pts[ctx.p1DataIndex];
-                                if (!p0 || !p1) return 'rgba(134, 59, 255, 0.14)';
-                                const distMeters = (p1.distanceKm - p0.distanceKm) * 1000;
-                                const eleDiff = p1.ele - p0.ele;
-                                const slope = distMeters > 0.5 ? (eleDiff / distMeters) * 100 : 0;
-                                return getSlopeBracket(slope).backgroundColor;
+                                const seg = segmentMapRef.current[ctx.p0DataIndex];
+                                return seg?.bracket.backgroundColor ?? 'rgba(134, 59, 255, 0.14)';
                             },
                         },
                         pointRadius: 0,
@@ -393,8 +456,14 @@ export function RouteStatsBar() {
                             const eleVal = curUnits === 'mi' ? Math.round(cur.ele * 3.28084) : cur.ele;
                             const eleUnit = curUnits === 'mi' ? 'ft' : 'm';
 
-                            const { lengthKm, bracket } = getSegmentDetails(pts, idx);
-                            const segLenVal = curUnits === 'mi' ? lengthKm * 0.621371 : lengthKm;
+                            const seg = segmentMapRef.current[idx] || {
+                                lengthKm: 0.1,
+                                bracket: getSlopeBracket(0),
+                                slope: 0,
+                            };
+                            const rawSegLen = curUnits === 'mi' ? seg.lengthKm * 0.621371 : seg.lengthKm;
+                            const segLenVal = Math.max(0.1, rawSegLen);
+                            const bracket = seg.bracket;
 
                             contentEl.innerHTML = `
                                 <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
