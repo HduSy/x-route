@@ -44,26 +44,25 @@ interface SlopeBracket {
  * level  5:  16% ...      (> 15%)
  */
 function getSlopeBracket(slope: number): SlopeBracket {
-    const g = Math.round(slope);
-    if (g <= -16) {
+    if (slope < -15.5) {
         return { id: -5, label: '< -15%', borderColor: '#0369A1', backgroundColor: 'rgba(3, 105, 161, 0.16)' };
-    } else if (g <= -10) {
+    } else if (slope < -9.5) {
         return { id: -4, label: '-10 ~ -15%', borderColor: '#0284C7', backgroundColor: 'rgba(2, 132, 199, 0.16)' };
-    } else if (g <= -7) {
+    } else if (slope < -6.5) {
         return { id: -3, label: '-7 ~ -9%', borderColor: '#0EA5E9', backgroundColor: 'rgba(14, 165, 233, 0.16)' };
-    } else if (g <= -4) {
+    } else if (slope < -3.5) {
         return { id: -2, label: '-4 ~ -6%', borderColor: '#38BDF8', backgroundColor: 'rgba(56, 189, 248, 0.16)' };
-    } else if (g <= -1) {
+    } else if (slope < -1.0) {
         return { id: -1, label: '-1 ~ -3%', borderColor: '#60A5FA', backgroundColor: 'rgba(96, 165, 250, 0.16)' };
-    } else if (g === 0) {
+    } else if (slope <= 1.0) {
         return { id: 0, label: '0%', borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.16)' };
-    } else if (g <= 3) {
+    } else if (slope <= 3.5) {
         return { id: 1, label: '1-3%', borderColor: '#FACC15', backgroundColor: 'rgba(250, 204, 21, 0.18)' };
-    } else if (g <= 6) {
+    } else if (slope <= 6.5) {
         return { id: 2, label: '4-6%', borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.20)' };
-    } else if (g <= 9) {
+    } else if (slope <= 9.5) {
         return { id: 3, label: '7-9%', borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.22)' };
-    } else if (g <= 15) {
+    } else if (slope <= 15.5) {
         return { id: 4, label: '10-15%', borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.24)' };
     } else {
         return { id: 5, label: '> 15%', borderColor: '#863BFF', backgroundColor: 'rgba(134, 59, 255, 0.28)' };
@@ -81,104 +80,146 @@ function buildSegmentMap(pts: ProfilePoint[]): SegmentInfo[] {
         return pts.map(() => ({ lengthKm: 0.1, bracket: getSlopeBracket(0), slope: 0 }));
     }
 
-    // 1. Calculate smoothed slope at each point using ~150m baseline window (±75m)
-    const pointSlopes = pts.map((p, i) => {
-        const curDist = p.distanceKm;
-        let p0 = p;
-        let p1 = p;
-        for (let j = i; j >= 0; j--) {
-            if ((curDist - pts[j]!.distanceKm) * 1000 >= 75) {
-                p0 = pts[j]!;
-                break;
-            }
-            p0 = pts[0]!;
-        }
-        for (let j = i; j < pts.length; j++) {
-            if ((pts[j]!.distanceKm - curDist) * 1000 >= 75) {
-                p1 = pts[j]!;
-                break;
-            }
-            p1 = pts[pts.length - 1]!;
-        }
-        const dMeters = (p1.distanceKm - p0.distanceKm) * 1000;
-        const slope = dMeters > 10 ? ((p1.ele - p0.ele) / dMeters) * 100 : 0;
-        return { slope, bracket: getSlopeBracket(slope) };
-    });
+    const totalDistKm = pts[pts.length - 1]!.distanceKm - pts[0]!.distanceKm;
+    const totalDistMeters = totalDistKm * 1000;
 
-    // 2. Initial contiguous runs
-    interface RawSeg {
-        startIdx: number;
-        endIdx: number;
-        bracket: SlopeBracket;
+    // BRouter geo-data-exchange normalization distance threshold:
+    // Scale dynamically with route length:
+    // Short trips (< 2km): 120m - 240m
+    // Medium trips (2-10km): 250m - 500m
+    // Long trips (> 10km): 450m - 2200m
+    const minNormalizationDistMeters =
+        totalDistKm <= 2
+            ? Math.max(120, totalDistMeters * 0.12)
+            : totalDistKm <= 10
+            ? Math.max(250, totalDistMeters * 0.045)
+            : Math.max(450, Math.min(2200, totalDistMeters * 0.03));
+
+    const calcGradient = (p0: ProfilePoint, p1: ProfilePoint): number => {
+        const d = (p1.distanceKm - p0.distanceKm) * 1000;
+        if (d <= 1.0) return 0;
+        return ((p1.ele - p0.ele) / d) * 100;
+    };
+
+    // Filter points closer than 30m (BRouter _isInFuzzyRange) to eliminate high-frequency DEM noise
+    const filteredIndices: number[] = [0];
+    for (let i = 1; i < pts.length; i++) {
+        const lastIdx = filteredIndices[filteredIndices.length - 1]!;
+        if ((pts[i]!.distanceKm - pts[lastIdx]!.distanceKm) * 1000 >= 30 || i === pts.length - 1) {
+            filteredIndices.push(i);
+        }
+    }
+    if (filteredIndices.length < 2) {
+        filteredIndices.push(pts.length - 1);
+    }
+
+    interface RawFeature {
+        start: number;
+        end: number;
         lenMeters: number;
+        bracket: SlopeBracket;
+        slope: number;
     }
 
-    const segs: RawSeg[] = [];
-    let segStart = 0;
-    for (let i = 0; i < pts.length; i++) {
-        if (i === pts.length - 1 || pointSlopes[i]!.bracket.id !== pointSlopes[i + 1]!.bracket.id) {
-            segs.push({
-                startIdx: segStart,
-                endIdx: i,
-                bracket: pointSlopes[i]!.bracket,
-                lenMeters: (pts[i]!.distanceKm - pts[segStart]!.distanceKm) * 1000,
-            });
-            segStart = i + 1;
-        }
-    }
+    const features: RawFeature[] = [];
+    let startIdx = filteredIndices[0]!;
+    let curLenMeters = (pts[filteredIndices[1]!]!.distanceKm - pts[startIdx]!.distanceKm) * 1000;
+    let prevSlope = calcGradient(pts[startIdx]!, pts[filteredIndices[1]!]!);
+    let prevBracket = getSlopeBracket(prevSlope);
 
-    // 3. Merge short transitional blips (< 120m) into adjacent neighbors
-    let changed = true;
-    let iterations = 0;
-    while (changed && segs.length > 1 && iterations < 50) {
-        changed = false;
-        iterations++;
-        for (let i = 0; i < segs.length; i++) {
-            if (segs[i]!.lenMeters < 120) {
-                const target = i > 0 ? i - 1 : i + 1;
-                segs[target]!.startIdx = Math.min(segs[target]!.startIdx, segs[i]!.startIdx);
-                segs[target]!.endIdx = Math.max(segs[target]!.endIdx, segs[i]!.endIdx);
-                segs[target]!.lenMeters =
-                    (pts[segs[target]!.endIdx]!.distanceKm - pts[segs[target]!.startIdx]!.distanceKm) * 1000;
-                segs.splice(i, 1);
-                changed = true;
-                break;
+    for (let f = 2; f < filteredIndices.length; f++) {
+        const prevIdx = filteredIndices[f - 1]!;
+        const curIdx = filteredIndices[f]!;
+        const stepDist = (pts[curIdx]!.distanceKm - pts[prevIdx]!.distanceKm) * 1000;
+        const curSlope = calcGradient(pts[prevIdx]!, pts[curIdx]!);
+        const curBracket = getSlopeBracket(curSlope);
+        curLenMeters += stepDist;
+
+        // Inflection point: clear switch between climb (>1.5%) and descent (<-1.5%)
+        const isOpposite =
+            ((prevSlope > 1.5 && curSlope < -1.5) || (prevSlope < -1.5 && curSlope > 1.5)) &&
+            curLenMeters >= Math.min(minNormalizationDistMeters, 200);
+
+        if (curBracket.id !== prevBracket.id) {
+            if (curLenMeters < minNormalizationDistMeters && !isOpposite) {
+                // Absorb into ongoing segment (BRouter geoDataExchange normalization)
+                prevSlope = calcGradient(pts[startIdx]!, pts[curIdx]!);
+                prevBracket = getSlopeBracket(prevSlope);
+            } else {
+                const segSlope = calcGradient(pts[startIdx]!, pts[prevIdx]!);
+                features.push({
+                    start: startIdx,
+                    end: prevIdx,
+                    lenMeters: (pts[prevIdx]!.distanceKm - pts[startIdx]!.distanceKm) * 1000,
+                    bracket: getSlopeBracket(segSlope),
+                    slope: segSlope,
+                });
+                startIdx = prevIdx;
+                curLenMeters = stepDist;
+                prevSlope = curSlope;
+                prevBracket = curBracket;
             }
         }
     }
 
-    // 4. Coalesce adjacent segments with matching bracket IDs
-    const coalesced: RawSeg[] = [];
-    for (const seg of segs) {
-        if (coalesced.length > 0 && coalesced[coalesced.length - 1]!.bracket.id === seg.bracket.id) {
-            const last = coalesced[coalesced.length - 1]!;
-            last.endIdx = seg.endIdx;
-            last.lenMeters = (pts[seg.endIdx]!.distanceKm - pts[last.startIdx]!.distanceKm) * 1000;
-        } else {
-            coalesced.push({ ...seg });
-        }
+    // Process final segment
+    const finalEndIdx = pts.length - 1;
+    const lastLenMeters = (pts[finalEndIdx]!.distanceKm - pts[startIdx]!.distanceKm) * 1000;
+    if (lastLenMeters < minNormalizationDistMeters && features.length > 0) {
+        const last = features[features.length - 1]!;
+        last.end = finalEndIdx;
+        last.lenMeters = (pts[finalEndIdx]!.distanceKm - pts[last.start]!.distanceKm) * 1000;
+        last.slope = calcGradient(pts[last.start]!, pts[finalEndIdx]!);
+        last.bracket = getSlopeBracket(last.slope);
+    } else {
+        const segSlope = calcGradient(pts[startIdx]!, pts[finalEndIdx]!);
+        features.push({
+            start: startIdx,
+            end: finalEndIdx,
+            lenMeters: lastLenMeters,
+            bracket: getSlopeBracket(segSlope),
+            slope: segSlope,
+        });
     }
 
-    // 5. Build point-to-segment map
+    // Coalesce adjacent segments that share the same bracket (up to 2 passes)
+    let merged = features;
+    for (let pass = 0; pass < 2; pass++) {
+        const next: RawFeature[] = [];
+        for (const f of merged) {
+            if (next.length > 0 && next[next.length - 1]!.bracket.id === f.bracket.id) {
+                const prev = next[next.length - 1]!;
+                prev.end = f.end;
+                prev.lenMeters = (pts[f.end]!.distanceKm - pts[prev.start]!.distanceKm) * 1000;
+                prev.slope = calcGradient(pts[prev.start]!, pts[f.end]!);
+                prev.bracket = getSlopeBracket(prev.slope);
+            } else {
+                next.push({ ...f });
+            }
+        }
+        merged = next;
+    }
+
+    // Map point index to segment info
     const map: SegmentInfo[] = new Array(pts.length);
-    for (const seg of coalesced) {
-        const lengthKm = Math.max(0.01, pts[seg.endIdx]!.distanceKm - pts[seg.startIdx]!.distanceKm);
-        for (let i = seg.startIdx; i <= seg.endIdx; i++) {
+    for (const seg of merged) {
+        const lengthKm = Math.max(0.05, pts[seg.end]!.distanceKm - pts[seg.start]!.distanceKm);
+        for (let i = seg.start; i <= seg.end; i++) {
             map[i] = {
                 lengthKm,
                 bracket: seg.bracket,
-                slope: pointSlopes[i]?.slope ?? 0,
+                slope: seg.slope,
             };
         }
     }
 
-    // Fallback fill for any unassigned indices
+    // Safety fallback for any unassigned indices
     for (let i = 0; i < pts.length; i++) {
         if (!map[i]) {
-            map[i] = {
-                lengthKm: 0.05,
-                bracket: pointSlopes[i]?.bracket || getSlopeBracket(0),
-                slope: pointSlopes[i]?.slope ?? 0,
+            map[i] = map[i > 0 ? i - 1 : 0] || {
+                lengthKm: 0.1,
+                bracket: getSlopeBracket(0),
+                slope: 0,
             };
         }
     }
@@ -254,7 +295,7 @@ export function RouteStatsBar() {
             const stats = computeElevationStats(list);
             const formattedPoints: ProfilePoint[] = list.map((p, idx) => ({
                 ...p,
-                ele: Math.round(stats.smoothedElevations[idx] ?? p.ele),
+                ele: Number((stats.smoothedElevations[idx] ?? p.ele).toFixed(1)),
             }));
             return { pointsData: formattedPoints, eleStats: stats };
         };
@@ -397,14 +438,27 @@ export function RouteStatsBar() {
 
         const chartData = sampled.map((p) => ({
             x: units === 'mi' ? p.distanceKm * 0.621371 : p.distanceKm,
-            y: units === 'mi' ? Math.round(p.ele * 3.28084) : p.ele,
+            y: units === 'mi' ? Number((p.ele * 3.28084).toFixed(1)) : p.ele,
         }));
+
+        // Dynamic vertical range (BRouter Heightgraph formula)
+        const yValues = chartData.map((d) => d.y);
+        const minY = yValues.length > 0 ? Math.min(...yValues) : 0;
+        const maxY = yValues.length > 0 ? Math.max(...yValues) : 100;
+        const rangeY = maxY - minY;
+        const padY = rangeY < 10 ? 10 : Math.max(4, rangeY * 0.12);
+        const yMinScale = Math.max(0, Math.floor(minY - padY));
+        const yMaxScale = Math.ceil(maxY + padY);
 
         if (chartRef.current) {
             chartRef.current.data.datasets[0]!.data = chartData as any;
             if (chartRef.current.options.scales?.x) {
                 chartRef.current.options.scales.x.min = 0;
                 chartRef.current.options.scales.x.max = Math.max(0.01, totalDist);
+            }
+            if (chartRef.current.options.scales?.y) {
+                chartRef.current.options.scales.y.min = yMinScale;
+                chartRef.current.options.scales.y.max = yMaxScale;
             }
             chartRef.current.update('none');
             return;
@@ -418,7 +472,9 @@ export function RouteStatsBar() {
                         label: 'Elevation',
                         data: chartData as any,
                         borderColor: '#863BFF',
-                        borderWidth: 2.5,
+                        borderWidth: 2,
+                        cubicInterpolationMode: 'monotone',
+                        tension: 0.15,
                         fill: true,
                         backgroundColor: 'rgba(134, 59, 255, 0.14)',
                         segment: {
@@ -436,7 +492,6 @@ export function RouteStatsBar() {
                         pointHoverBackgroundColor: '#863BFF',
                         pointHoverBorderColor: '#FFFFFF',
                         pointHoverBorderWidth: 2,
-                        tension: 0.1,
                     },
                 ],
             },
@@ -479,7 +534,7 @@ export function RouteStatsBar() {
                             const cur = pts[idx]!;
                             const distVal = curUnits === 'mi' ? cur.distanceKm * 0.621371 : cur.distanceKm;
                             const distUnit = curUnits === 'mi' ? 'mi' : 'km';
-                            const eleVal = curUnits === 'mi' ? Math.round(cur.ele * 3.28084) : cur.ele;
+                            const eleVal = curUnits === 'mi' ? cur.ele * 3.28084 : cur.ele;
                             const eleUnit = curUnits === 'mi' ? 'ft' : 'm';
 
                             const seg = segmentMapRef.current[idx] || {
@@ -511,15 +566,15 @@ export function RouteStatsBar() {
                                 </div>
                                 <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
                                     <span class="text-zinc-400 font-normal">${curT.elevation}:</span>
-                                    <span class="font-bold text-white font-mono">${eleVal} ${eleUnit}</span>
+                                    <span class="font-bold text-white font-mono">${Math.round(eleVal)} ${eleUnit}</span>
                                 </div>
                                 <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
                                     <span class="text-zinc-400 font-normal">${curT.segmentLength}:</span>
                                     <span class="font-bold text-white font-mono">${segLenStr}</span>
                                 </div>
                                 <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
-                                    <span class="text-zinc-400 font-normal">${curT.type}:</span>
-                                    <span class="font-bold text-white">${bracket.label}</span>
+                                    <span class="text-zinc-400 font-normal">${curT.slope}:</span>
+                                    <span class="font-bold text-white">${bracket.label} (${seg.slope >= 0 ? '+' : ''}${seg.slope.toFixed(1)}%)</span>
                                 </div>
                             `;
 
@@ -585,11 +640,13 @@ export function RouteStatsBar() {
                     },
                     y: {
                         display: true,
+                        min: yMinScale,
+                        max: yMaxScale,
                         grid: { color: 'rgba(0,0,0,0.06)' },
                         ticks: {
                             maxTicksLimit: 4,
                             font: { size: 10 },
-                            callback: (val) => `${val}${latestUnitsRef.current === 'mi' ? 'ft' : 'm'}`,
+                            callback: (val) => `${Math.round(Number(val))}${latestUnitsRef.current === 'mi' ? 'ft' : 'm'}`,
                         },
                     },
                 },
