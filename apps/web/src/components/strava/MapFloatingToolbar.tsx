@@ -331,7 +331,7 @@ export function MapFloatingToolbar() {
                         'group flex h-8 sm:h-9 items-center gap-1.5 rounded-lg px-2.5 sm:px-4 text-xs font-bold tracking-tight transition-all duration-150 select-none',
                         resultPoints.length >= 2
                             ? 'bg-[#863BFF] text-white shadow-sm hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
-                            : 'bg-muted/80 text-muted-foreground/60 border border-border/50 cursor-not-allowed shadow-none'
+                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-700 cursor-not-allowed shadow-none opacity-100'
                     )}
                     title={t.saveRoute}
                 >
