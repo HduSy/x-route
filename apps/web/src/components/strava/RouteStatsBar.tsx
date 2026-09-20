@@ -115,6 +115,15 @@ export function RouteStatsBar() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const chartRef = useRef<Chart | null>(null);
     const sampledRef = useRef<ProfilePoint[]>([]);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const tooltipRef = useRef<HTMLDivElement | null>(null);
+    const tooltipArrowRef = useRef<HTMLDivElement | null>(null);
+    const tooltipContentRef = useRef<HTMLDivElement | null>(null);
+
+    const latestTRef = useRef(t);
+    latestTRef.current = t;
+    const latestUnitsRef = useRef(units);
+    latestUnitsRef.current = units;
 
     // Selected file from Dexie (if not planning or viewing saved file)
     const selectedFile = useLiveQuery(
@@ -353,49 +362,88 @@ export function RouteStatsBar() {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        enabled: true,
-                        displayColors: false,
-                        backgroundColor: 'rgba(24, 24, 27, 0.94)',
-                        titleColor: '#FFFFFF',
-                        bodyColor: '#F4F4F5',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
-                        borderWidth: 1,
-                        padding: {
-                            top: 7,
-                            bottom: 7,
-                            left: 9,
-                            right: 9,
-                        },
-                        cornerRadius: 6,
-                        bodySpacing: 3,
-                        bodyFont: {
-                            family: 'Geist, -apple-system, sans-serif',
-                            size: 11,
-                            weight: 'normal',
-                        },
-                        callbacks: {
-                            title: () => [],
-                            label: (item) => {
-                                const idx = item.dataIndex;
-                                const pts = sampledRef.current;
-                                if (!pts || pts.length === 0 || !pts[idx]) return [];
+                        enabled: false,
+                        animation: { duration: 0 },
+                        external: (context) => {
+                            const tooltip = context.tooltip;
+                            const container = containerRef.current;
+                            const tooltipEl = tooltipRef.current;
+                            const arrowEl = tooltipArrowRef.current;
+                            const contentEl = tooltipContentRef.current;
 
-                                const cur = pts[idx]!;
-                                const distVal = units === 'mi' ? cur.distanceKm * 0.621371 : cur.distanceKm;
-                                const distUnit = units === 'mi' ? 'mi' : 'km';
-                                const eleVal = units === 'mi' ? Math.round(cur.ele * 3.28084) : cur.ele;
-                                const eleUnit = units === 'mi' ? 'ft' : 'm';
+                            if (!container || !tooltipEl || !arrowEl || !contentEl) return;
 
-                                const { lengthKm, bracket } = getSegmentDetails(pts, idx);
-                                const segLenVal = units === 'mi' ? lengthKm * 0.621371 : lengthKm;
+                            if (tooltip.opacity === 0 || !tooltip.dataPoints || tooltip.dataPoints.length === 0) {
+                                tooltipEl.style.opacity = '0';
+                                return;
+                            }
 
-                                return [
-                                    `${t.distance}: ${distVal.toFixed(1)} ${distUnit}`,
-                                    `${t.elevation}: ${eleVal} ${eleUnit}`,
-                                    `${t.segmentLength}: ${segLenVal.toFixed(1)} ${distUnit}`,
-                                    `${t.type}: ${bracket.label}`,
-                                ];
-                            },
+                            const idx = tooltip.dataPoints[0]!.dataIndex;
+                            const pts = sampledRef.current;
+                            if (!pts || pts.length === 0 || !pts[idx]) {
+                                tooltipEl.style.opacity = '0';
+                                return;
+                            }
+
+                            const curT = latestTRef.current;
+                            const curUnits = latestUnitsRef.current;
+                            const cur = pts[idx]!;
+                            const distVal = curUnits === 'mi' ? cur.distanceKm * 0.621371 : cur.distanceKm;
+                            const distUnit = curUnits === 'mi' ? 'mi' : 'km';
+                            const eleVal = curUnits === 'mi' ? Math.round(cur.ele * 3.28084) : cur.ele;
+                            const eleUnit = curUnits === 'mi' ? 'ft' : 'm';
+
+                            const { lengthKm, bracket } = getSegmentDetails(pts, idx);
+                            const segLenVal = curUnits === 'mi' ? lengthKm * 0.621371 : lengthKm;
+
+                            contentEl.innerHTML = `
+                                <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
+                                    <span class="text-zinc-400 font-normal">${curT.distance}:</span>
+                                    <span class="font-bold text-white font-mono">${distVal.toFixed(1)} ${distUnit}</span>
+                                </div>
+                                <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
+                                    <span class="text-zinc-400 font-normal">${curT.elevation}:</span>
+                                    <span class="font-bold text-white font-mono">${eleVal} ${eleUnit}</span>
+                                </div>
+                                <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
+                                    <span class="text-zinc-400 font-normal">${curT.segmentLength}:</span>
+                                    <span class="font-bold text-white font-mono">${segLenVal.toFixed(1)} ${distUnit}</span>
+                                </div>
+                                <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
+                                    <span class="text-zinc-400 font-normal">${curT.type}:</span>
+                                    <span class="font-bold text-white">${bracket.label}</span>
+                                </div>
+                            `;
+
+                            const canvas = context.chart.canvas;
+                            const element = tooltip.dataPoints[0]?.element;
+                            const caretX = element?.x ?? tooltip.caretX;
+                            const caretY = element?.y ?? tooltip.caretY;
+
+                            const pointX = canvas.offsetLeft + caretX;
+                            const pointY = canvas.offsetTop + caretY;
+
+                            const tooltipWidth = tooltipEl.offsetWidth || 140;
+                            const tooltipHeight = tooltipEl.offsetHeight || 78;
+                            const containerWidth = container.offsetWidth;
+
+                            const halfWidth = tooltipWidth / 2;
+                            const minLeft = 8;
+                            const maxLeft = Math.max(minLeft, containerWidth - tooltipWidth - 8);
+                            const boxLeft = Math.max(minLeft, Math.min(pointX - halfWidth, maxLeft));
+
+                            // Float directly above the curve point
+                            // Arrow extends ~4px below the box, hover dot radius is 5px
+                            // Arrow tip lands directly at pointY - 6px pointing down at the curve point
+                            const boxTop = pointY - tooltipHeight - 10;
+
+                            // Horizontal position of caret arrow inside the tooltip box
+                            const desiredArrowLeft = pointX - boxLeft;
+                            const arrowLeft = Math.max(12, Math.min(desiredArrowLeft, tooltipWidth - 12));
+
+                            tooltipEl.style.transform = `translate3d(${Math.round(boxLeft)}px, ${Math.round(boxTop)}px, 0)`;
+                            arrowEl.style.left = `${Math.round(arrowLeft)}px`;
+                            tooltipEl.style.opacity = '1';
                         },
                     },
                 },
@@ -434,12 +482,14 @@ export function RouteStatsBar() {
                         }
                     }
                     mapManager.setCursor(null);
+                    if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
                 },
             },
         });
 
         return () => {
             mapManager.setCursor(null);
+            if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
             chartRef.current?.destroy();
             chartRef.current = null;
         };
@@ -447,14 +497,21 @@ export function RouteStatsBar() {
 
     return (
         <footer
-            onMouseLeave={() => mapManager.setCursor(null)}
+            onMouseLeave={() => {
+                mapManager.setCursor(null);
+                if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
+            }}
             className="relative z-20 flex shrink-0 flex-col border-t border-border bg-background shadow-lg select-none"
         >
             {/* Elevation Chart Drawer */}
             {elevationExpanded && pointsData.length >= 2 && (
                 <div
+                    ref={containerRef}
                     className="relative h-24 sm:h-28 w-full border-b border-border/80 px-2 sm:px-4 py-1.5"
-                    onMouseLeave={() => mapManager.setCursor(null)}
+                    onMouseLeave={() => {
+                        mapManager.setCursor(null);
+                        if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
+                    }}
                 >
                     {/* Slope Grade Color Legend (BRouter-Web style with modern translucency) */}
                     <div className="absolute top-1.5 right-3 hidden sm:flex items-center gap-2 text-[10px] text-muted-foreground bg-background/85 backdrop-blur-xs px-2.5 py-0.5 rounded-md border border-border/60 pointer-events-none z-10 shadow-2xs">
@@ -486,6 +543,21 @@ export function RouteStatsBar() {
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#863BFF]" />
                             <span>&gt; 16%</span>
+                        </div>
+                    </div>
+
+                    {/* Floating Elevation Tooltip pinned to curve point */}
+                    <div
+                        ref={tooltipRef}
+                        className="pointer-events-none absolute left-0 top-0 z-30 opacity-0 transition-opacity duration-150 ease-out"
+                        style={{ willChange: 'transform, opacity' }}
+                    >
+                        <div className="relative rounded-md border border-white/15 bg-zinc-900/95 px-3 py-2 text-zinc-200 shadow-xl backdrop-blur-xs min-w-[135px]">
+                            <div ref={tooltipContentRef} className="flex flex-col gap-1 text-[11px]" />
+                            <div
+                                ref={tooltipArrowRef}
+                                className="absolute -bottom-1 size-2 -translate-x-1/2 rotate-45 border-r border-b border-white/15 bg-zinc-900"
+                            />
                         </div>
                     </div>
 
