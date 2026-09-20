@@ -150,7 +150,7 @@ function buildSegmentMap(pts: ProfilePoint[]): SegmentInfo[] {
     // 5. Build point-to-segment map
     const map: SegmentInfo[] = new Array(pts.length);
     for (const seg of coalesced) {
-        const lengthKm = Math.max(0.1, pts[seg.endIdx]!.distanceKm - pts[seg.startIdx]!.distanceKm);
+        const lengthKm = Math.max(0.01, pts[seg.endIdx]!.distanceKm - pts[seg.startIdx]!.distanceKm);
         for (let i = seg.startIdx; i <= seg.endIdx; i++) {
             map[i] = {
                 lengthKm,
@@ -164,7 +164,7 @@ function buildSegmentMap(pts: ProfilePoint[]): SegmentInfo[] {
     for (let i = 0; i < pts.length; i++) {
         if (!map[i]) {
             map[i] = {
-                lengthKm: 0.1,
+                lengthKm: 0.05,
                 bracket: pointSlopes[i]?.bracket || getSlopeBracket(0),
                 slope: pointSlopes[i]?.slope ?? 0,
             };
@@ -457,12 +457,25 @@ export function RouteStatsBar() {
                             const eleUnit = curUnits === 'mi' ? 'ft' : 'm';
 
                             const seg = segmentMapRef.current[idx] || {
-                                lengthKm: 0.1,
+                                lengthKm: 0.05,
                                 bracket: getSlopeBracket(0),
                                 slope: 0,
                             };
-                            const rawSegLen = curUnits === 'mi' ? seg.lengthKm * 0.621371 : seg.lengthKm;
-                            const segLenVal = Math.max(0.1, rawSegLen);
+                            let segLenStr: string;
+                            if (curUnits === 'mi') {
+                                const mi = seg.lengthKm * 0.621371;
+                                if (mi < 0.2) {
+                                    segLenStr = `${Math.round(mi * 5280)} ft`;
+                                } else {
+                                    segLenStr = `${mi.toFixed(1)} mi`;
+                                }
+                            } else {
+                                if (seg.lengthKm < 1.0) {
+                                    segLenStr = `${Math.round(seg.lengthKm * 1000)} m`;
+                                } else {
+                                    segLenStr = `${seg.lengthKm.toFixed(1)} km`;
+                                }
+                            }
                             const bracket = seg.bracket;
 
                             contentEl.innerHTML = `
@@ -476,7 +489,7 @@ export function RouteStatsBar() {
                                 </div>
                                 <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
                                     <span class="text-zinc-400 font-normal">${curT.segmentLength}:</span>
-                                    <span class="font-bold text-white font-mono">${segLenVal.toFixed(1)} ${distUnit}</span>
+                                    <span class="font-bold text-white font-mono">${segLenStr}</span>
                                 </div>
                                 <div class="flex items-center justify-between gap-3 text-[11px] leading-tight">
                                     <span class="text-zinc-400 font-normal">${curT.type}:</span>
