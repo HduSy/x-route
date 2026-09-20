@@ -428,8 +428,7 @@ export class RoutingLayerController {
             const hit = this.getLineHit(screenX, screenY, map);
             if (hit) {
                 this.isHoveringLine = true;
-                this.ensureGhostMarker(map);
-                this.ghostMarker?.setLngLat([hit.closestLngLat.lng, hit.closestLngLat.lat]);
+                this.ensureGhostMarker(map, hit.closestLngLat);
                 map.getCanvas().style.cursor = 'grab';
             } else if (this.isHoveringLine) {
                 this.isHoveringLine = false;
@@ -450,7 +449,12 @@ export class RoutingLayerController {
         // Synchronously stops propagation and disables map dragPan BEFORE MapLibre can initiate a map pan!
         this.containerPointerDownHandler = (e: MouseEvent | PointerEvent) => {
             if (e.button !== 0) return;
-            if (this.isDraggingLine) return;
+            if (this.isDraggingLine) {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                return;
+            }
             if (this.currentPoints.length < 2) return;
 
             const canvas = map.getCanvas();
@@ -476,12 +480,6 @@ export class RoutingLayerController {
             this.dragInsertIndex = hit.insertIndex;
             map.getCanvas().style.cursor = 'grabbing';
 
-            this.ensureGhostMarker(map);
-            if (this.ghostMarker) {
-                this.ghostMarker.setLngLat([hit.closestLngLat.lng, hit.closestLngLat.lat]);
-                this.showGhostTooltip(this.ghostMarker);
-            }
-
             const startClientX = e.clientX;
             const startClientY = e.clientY;
 
@@ -500,8 +498,6 @@ export class RoutingLayerController {
                 return coords;
             };
 
-            this.setRubberBand(getRubberBandCoords(hit.closestLngLat));
-
             const removeAllListeners = () => {
                 window.removeEventListener('pointermove', onWindowMove, { capture: true });
                 window.removeEventListener('mousemove', onWindowMove, { capture: true });
@@ -512,12 +508,16 @@ export class RoutingLayerController {
             };
 
             const cleanupState = () => {
-                map.dragPan.enable();
+                try {
+                    map.dragPan.enable();
+                } catch {}
                 map.getCanvas().style.cursor = '';
                 this.isDraggingLine = false;
                 this.isHoveringLine = false;
                 this.clearRubberBand();
-                this.hideDragTooltip(this.ghostMarker);
+                if (this.ghostMarker) {
+                    this.hideDragTooltip(this.ghostMarker);
+                }
                 this.removeGhostMarker();
                 setTimeout(() => {
                     this.suppressClick = false;
@@ -569,12 +569,24 @@ export class RoutingLayerController {
                 cleanupState();
             };
 
-            window.addEventListener('pointermove', onWindowMove, { capture: true });
-            window.addEventListener('mousemove', onWindowMove, { capture: true });
-            window.addEventListener('pointerup', onWindowUp, { capture: true });
-            window.addEventListener('mouseup', onWindowUp, { capture: true });
-            window.addEventListener('keydown', onKeyDown, { capture: true });
-            window.addEventListener('blur', onBlur);
+            try {
+                this.ensureGhostMarker(map, hit.closestLngLat);
+                if (this.ghostMarker) {
+                    this.showGhostTooltip(this.ghostMarker);
+                }
+                this.setRubberBand(getRubberBandCoords(hit.closestLngLat));
+
+                window.addEventListener('pointermove', onWindowMove, { capture: true });
+                window.addEventListener('mousemove', onWindowMove, { capture: true });
+                window.addEventListener('pointerup', onWindowUp, { capture: true });
+                window.addEventListener('mouseup', onWindowUp, { capture: true });
+                window.addEventListener('keydown', onKeyDown, { capture: true });
+                window.addEventListener('blur', onBlur);
+            } catch (err) {
+                console.error('[RoutingLayer] Error during drag initiation:', err);
+                removeAllListeners();
+                cleanupState();
+            }
         };
 
         container.addEventListener('pointerdown', this.containerPointerDownHandler, { capture: true });
@@ -604,13 +616,21 @@ export class RoutingLayerController {
                 this.wiredMap.off('click', this.clickHandler);
             }
         }
+        this.clearRubberBand();
+        this.removeGhostMarker();
+        this.isDraggingLine = false;
+        this.isHoveringLine = false;
         this.clickHandler = null;
         this.wiredMap = null;
     }
 
     private removeGhostMarker() {
         if (this.ghostMarker) {
-            this.ghostMarker.remove();
+            try {
+                this.ghostMarker.remove();
+            } catch (err) {
+                console.error('[RoutingLayer] Error removing ghost marker:', err);
+            }
             this.ghostMarker = null;
         }
     }
@@ -628,18 +648,21 @@ export class RoutingLayerController {
             bottom: calc(100% + 8px);
             left: 50%;
             transform: translateX(-50%);
-            white-space: nowrap;
-            background: #18181b;
-            color: #ffffff;
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 8px;
+            background: rgba(15, 23, 42, 0.92);
+            color: #fff;
+            padding: 4px 8px;
             border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
             pointer-events: none;
-            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            z-index: 100;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            animation: x-route-tip-in 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         `;
-        tip.innerText = label;
+        tip.textContent = label;
         el.appendChild(tip);
     }
 
@@ -652,18 +675,21 @@ export class RoutingLayerController {
             bottom: calc(100% + 8px);
             left: 50%;
             transform: translateX(-50%);
-            white-space: nowrap;
-            background: #863bff;
-            color: #ffffff;
+            background: rgba(37, 99, 235, 0.95);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(134,59,255,0.4);
+            white-space: nowrap;
             pointer-events: none;
-            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+            z-index: 100;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            animation: x-route-tip-in 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         `;
-        tip.innerText = '➕ 插入新途经点';
+        tip.textContent = '📍 拖拽调整路线';
         el.appendChild(tip);
     }
 
@@ -704,8 +730,12 @@ export class RoutingLayerController {
         this.setRubberBand([]);
     }
 
-    private ensureGhostMarker(map: MapLibreMap) {
-        if (this.ghostMarker) return;
+    private ensureGhostMarker(map: MapLibreMap, lngLat: { lng: number; lat: number }) {
+        if (!Number.isFinite(lngLat.lng) || !Number.isFinite(lngLat.lat)) return;
+        if (this.ghostMarker) {
+            this.ghostMarker.setLngLat([lngLat.lng, lngLat.lat]);
+            return;
+        }
         const el = ghostAnchorElement();
         const marker = new Marker({
             element: el,
@@ -713,6 +743,10 @@ export class RoutingLayerController {
             anchor: 'center',
             subpixelPositioning: true,
         });
+        // CRITICAL: MUST setLngLat BEFORE addTo(map), because addTo(map) synchronously
+        // executes _update() which immediately accesses marker._lngLat.lng!
+        // Calling addTo without lngLat throws TypeError and breaks all map rendering and animation frames!
+        marker.setLngLat([lngLat.lng, lngLat.lat]);
         marker.addTo(map);
         this.ghostMarker = marker;
     }

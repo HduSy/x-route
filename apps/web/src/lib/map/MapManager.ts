@@ -228,21 +228,21 @@ class SmoothScrollZoomController {
                 (e.deltaMode !== 0 || Math.abs(dy) % 40 === 0 || Math.abs(dy) >= 100);
 
             if (isDiscreteNotch) {
-                // Mechanical mouse wheel: crisp, comfortable, predictable step (~0.25 zoom levels per notch)
+                // Mechanical mouse wheel: crisp, comfortable, predictable step (~0.28 zoom levels per notch)
                 const direction = dy < 0 ? 1 : -1;
                 const notchCount = Math.max(1, Math.min(3, Math.round(Math.abs(dy) / 100)));
-                deltaZ = direction * 0.25 * notchCount;
+                deltaZ = direction * 0.28 * notchCount;
             } else if (isPinch) {
                 // Trackpad pinch-to-zoom (macOS ctrlKey + wheel)
                 deltaZ = -dy * 0.008;
                 deltaZ = Math.max(-0.25, Math.min(0.25, deltaZ));
             } else {
                 // Continuous high-frequency trackpad scrolling
-                deltaZ = -dy * 0.0022;
-                deltaZ = Math.max(-0.18, Math.min(0.18, deltaZ));
+                deltaZ = -dy * 0.0055;
+                deltaZ = Math.max(-0.22, Math.min(0.22, deltaZ));
             }
 
-            if (deltaZ === 0) return;
+            if (deltaZ === 0 || !Number.isFinite(deltaZ)) return;
 
             // Update target zoom with Explosion Horizon Clamp
             let nextTarget = (this.targetZoom ?? curZoom) + deltaZ;
@@ -268,11 +268,19 @@ class SmoothScrollZoomController {
                 easing: (t: number) => t * (2 - t), // smooth quadratic ease-out
             };
 
-            if (this.activeAround) {
+            if (
+                this.activeAround &&
+                Number.isFinite(this.activeAround.lng) &&
+                Number.isFinite(this.activeAround.lat)
+            ) {
                 easeOptions.around = [this.activeAround.lng, this.activeAround.lat];
             }
 
-            this.map.easeTo(easeOptions);
+            try {
+                this.map.easeTo(easeOptions);
+            } catch (err) {
+                console.error('[SmoothScrollZoomController] easeTo error:', err);
+            }
         };
 
         this.container.addEventListener('wheel', this.wheelHandler, { passive: false, capture: true });
