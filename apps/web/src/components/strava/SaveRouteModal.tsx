@@ -126,7 +126,7 @@ export function SaveRouteModal() {
                             {t.saveRouteModalTitle}
                         </h2>
                         <p className="text-xs text-muted-foreground">
-                            保存当前规划路线至本地个人路线库
+                            {t.saveRouteModalSubtitle}
                         </p>
                     </div>
                 </div>
@@ -166,7 +166,7 @@ export function SaveRouteModal() {
                             value={routeName}
                             onChange={(e) => setRouteName(e.target.value)}
                             required
-                            placeholder="例如：周日环山绿道骑行…"
+                            placeholder={t.routeNamePlaceholder}
                             className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground outline-none transition focus:border-[#863BFF] focus:ring-2 focus:ring-[#863BFF]/20"
                         />
                     </div>
@@ -179,7 +179,7 @@ export function SaveRouteModal() {
                             rows={3}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="添加路况备注、补给点、推荐季节等信息…"
+                            placeholder={t.routeDescriptionPlaceholder}
                             className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-sm text-foreground outline-none transition focus:border-[#863BFF] focus:ring-2 focus:ring-[#863BFF]/20"
                         />
                     </div>

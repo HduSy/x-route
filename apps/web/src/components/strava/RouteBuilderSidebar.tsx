@@ -25,7 +25,7 @@ interface SearchResult {
 }
 
 export function RouteBuilderSidebar() {
-    const { t, lang } = useT();
+    const { t } = useT();
 
     // Store state
     const active = useRoutingStore((s) => s.active);
@@ -123,7 +123,7 @@ export function RouteBuilderSidebar() {
                         onClick={() => {
                             setSidebarCollapsed(true);
                         }}
-                        title={lang === 'zh' ? '关闭面板' : 'Close'}
+                        title={t.closeSidebar}
                     >
                         <X className="size-4" />
                     </button>
@@ -147,7 +147,7 @@ export function RouteBuilderSidebar() {
                             title={t.dragToPanMap}
                         >
                             <Hand className="size-3.5" />
-                            <span>{lang === 'zh' ? '浏览地图' : 'Browse'}</span>
+                            <span>{t.browseMode}</span>
                         </button>
                         <button
                             type="button"
@@ -161,7 +161,7 @@ export function RouteBuilderSidebar() {
                             title={t.clickMapToAddPoint}
                         >
                             <Crosshair className="size-3.5" />
-                            <span>{lang === 'zh' ? '绘制路线' : 'Draw'}</span>
+                            <span>{t.drawMode}</span>
                         </button>
                     </div>
                 </div>
@@ -395,7 +395,7 @@ export function RouteBuilderSidebar() {
                         className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#863BFF] py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#7424F8] active:scale-98 cursor-pointer"
                     >
                         <Crosshair className="size-4" />
-                        <span>{lang === 'zh' ? '在地图上选点绘制' : 'Draw on map'}</span>
+                        <span>{t.drawOnMap}</span>
                     </button>
                 </div>
             </div>

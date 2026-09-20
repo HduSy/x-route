@@ -141,7 +141,7 @@ export function MyRoutesDrawer() {
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="搜索路线名称…"
+                                placeholder={t.searchRoutesPlaceholder}
                                 className="w-full rounded-lg border border-border bg-background py-1.5 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground outline-none transition focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF]"
                             />
                             {searchQuery && (
@@ -176,19 +176,21 @@ export function MyRoutesDrawer() {
                                 {t.noRoutesSaved}
                             </p>
                             <p className="text-xs text-muted-foreground max-w-xs mb-4">
-                                点击地图规划路线后保存，或直接导入本地 GPX 轨迹文件
+                                {t.noRoutesSavedHint}
                             </p>
                             <button
                                 onClick={triggerFileInput}
                                 className="rounded-lg border border-border bg-white dark:bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-xs transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
                             >
-                                立即导入轨迹
+                                {t.importNow}
                             </button>
                         </div>
                     ) : filteredFileIds.length === 0 ? (
                         <div className="flex h-48 flex-col items-center justify-center text-center px-4 text-muted-foreground">
                             <Search className="size-8 stroke-[1.5] text-muted-foreground/40 mb-2" />
-                            <p className="text-xs font-medium">未找到匹配 “{searchQuery}” 的路线</p>
+                            <p className="text-xs font-medium">
+                                {t.noMatchingRoutesPrefix}“{searchQuery}”{t.noMatchingRoutesSuffix}
+                            </p>
                         </div>
                     ) : (
                         filteredFileIds.map((id) => {
@@ -279,7 +281,7 @@ export function MyRoutesDrawer() {
                                         <div>
                                             <div className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                                 <Clock className="size-3 text-[#863BFF]" />
-                                                <span>预估耗时</span>
+                                                <span>{t.estMovingTime}</span>
                                             </div>
                                             <div className="text-xs font-black text-foreground mt-0.5">
                                                 {estTime}
@@ -293,10 +295,10 @@ export function MyRoutesDrawer() {
                                             {isSelected ? (
                                                 <span className="inline-flex items-center gap-1 text-[#863BFF] font-bold">
                                                     <span className="size-1.5 rounded-full bg-[#863BFF] animate-pulse" />
-                                                    当前编辑中
+                                                    {t.currentlyEditing}
                                                 </span>
                                             ) : (
-                                                '准备就绪'
+                                                t.readyToLoad
                                             )}
                                         </span>
                                         <button

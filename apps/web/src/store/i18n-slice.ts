@@ -108,6 +108,42 @@ export const translations = {
         updateRoute: 'Update Route',
         lassoMode: 'Box select (drag to remove waypoints)',
 
+        // Map controls & tooltips
+        zoomIn: 'Zoom in',
+        zoomOut: 'Zoom out',
+        resetNorth: 'Reset bearing to North',
+        toggle3D: 'Toggle 2D / 3D tilt',
+        manualModeActive: 'Manual mode (Active)',
+        manualModeInactive: 'Manual mode (Click to draw manual straight lines)',
+        closeSidebar: 'Close sidebar',
+        browseMode: 'Browse',
+        drawMode: 'Draw',
+        drawOnMap: 'Draw on map',
+        switchLanguage: 'Switch Language / 切换语言',
+        elevationShort: 'Ele',
+        hideShort: 'Hide',
+
+        // Save Route Modal
+        saveRouteModalSubtitle: 'Save current route to your local library',
+        routeNamePlaceholder: 'e.g. Sunday Morning Mountain Ride…',
+        routeDescriptionPlaceholder: 'Add road conditions, supply points, season notes…',
+
+        // My Routes Drawer
+        searchRoutesPlaceholder: 'Search routes by name…',
+        noRoutesSavedHint: 'Click the map to plan a route and save, or import local GPX files',
+        importNow: 'Import GPX Now',
+        noMatchingRoutesPrefix: 'No routes matching ',
+        noMatchingRoutesSuffix: '',
+        currentlyEditing: 'Currently Editing',
+        readyToLoad: 'Ready',
+
+        // Routing Layer Tooltips
+        dragWaypointTip: '📌 Drag to move waypoint',
+        dragStartTip: '📍 Drag to move start point',
+        dragEndTip: '🏁 Drag to move finish point',
+        dragGhostHoverTip: '📍 Click or drag to adjust route',
+        dragGhostActiveTip: '🎯 Release to insert waypoint',
+
         profiles: {
             bike: 'Bike',
             racing_bike: 'Road bike',
@@ -227,6 +263,42 @@ export const translations = {
         confirm: '确认清空',
         updateRoute: '更新路线',
         lassoMode: '框选删除节点（拖拽框选区域）',
+
+        // 地图控制与工具提示
+        zoomIn: '放大地图',
+        zoomOut: '缩小地图',
+        resetNorth: '重置地图正北方向',
+        toggle3D: '切换 2D / 3D 视角',
+        manualModeActive: '自由画线模式 (已开启)',
+        manualModeInactive: '自由画线模式 (点击开启手动直线绘制)',
+        closeSidebar: '关闭面板',
+        browseMode: '浏览地图',
+        drawMode: '绘制路线',
+        drawOnMap: '在地图上选点绘制',
+        switchLanguage: '切换语言 / Switch Language',
+        elevationShort: '海拔',
+        hideShort: '收起',
+
+        // 保存路线弹窗
+        saveRouteModalSubtitle: '保存当前规划路线至本地个人路线库',
+        routeNamePlaceholder: '例如：周日环山绿道骑行…',
+        routeDescriptionPlaceholder: '添加路况备注、补给点、推荐季节等信息…',
+
+        // 我的路线抽屉
+        searchRoutesPlaceholder: '搜索路线名称…',
+        noRoutesSavedHint: '点击地图规划路线后保存，或直接导入本地 GPX 轨迹文件',
+        importNow: '立即导入轨迹',
+        noMatchingRoutesPrefix: '未找到匹配 “',
+        noMatchingRoutesSuffix: '” 的路线',
+        currentlyEditing: '当前编辑中',
+        readyToLoad: '准备就绪',
+
+        // 路线规划图层交互提示
+        dragWaypointTip: '📌 调整途经点',
+        dragStartTip: '📍 调整起点',
+        dragEndTip: '🏁 调整终点',
+        dragGhostHoverTip: '📍 点击或拖拽以调整路线',
+        dragGhostActiveTip: '🎯 释放以新增途经点',
 
         profiles: {
             bike: '标准骑行',

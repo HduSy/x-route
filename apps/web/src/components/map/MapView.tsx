@@ -458,8 +458,8 @@ export function MapView() {
                     )}
                     title={
                         manualMode
-                            ? t.manualMode + ' (Active)'
-                            : t.manualMode + ' (Click to draw manual straight lines)'
+                            ? t.manualModeActive
+                            : t.manualModeInactive
                     }
                 >
                     <Spline className="size-4" />
@@ -468,14 +468,14 @@ export function MapView() {
                 <button
                     onClick={handleZoomIn}
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
-                    title="Zoom in"
+                    title={t.zoomIn}
                 >
                     <Plus className="size-4" />
                 </button>
                 <button
                     onClick={handleZoomOut}
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
-                    title="Zoom out"
+                    title={t.zoomOut}
                 >
                     <Minus className="size-4" />
                 </button>
@@ -490,7 +490,7 @@ export function MapView() {
                 <button
                     onClick={handleResetCompass}
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] transition cursor-pointer"
-                    title="Reset bearing to North"
+                    title={t.resetNorth}
                 >
                     <Compass
                         className="size-4 transition-transform duration-75"
@@ -529,7 +529,7 @@ export function MapView() {
                                     <button
                                         key={key}
                                         onClick={() => {
-                                            mapManager.setBasemap(key);
+                                             mapManager.setBasemap(key);
                                             setBasemapOpen(false);
                                         }}
                                         className={cn(
@@ -558,7 +558,7 @@ export function MapView() {
                         'flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-white dark:bg-card text-xs font-black shadow-sm transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer active:scale-98',
                         is3D ? 'bg-[#863BFF]/15 text-[#863BFF] border-[#863BFF]' : 'text-foreground'
                     )}
-                    title="Toggle 2D / 3D tilt"
+                    title={t.toggle3D}
                 >
                     {is3D ? '2D' : '3D'}
                 </button>

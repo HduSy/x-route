@@ -20,7 +20,7 @@ interface ProfilePoint {
 }
 
 export function RouteStatsBar() {
-    const { t, lang } = useT();
+    const { t } = useT();
 
     // Store state
     const resultPoints = useRoutingStore((s) => s.resultPoints);
@@ -375,7 +375,7 @@ export function RouteStatsBar() {
                     title={elevationExpanded ? t.hideElevation : t.showElevation}
                 >
                     <span className="hidden sm:inline">{elevationExpanded ? t.hideElevation : t.showElevation}</span>
-                    <span className="sm:hidden">{lang === 'zh' ? (elevationExpanded ? '收起' : '海拔') : (elevationExpanded ? 'Hide' : 'Ele')}</span>
+                    <span className="sm:hidden">{elevationExpanded ? t.hideShort : t.elevationShort}</span>
                     {elevationExpanded ? <ChevronDown className="size-3 sm:size-3.5" /> : <ChevronUp className="size-3 sm:size-3.5" />}
                 </button>
             </div>

@@ -84,7 +84,7 @@ export function StravaNavbar() {
                     size="sm"
                     className="h-8 px-2 sm:px-3 gap-1.5 border-dashed text-xs font-semibold text-foreground hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
                     onClick={triggerFileInput}
-                    title="Import GPX / ZIP"
+                    title={t.importBtn}
                 >
                     <FolderOpen className="size-3.5 text-[#863BFF]" />
                     <span className="hidden sm:inline">{t.importBtn}</span>
@@ -95,7 +95,7 @@ export function StravaNavbar() {
                     size="sm"
                     className="h-8 px-1.5 sm:px-2 text-xs font-medium hover:text-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] cursor-pointer"
                     onClick={toggleLanguage}
-                    title="Switch Language / 切换语言"
+                    title={t.switchLanguage}
                 >
                     <Languages className="mr-0.5 sm:mr-1 size-3.5" />
                     {lang === 'en' ? '中文' : 'EN'}

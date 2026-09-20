@@ -3,6 +3,7 @@ import { mapManager } from './MapManager';
 import type { RoutingAnchor, UnitType } from '@/store/routing-slice';
 import { TrackPoint, distance } from '@x-route/gpx';
 import { getClosestLinePoint } from '@/lib/utils';
+import { translations, useI18nStore } from '@/store/i18n-slice';
 
 // Strava Route Builder imperative routing layer:
 // - Strava signature energetic orange route polyline with casing
@@ -696,9 +697,11 @@ export class RoutingLayerController {
 
     private showDragTooltip(marker: Marker, index: number, total: number) {
         const el = marker.getElement();
-        let label = '📌 调整途经点';
-        if (index === 0) label = '📍 调整起点';
-        else if (index === total - 1) label = '🏁 调整终点';
+        const lang = useI18nStore.getState().language;
+        const t = translations[lang];
+        let label: string = t.dragWaypointTip;
+        if (index === 0) label = t.dragStartTip;
+        else if (index === total - 1) label = t.dragEndTip;
 
         const tip = document.createElement('div');
         tip.className = 'x-route-drag-tip';
@@ -728,6 +731,8 @@ export class RoutingLayerController {
     private showGhostTooltip(marker: Marker, mode: 'hover' | 'drag' = 'hover') {
         const el = marker.getElement();
         this.hideDragTooltip(marker);
+        const lang = useI18nStore.getState().language;
+        const t = translations[lang];
         const tip = document.createElement('div');
         tip.className = 'x-route-drag-tip';
         tip.style.cssText = `
@@ -749,7 +754,7 @@ export class RoutingLayerController {
             border: 1px solid rgba(255, 255, 255, 0.2);
             animation: x-route-tip-in 0.15s cubic-bezier(0.16, 1, 0.3, 1);
         `;
-        tip.textContent = mode === 'drag' ? '🎯 释放以新增途经点' : '📍 点击或拖拽以调整路线';
+        tip.textContent = mode === 'drag' ? t.dragGhostActiveTip : t.dragGhostHoverTip;
         el.appendChild(tip);
     }
 
