@@ -40,7 +40,6 @@ export function MapFloatingToolbar() {
     const reverseAnchors = useRoutingStore((s) => s.reverseAnchors);
     const clear = useRoutingStore((s) => s.clear);
     const setSaveModalOpen = useRoutingStore((s) => s.setSaveModalOpen);
-    const myRoutesOpen = useRoutingStore((s) => s.myRoutesOpen);
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
@@ -183,9 +182,8 @@ export function MapFloatingToolbar() {
     return (
         <div
             className={cn(
-                'pointer-events-none absolute top-2 sm:top-3 z-10 flex items-center justify-between select-none transition-[left,right] duration-200 ease-in-out',
-                sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]',
-                myRoutesOpen ? 'right-2 sm:right-[332px]' : 'right-2 sm:right-3'
+                'pointer-events-none absolute right-2 top-2 sm:right-3 sm:top-3 z-10 flex items-center justify-between select-none transition-[left] duration-200 ease-in-out',
+                sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
             )}
         >
             {/* Left toolbar group */}
@@ -347,31 +345,14 @@ export function MapFloatingToolbar() {
             {/* Right side: My Routes button (Solid opaque, never transparent on hover) */}
             <div className="pointer-events-auto flex items-center gap-2">
                 <button
-                    onClick={() => setMyRoutesOpen(!myRoutesOpen)}
-                    className={cn(
-                        'group flex h-8 sm:h-9 items-center gap-1.5 sm:gap-2 rounded-lg border px-2.5 sm:px-3.5 text-xs font-bold tracking-tight shadow-sm transition-all duration-150 cursor-pointer active:scale-98',
-                        myRoutesOpen
-                            ? 'bg-[#863BFF] text-white border-[#863BFF] shadow-md shadow-[#863BFF]/20'
-                            : 'bg-white dark:bg-card border-border text-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] hover:shadow-md'
-                    )}
+                    onClick={() => setMyRoutesOpen(true)}
+                    className="group flex h-8 sm:h-9 items-center gap-1.5 sm:gap-2 rounded-lg border border-border bg-white dark:bg-card px-2.5 sm:px-3.5 text-xs font-bold tracking-tight text-foreground shadow-sm transition-all duration-150 hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] hover:shadow-md cursor-pointer active:scale-98"
                     title={t.myRoutes}
                 >
-                    <Bookmark
-                        className={cn(
-                            'size-3.5 sm:size-4 transition-transform group-hover:scale-110',
-                            myRoutesOpen ? 'text-white fill-white' : 'text-[#863BFF]'
-                        )}
-                    />
+                    <Bookmark className="size-3.5 sm:size-4 text-[#863BFF] transition-transform group-hover:scale-110" />
                     <span className="hidden sm:inline">{t.myRoutes}</span>
                     {fileCount > 0 && (
-                        <span
-                            className={cn(
-                                'rounded-full px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black',
-                                myRoutesOpen
-                                    ? 'bg-white/20 text-white'
-                                    : 'bg-[#863BFF]/15 text-[#863BFF]'
-                            )}
-                        >
+                        <span className="rounded-full bg-[#863BFF]/15 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black text-[#863BFF]">
                             {fileCount}
                         </span>
                     )}
