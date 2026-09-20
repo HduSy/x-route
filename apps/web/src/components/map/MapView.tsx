@@ -65,6 +65,8 @@ export function MapView() {
     const active = useRoutingStore((s) => s.active);
     const setActive = useRoutingStore((s) => s.setActive);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
+    const myRoutesOpen = useRoutingStore((s) => s.myRoutesOpen);
+    const isLeftPanelOpen = !sidebarCollapsed || myRoutesOpen;
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
     const units = useRoutingStore((s) => s.units);
@@ -446,7 +448,7 @@ export function MapView() {
         <div className="relative h-full w-full">
             <div
                 ref={containerRef}
-                className={cn('h-full w-full', active && 'route-building-cursor', !sidebarCollapsed && 'sidebar-open')}
+                className={cn('h-full w-full', active && 'route-building-cursor', isLeftPanelOpen && 'sidebar-open')}
             />
 
             {/* Lasso selection rectangle overlay */}
@@ -469,7 +471,7 @@ export function MapView() {
             <div
                 className={cn(
                     'absolute top-13 sm:top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none transition-[left] duration-200 ease-in-out',
-                    sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
+                    !isLeftPanelOpen ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
                 )}
             >
                 {/* Route planning / creation mode toggle */}
@@ -546,7 +548,7 @@ export function MapView() {
             <div
                 className={cn(
                     'absolute bottom-8 sm:bottom-9 z-10 flex flex-col gap-1 select-none transition-[left] duration-200 ease-in-out',
-                    sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
+                    !isLeftPanelOpen ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
                 )}
             >
                 {/* Basemap selector popover button */}

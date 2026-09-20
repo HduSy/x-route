@@ -131,6 +131,7 @@ export const translations = {
         routeDescriptionPlaceholder: 'Add road conditions, supply points, season notes…',
 
         // My Routes Drawer
+        backToRouteBuilder: 'Back to Route Builder',
         searchRoutesPlaceholder: 'Search routes by name…',
         noRoutesSavedHint: 'Click the map to plan a route and save, or import local GPX files',
         importNow: 'Import GPX Now',
@@ -298,6 +299,7 @@ export const translations = {
         routeDescriptionPlaceholder: '添加路况备注、补给点、推荐季节等信息…',
 
         // 我的路线抽屉
+        backToRouteBuilder: '返回路线规划',
         searchRoutesPlaceholder: '搜索路线名称…',
         noRoutesSavedHint: '点击地图规划路线后保存，或直接导入本地 GPX 轨迹文件',
         importNow: '立即导入轨迹',

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
     Bike,
+    Bookmark,
     ChevronDown,
     Compass,
     Crosshair,
@@ -46,6 +47,8 @@ export function RouteBuilderSidebar() {
     const setUnits = useRoutingStore((s) => s.setUnits);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
+    const myRoutesOpen = useRoutingStore((s) => s.myRoutesOpen);
+    const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const addAnchor = useRoutingStore((s) => s.addAnchor);
 
     // Geocoding search
@@ -112,9 +115,11 @@ export function RouteBuilderSidebar() {
             )}
 
             <aside
+                aria-hidden={sidebarCollapsed || myRoutesOpen}
                 className={cn(
                     'fixed inset-y-0 left-0 z-40 w-[85vw] max-w-xs sm:absolute sm:inset-y-0 sm:left-0 sm:z-20 sm:w-80 sm:min-w-80 sm:max-w-none flex h-full flex-col border-r border-border bg-background shadow-2xl sm:shadow-md select-none transition-transform duration-200 ease-in-out',
-                    sidebarCollapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0 pointer-events-auto'
+                    sidebarCollapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0 pointer-events-auto',
+                    myRoutesOpen && 'pointer-events-none'
                 )}
             >
                 {/* Header */}
@@ -122,15 +127,27 @@ export function RouteBuilderSidebar() {
                     <h2 className="text-base font-bold tracking-tight text-foreground">
                         {t.buildYourRoute}
                     </h2>
-                    <button
-                        className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
-                        onClick={() => {
-                            setSidebarCollapsed(true);
-                        }}
-                        title={t.closeSidebar}
-                    >
-                        <X className="size-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={() => setMyRoutesOpen(true)}
+                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-accent hover:text-[#863BFF] cursor-pointer"
+                            title={t.myRoutes}
+                        >
+                            <Bookmark className="size-3.5 text-[#863BFF]" />
+                            <span className="text-[11px] font-medium">{t.myRoutes}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+                            onClick={() => {
+                                setSidebarCollapsed(true);
+                            }}
+                            title={t.closeSidebar}
+                        >
+                            <X className="size-4" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Sidebar content */}
