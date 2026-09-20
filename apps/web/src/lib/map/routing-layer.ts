@@ -284,6 +284,7 @@ export class RoutingLayerController {
     private containerPointerDownHandler: ((e: MouseEvent | PointerEvent) => void) | null = null;
     private containerMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
     private containerMouseLeaveHandler: (() => void) | null = null;
+    private windowPointerUpHandler: (() => void) | null = null;
     /** Set to true for one tick after a drag ends, to suppress the click that fires on mouseup. */
     private justFinishedGhostDrag = false;
     private currentAnchors: RoutingAnchor[] = [];
@@ -484,6 +485,12 @@ export class RoutingLayerController {
             }
             if (this.currentPoints.length < 2) return;
 
+            // CRITICAL: If the target is an existing marker, let the marker handle its own drag!
+            const targetEl = e.target as HTMLElement | null;
+            if (targetEl && targetEl.closest('.maplibregl-marker')) {
+                return;
+            }
+
             const canvas = map.getCanvas();
             const rect = canvas.getBoundingClientRect();
             const screenX = e.clientX - rect.left;
@@ -549,7 +556,7 @@ export class RoutingLayerController {
                 setTimeout(() => {
                     this.suppressClick = false;
                     this.justFinishedGhostDrag = false;
-                }, 250);
+                }, 150);
             };
 
             const onWindowMove = (we: MouseEvent | PointerEvent) => {
@@ -560,9 +567,6 @@ export class RoutingLayerController {
                 const curRect = canvas.getBoundingClientRect();
                 const curLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
                 this.ghostMarker?.setLngLat([curLngLat.lng, curLngLat.lat]);
-                if (this.ghostMarker) {
-                    this.showGhostTooltip(this.ghostMarker, 'drag');
-                }
                 this.setRubberBand(getRubberBandCoords(curLngLat));
             };
 
@@ -581,6 +585,9 @@ export class RoutingLayerController {
                 const moveDist = Math.hypot(we.clientX - startClientX, we.clientY - startClientY);
                 this.justFinishedGhostDrag = true;
 
+                // CRITICAL: Cleanup and unfreeze map state FIRST before store state update
+                cleanupState();
+
                 if (moveDist >= 6) {
                     // Dragged to a new location on the map: insert custom waypoint at released map location
                     this.onInsertAnchor?.(this.dragInsertIndex, { lon: finalLngLat.lng, lat: finalLngLat.lat });
@@ -588,8 +595,6 @@ export class RoutingLayerController {
                     // Direct click/selection on route line: insert waypoint right at clicked line position
                     this.onInsertAnchor?.(this.dragInsertIndex, { lon: hit.closestLngLat.lng, lat: hit.closestLngLat.lat });
                 }
-
-                cleanupState();
             };
 
             const onKeyDown = (ke: KeyboardEvent) => {
@@ -607,7 +612,7 @@ export class RoutingLayerController {
             try {
                 this.ensureGhostMarker(map, hit.closestLngLat);
                 if (this.ghostMarker) {
-                    this.showGhostTooltip(this.ghostMarker, 'hover');
+                    this.showGhostTooltip(this.ghostMarker, 'drag');
                 }
                 this.setRubberBand(getRubberBandCoords(hit.closestLngLat));
 
@@ -628,6 +633,20 @@ export class RoutingLayerController {
         container.addEventListener('mousedown', this.containerPointerDownHandler, { capture: true });
         container.addEventListener('mousemove', this.containerMouseMoveHandler);
         container.addEventListener('mouseleave', this.containerMouseLeaveHandler);
+
+        this.windowPointerUpHandler = () => {
+            // Safety: guarantee map panning is re-enabled if line drag has ended
+            if (!this.isDraggingLine && this.wiredMap) {
+                try {
+                    this.wiredMap.dragPan.enable();
+                } catch {}
+            }
+            setTimeout(() => {
+                this.suppressClick = false;
+            }, 120);
+        };
+        window.addEventListener('pointerup', this.windowPointerUpHandler, { capture: true });
+        window.addEventListener('mouseup', this.windowPointerUpHandler, { capture: true });
     }
 
     unwire() {
@@ -650,6 +669,11 @@ export class RoutingLayerController {
             if (this.clickHandler) {
                 this.wiredMap.off('click', this.clickHandler);
             }
+        }
+        if (this.windowPointerUpHandler) {
+            window.removeEventListener('pointerup', this.windowPointerUpHandler, { capture: true });
+            window.removeEventListener('mouseup', this.windowPointerUpHandler, { capture: true });
+            this.windowPointerUpHandler = null;
         }
         this.clearRubberBand();
         this.removeGhostMarker();

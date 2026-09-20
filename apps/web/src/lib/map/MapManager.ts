@@ -131,171 +131,6 @@ function saveLastLocation(coords: { lon: number; lat: number } | null) {
     } catch {}
 }
 
-/**
- * SmoothScrollZoomController
- * Replaces MapLibre's built-in ScrollZoomHandler with an ultra-smooth,
- * bounded, explosion-proof zoom controller modeled after Strava and Google Maps.
- *
- * 1. Delta Normalization: Handles mouse wheel notches, trackpad smooth scroll, and pinch-to-zoom consistently.
- * 2. Explosion Horizon Shield: At any millisecond, targetZoom is mathematically bounded within
- *    [currentZoom - 1.15, currentZoom + 1.15], preventing runaway exponential magnification even with
- *    high-frequency free-spinning wheels or chaotic trackpad bursts.
- * 3. Drag Suppression: If any mouse button is currently held down (user is actively drag-panning,
- *    dragging a route polyline, or moving an anchor marker), wheel zoom is completely suppressed to
- *    prevent accidental zoom scale changes from finger brush / jitter.
- * 4. Pinned Pivot Easing: Smoothly eases camera around the exact geographic coordinates under the cursor
- *    using MapLibre's native easeTo({ zoom, around, duration: 140 }).
- */
-class SmoothScrollZoomController {
-    private map: MapLibreMap;
-    private container: HTMLElement;
-    private targetZoom: number | null = null;
-    private activeAround: { lng: number; lat: number } | null = null;
-    private lastWheelTime = 0;
-    private lastScreenX = 0;
-    private lastScreenY = 0;
-    private wheelHandler: ((e: WheelEvent) => void) | null = null;
-
-    constructor(map: MapLibreMap, container: HTMLElement) {
-        this.map = map;
-        this.container = container;
-        this.attach();
-    }
-
-    private attach() {
-        this.wheelHandler = (e: WheelEvent) => {
-            // 1. If any mouse button is pressed down (e.g. user is dragging the map,
-            // dragging a route polyline, or moving an anchor marker), suppress wheel zoom completely!
-            // This eliminates accidental zoom scale distortion when fingers slip on the wheel/trackpad during drag.
-            if (e.buttons !== 0) {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-            }
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            mapManager.markInteracted();
-
-            const rect = this.container.getBoundingClientRect();
-            const screenX = e.clientX - rect.left;
-            const screenY = e.clientY - rect.top;
-
-            const now = performance.now();
-            const timeSinceLast = now - this.lastWheelTime;
-            this.lastWheelTime = now;
-
-            const curZoom = this.map.getZoom();
-
-            // If this is a new gesture sequence (> 140ms gap) or target has settled, reset pivot to current cursor
-            if (timeSinceLast > 140 || this.targetZoom === null || Math.abs(curZoom - this.targetZoom) < 0.01) {
-                this.targetZoom = curZoom;
-                try {
-                    const unprojected = this.map.unproject([screenX, screenY]);
-                    this.activeAround = { lng: unprojected.lng, lat: unprojected.lat };
-                } catch {
-                    this.activeAround = null;
-                }
-                this.lastScreenX = screenX;
-                this.lastScreenY = screenY;
-            } else {
-                // If cursor has moved significantly (> 16px) during continuous scrolling, update the pivot
-                if (Math.hypot(screenX - this.lastScreenX, screenY - this.lastScreenY) > 16) {
-                    try {
-                        const unprojected = this.map.unproject([screenX, screenY]);
-                        this.activeAround = { lng: unprojected.lng, lat: unprojected.lat };
-                    } catch {}
-                    this.lastScreenX = screenX;
-                    this.lastScreenY = screenY;
-                }
-            }
-
-            // Normalize deltaY across browsers and input modes
-            let dy = e.deltaY;
-            if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-                dy *= 20; // Firefox line delta
-            } else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-                dy *= 200;
-            }
-
-            // Device & gesture detection
-            let deltaZ = 0;
-            const isPinch = e.ctrlKey;
-            const isDiscreteNotch =
-                !isPinch &&
-                Math.abs(dy) >= 40 &&
-                (e.deltaMode !== 0 || Math.abs(dy) % 40 === 0 || Math.abs(dy) >= 100);
-
-            if (isDiscreteNotch) {
-                // Mechanical mouse wheel: crisp, comfortable, predictable step (~0.28 zoom levels per notch)
-                const direction = dy < 0 ? 1 : -1;
-                const notchCount = Math.max(1, Math.min(3, Math.round(Math.abs(dy) / 100)));
-                deltaZ = direction * 0.28 * notchCount;
-            } else if (isPinch) {
-                // Trackpad pinch-to-zoom (macOS ctrlKey + wheel)
-                deltaZ = -dy * 0.008;
-                deltaZ = Math.max(-0.25, Math.min(0.25, deltaZ));
-            } else {
-                // Continuous high-frequency trackpad scrolling
-                deltaZ = -dy * 0.0055;
-                deltaZ = Math.max(-0.22, Math.min(0.22, deltaZ));
-            }
-
-            if (deltaZ === 0 || !Number.isFinite(deltaZ)) return;
-
-            // Update target zoom with Explosion Horizon Clamp
-            let nextTarget = (this.targetZoom ?? curZoom) + deltaZ;
-
-            // EXPLOSION SHIELD:
-            // Bound the maximum leading horizon ahead of curZoom to ±1.15 zoom levels.
-            // Even under an avalanche of events from a free-spinning wheel,
-            // the zoom can never run away into deep space or microscopic zoom!
-            const MAX_HORIZON = 1.15;
-            nextTarget = Math.max(curZoom - MAX_HORIZON, Math.min(curZoom + MAX_HORIZON, nextTarget));
-
-            // Clamp to map zoom bounds
-            const minZ = this.map.getMinZoom();
-            const maxZ = this.map.getMaxZoom();
-            nextTarget = Math.max(minZ, Math.min(maxZ, nextTarget));
-
-            this.targetZoom = nextTarget;
-
-            // Smooth ease towards target around the pinned cursor coordinate
-            const easeOptions: any = {
-                zoom: nextTarget,
-                duration: 140,
-                easing: (t: number) => t * (2 - t), // smooth quadratic ease-out
-            };
-
-            if (
-                this.activeAround &&
-                Number.isFinite(this.activeAround.lng) &&
-                Number.isFinite(this.activeAround.lat)
-            ) {
-                easeOptions.around = [this.activeAround.lng, this.activeAround.lat];
-            }
-
-            try {
-                this.map.easeTo(easeOptions);
-            } catch (err) {
-                console.error('[SmoothScrollZoomController] easeTo error:', err);
-            }
-        };
-
-        this.container.addEventListener('wheel', this.wheelHandler, { passive: false, capture: true });
-    }
-
-    destroy() {
-        if (this.wheelHandler) {
-            this.container.removeEventListener('wheel', this.wheelHandler, { capture: true });
-            this.wheelHandler = null;
-        }
-        this.targetZoom = null;
-        this.activeAround = null;
-    }
-}
-
 class MapManager {
     private map: MapLibreMap | null = null;
     private container: HTMLElement | null = null;
@@ -307,7 +142,6 @@ class MapManager {
     private styleReloadCallbacks = new Set<() => void>();
     private userInteracted = false;
     private saveViewportTimer: ReturnType<typeof setTimeout> | null = null;
-    private scrollZoomController: SmoothScrollZoomController | null = null;
 
     hasSavedViewport(): boolean {
         return getSavedViewport() !== null;
@@ -347,9 +181,11 @@ class MapManager {
             attribControl._container?.classList.remove('maplibregl-compact-show');
         });
 
-        // Completely disable MapLibre's built-in ScrollZoomHandler
-        // to eliminate hardcoded maxScalePerFrame = 2 compounding zoom runaway!
-        map.scrollZoom.disable();
+        // Use MapLibre's rock-solid native ScrollZoomHandler with calibrated rate:
+        // default 1/450 is predictable, smooth, and explosion-free across wheel and trackpads
+        map.scrollZoom.enable();
+        map.scrollZoom.setWheelZoomRate(1 / 450);
+        map.scrollZoom.setZoomRate(1 / 100);
 
         // Prevent gesture disruptions during route building:
         // 1. boxZoom: Shift-dragging must NOT suddenly zoom the map into a tiny bounding box
@@ -362,9 +198,6 @@ class MapManager {
         map.touchPitch.disable();
         // 5. touchZoomRotate: disable rotation during pinch zoom
         map.touchZoomRotate.disableRotation();
-
-        // Attach our custom Strava-grade SmoothScrollZoomController
-        this.scrollZoomController = new SmoothScrollZoomController(map, container);
 
         // Track whether the user has driven the camera (pan/zoom/pinch/click).
         // Auto-fitBounds must never yank the viewport away from an inspecting user.
@@ -406,8 +239,6 @@ class MapManager {
     }
 
     destroy() {
-        this.scrollZoomController?.destroy();
-        this.scrollZoomController = null;
         if (this.saveViewportTimer) {
             clearTimeout(this.saveViewportTimer);
             this.saveViewportTimer = null;
