@@ -21,57 +21,84 @@ interface ProfilePoint {
     lon: number;
 }
 
-interface SlopeStyle {
+interface SlopeBracket {
+    id: number;
+    label: string;
     borderColor: string;
     backgroundColor: string;
 }
 
 /**
- * Maps gradient (slope) to color and translucent background matching BRouter-Web logic
- * while harmonizing with x-route's violet/purple athletic aesthetic.
+ * Maps gradient (slope) to BRouter-Web steepness categories with color and translucent fill.
  */
-function getSlopeStyle(p0: ProfilePoint, p1: ProfilePoint): SlopeStyle {
+function getSlopeBracket(slope: number): SlopeBracket {
+    if (slope <= -16) {
+        return { id: -5, label: '< -16%', borderColor: '#0369A1', backgroundColor: 'rgba(3, 105, 161, 0.16)' };
+    } else if (slope <= -10) {
+        return { id: -4, label: '-10 ~ -15%', borderColor: '#0284C7', backgroundColor: 'rgba(2, 132, 199, 0.16)' };
+    } else if (slope <= -7) {
+        return { id: -3, label: '-7 ~ -9%', borderColor: '#0EA5E9', backgroundColor: 'rgba(14, 165, 233, 0.16)' };
+    } else if (slope <= -4) {
+        return { id: -2, label: '-4 ~ -6%', borderColor: '#38BDF8', backgroundColor: 'rgba(56, 189, 248, 0.16)' };
+    } else if (slope <= -1) {
+        return { id: -1, label: '-1 ~ -3%', borderColor: '#60A5FA', backgroundColor: 'rgba(96, 165, 250, 0.16)' };
+    } else if (slope < 1.0) {
+        return { id: 0, label: '0%', borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.16)' };
+    } else if (slope < 3.5) {
+        return { id: 1, label: '1-3%', borderColor: '#FACC15', backgroundColor: 'rgba(250, 204, 21, 0.18)' };
+    } else if (slope < 6.5) {
+        // Matches "Type: 4-6%" exactly from brouter!
+        return { id: 2, label: '4-6%', borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.20)' };
+    } else if (slope < 9.5) {
+        return { id: 3, label: '7-9%', borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.22)' };
+    } else if (slope < 15.5) {
+        return { id: 4, label: '10-15%', borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.24)' };
+    } else {
+        return { id: 5, label: '> 16%', borderColor: '#863BFF', backgroundColor: 'rgba(134, 59, 255, 0.28)' };
+    }
+}
+
+function getIntervalBracket(pts: ProfilePoint[], intervalIdx: number): SlopeBracket {
+    const p0 = pts[intervalIdx];
+    const p1 = pts[intervalIdx + 1];
+    if (!p0 || !p1) {
+        return getSlopeBracket(0);
+    }
     const distMeters = (p1.distanceKm - p0.distanceKm) * 1000;
     const eleDiff = p1.ele - p0.ele;
     const slope = distMeters > 0.5 ? (eleDiff / distMeters) * 100 : 0;
+    return getSlopeBracket(slope);
+}
 
-    if (slope < -1.5) {
-        // Downhill (< -1.5%): Cool Azure / Sky
+function getSegmentDetails(pts: ProfilePoint[], idx: number): { lengthKm: number; bracket: SlopeBracket } {
+    if (pts.length < 2) {
         return {
-            borderColor: '#0284C7',
-            backgroundColor: 'rgba(2, 132, 199, 0.16)',
-        };
-    } else if (slope < 2.5) {
-        // Flat / Gentle cruise (-1.5% ~ 2.5%): Emerald
-        return {
-            borderColor: '#10B981',
-            backgroundColor: 'rgba(16, 185, 129, 0.16)',
-        };
-    } else if (slope < 5.0) {
-        // Mild Climb (2.5% ~ 5%): Amber Gold
-        return {
-            borderColor: '#F59E0B',
-            backgroundColor: 'rgba(245, 158, 11, 0.18)',
-        };
-    } else if (slope < 8.5) {
-        // Moderate Climb (5% ~ 8.5%): Warm Orange
-        return {
-            borderColor: '#F97316',
-            backgroundColor: 'rgba(249, 115, 22, 0.20)',
-        };
-    } else if (slope < 12.0) {
-        // Steep Climb (8.5% ~ 12%): Coral Red
-        return {
-            borderColor: '#EF4444',
-            backgroundColor: 'rgba(239, 68, 68, 0.22)',
-        };
-    } else {
-        // Extreme / HC Climb (>12%): Signature Electric Purple
-        return {
-            borderColor: '#863BFF',
-            backgroundColor: 'rgba(134, 59, 255, 0.26)',
+            lengthKm: 0,
+            bracket: getSlopeBracket(0),
         };
     }
+
+    const k = Math.min(Math.max(0, idx), pts.length - 2);
+    const targetBracket = getIntervalBracket(pts, k);
+
+    let startIdx = k;
+    while (startIdx > 0 && getIntervalBracket(pts, startIdx - 1).id === targetBracket.id) {
+        startIdx--;
+    }
+
+    let endIdx = k;
+    while (endIdx < pts.length - 2 && getIntervalBracket(pts, endIdx + 1).id === targetBracket.id) {
+        endIdx++;
+    }
+
+    const startDist = pts[startIdx]!.distanceKm;
+    const endDist = pts[endIdx + 1]!.distanceKm;
+    const lengthKm = Math.max(0.01, endDist - startDist);
+
+    return {
+        lengthKm,
+        bracket: targetBracket,
+    };
 }
 
 export function RouteStatsBar() {
@@ -291,14 +318,20 @@ export function RouteStatsBar() {
                                 const p0 = pts[ctx.p0DataIndex];
                                 const p1 = pts[ctx.p1DataIndex];
                                 if (!p0 || !p1) return '#863BFF';
-                                return getSlopeStyle(p0, p1).borderColor;
+                                const distMeters = (p1.distanceKm - p0.distanceKm) * 1000;
+                                const eleDiff = p1.ele - p0.ele;
+                                const slope = distMeters > 0.5 ? (eleDiff / distMeters) * 100 : 0;
+                                return getSlopeBracket(slope).borderColor;
                             },
                             backgroundColor: (ctx) => {
                                 const pts = sampledRef.current;
                                 const p0 = pts[ctx.p0DataIndex];
                                 const p1 = pts[ctx.p1DataIndex];
                                 if (!p0 || !p1) return 'rgba(134, 59, 255, 0.14)';
-                                return getSlopeStyle(p0, p1).backgroundColor;
+                                const distMeters = (p1.distanceKm - p0.distanceKm) * 1000;
+                                const eleDiff = p1.ele - p0.ele;
+                                const slope = distMeters > 0.5 ? (eleDiff / distMeters) * 100 : 0;
+                                return getSlopeBracket(slope).backgroundColor;
                             },
                         },
                         pointRadius: 0,
@@ -321,24 +354,47 @@ export function RouteStatsBar() {
                     legend: { display: false },
                     tooltip: {
                         enabled: true,
+                        displayColors: false,
+                        backgroundColor: 'rgba(24, 24, 27, 0.94)',
+                        titleColor: '#FFFFFF',
+                        bodyColor: '#F4F4F5',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderWidth: 1,
+                        padding: {
+                            top: 7,
+                            bottom: 7,
+                            left: 9,
+                            right: 9,
+                        },
+                        cornerRadius: 6,
+                        bodySpacing: 3,
+                        bodyFont: {
+                            family: 'Geist, -apple-system, sans-serif',
+                            size: 11,
+                            weight: 'normal',
+                        },
                         callbacks: {
-                            title: (items) =>
-                                `${items[0]?.label ?? 0} ${units === 'mi' ? 'mi' : 'km'}`,
+                            title: () => [],
                             label: (item) => {
                                 const idx = item.dataIndex;
                                 const pts = sampledRef.current;
-                                const cur = pts[idx];
-                                let slopeStr = '';
-                                if (cur && pts.length > 1) {
-                                    const prev = pts[Math.max(0, idx - 1)]!;
-                                    const next = pts[Math.min(pts.length - 1, idx + 1)]!;
-                                    const dM = (next.distanceKm - prev.distanceKm) * 1000;
-                                    const dH = next.ele - prev.ele;
-                                    const slope = dM > 0.5 ? (dH / dM) * 100 : 0;
-                                    const sign = slope > 0 ? '+' : '';
-                                    slopeStr = ` (${sign}${slope.toFixed(1)}%)`;
-                                }
-                                return ` ${item.raw} ${units === 'mi' ? 'ft' : 'm'}${slopeStr}`;
+                                if (!pts || pts.length === 0 || !pts[idx]) return [];
+
+                                const cur = pts[idx]!;
+                                const distVal = units === 'mi' ? cur.distanceKm * 0.621371 : cur.distanceKm;
+                                const distUnit = units === 'mi' ? 'mi' : 'km';
+                                const eleVal = units === 'mi' ? Math.round(cur.ele * 3.28084) : cur.ele;
+                                const eleUnit = units === 'mi' ? 'ft' : 'm';
+
+                                const { lengthKm, bracket } = getSegmentDetails(pts, idx);
+                                const segLenVal = units === 'mi' ? lengthKm * 0.621371 : lengthKm;
+
+                                return [
+                                    `${t.distance}: ${distVal.toFixed(1)} ${distUnit}`,
+                                    `${t.elevation}: ${eleVal} ${eleUnit}`,
+                                    `${t.segmentLength}: ${segLenVal.toFixed(1)} ${distUnit}`,
+                                    `${t.type}: ${bracket.label}`,
+                                ];
                             },
                         },
                     },
@@ -401,31 +457,35 @@ export function RouteStatsBar() {
                     onMouseLeave={() => mapManager.setCursor(null)}
                 >
                     {/* Slope Grade Color Legend (BRouter-Web style with modern translucency) */}
-                    <div className="absolute top-1.5 right-3 hidden sm:flex items-center gap-2.5 text-[10px] text-muted-foreground bg-background/85 backdrop-blur-xs px-2.5 py-0.5 rounded-md border border-border/60 pointer-events-none z-10 shadow-2xs">
+                    <div className="absolute top-1.5 right-3 hidden sm:flex items-center gap-2 text-[10px] text-muted-foreground bg-background/85 backdrop-blur-xs px-2.5 py-0.5 rounded-md border border-border/60 pointer-events-none z-10 shadow-2xs">
                         <span className="font-semibold text-foreground/80">{t.slope}:</span>
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#0284C7]" />
-                            <span>&lt; -1.5%</span>
+                            <span>&lt; 0%</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#10B981]" />
-                            <span>0~2.5%</span>
+                            <span>0%</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <span className="size-2 rounded-full bg-[#FACC15]" />
+                            <span>1-3%</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#F59E0B]" />
-                            <span>2.5~5%</span>
+                            <span>4-6%</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#F97316]" />
-                            <span>5~8.5%</span>
+                            <span>7-9%</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#EF4444]" />
-                            <span>8.5~12%</span>
+                            <span>10-15%</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#863BFF]" />
-                            <span>&gt; 12%</span>
+                            <span>&gt; 16%</span>
                         </div>
                     </div>
 
