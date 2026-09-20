@@ -29,32 +29,44 @@ interface SlopeBracket {
 }
 
 /**
- * Maps gradient (slope) to BRouter-Web steepness categories with color and translucent fill.
+ * Maps gradient (slope) to BRouter-Web / geo-data-exchange steepness categories with color and translucent fill.
+ * Matches BRouter's exact 11 standard gradient levels (-5 to 5):
+ * level -5:      ... -16% (< -15%)
+ * level -4: -15% ... -10% (-10 ~ -15%)
+ * level -3:  -9% ...  -7% (-7 ~ -9%)
+ * level -2:  -6% ...  -4% (-4 ~ -6%)
+ * level -1:  -3% ...  -1% (-1 ~ -3%)
+ * level  0:   0%
+ * level  1:   1% ...   3% (1-3%)
+ * level  2:   4% ...   6% (4-6%)
+ * level  3:   7% ...   9% (7-9%)
+ * level  4:  10% ...  15% (10-15%)
+ * level  5:  16% ...      (> 15%)
  */
 function getSlopeBracket(slope: number): SlopeBracket {
-    if (slope <= -16) {
-        return { id: -5, label: '< -16%', borderColor: '#0369A1', backgroundColor: 'rgba(3, 105, 161, 0.16)' };
-    } else if (slope <= -10) {
+    const g = Math.round(slope);
+    if (g <= -16) {
+        return { id: -5, label: '< -15%', borderColor: '#0369A1', backgroundColor: 'rgba(3, 105, 161, 0.16)' };
+    } else if (g <= -10) {
         return { id: -4, label: '-10 ~ -15%', borderColor: '#0284C7', backgroundColor: 'rgba(2, 132, 199, 0.16)' };
-    } else if (slope <= -7) {
+    } else if (g <= -7) {
         return { id: -3, label: '-7 ~ -9%', borderColor: '#0EA5E9', backgroundColor: 'rgba(14, 165, 233, 0.16)' };
-    } else if (slope <= -4) {
+    } else if (g <= -4) {
         return { id: -2, label: '-4 ~ -6%', borderColor: '#38BDF8', backgroundColor: 'rgba(56, 189, 248, 0.16)' };
-    } else if (slope <= -1) {
+    } else if (g <= -1) {
         return { id: -1, label: '-1 ~ -3%', borderColor: '#60A5FA', backgroundColor: 'rgba(96, 165, 250, 0.16)' };
-    } else if (slope < 1.0) {
+    } else if (g === 0) {
         return { id: 0, label: '0%', borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.16)' };
-    } else if (slope < 3.5) {
+    } else if (g <= 3) {
         return { id: 1, label: '1-3%', borderColor: '#FACC15', backgroundColor: 'rgba(250, 204, 21, 0.18)' };
-    } else if (slope < 6.5) {
-        // Matches "Type: 4-6%" exactly from brouter!
+    } else if (g <= 6) {
         return { id: 2, label: '4-6%', borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.20)' };
-    } else if (slope < 9.5) {
+    } else if (g <= 9) {
         return { id: 3, label: '7-9%', borderColor: '#F97316', backgroundColor: 'rgba(249, 115, 22, 0.22)' };
-    } else if (slope < 15.5) {
+    } else if (g <= 15) {
         return { id: 4, label: '10-15%', borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.24)' };
     } else {
-        return { id: 5, label: '> 16%', borderColor: '#863BFF', backgroundColor: 'rgba(134, 59, 255, 0.28)' };
+        return { id: 5, label: '> 15%', borderColor: '#863BFF', backgroundColor: 'rgba(134, 59, 255, 0.28)' };
     }
 }
 
@@ -624,7 +636,7 @@ export function RouteStatsBar() {
                         </div>
                         <div className="flex items-center gap-1">
                             <span className="size-2 rounded-full bg-[#863BFF]" />
-                            <span>&gt; 16%</span>
+                            <span>&gt; 15%</span>
                         </div>
                     </div>
 
