@@ -201,6 +201,8 @@ export function RouteStatsBar() {
     const chartRef = useRef<Chart | null>(null);
     const sampledRef = useRef<ProfilePoint[]>([]);
     const segmentMapRef = useRef<SegmentInfo[]>([]);
+    const totalDistRef = useRef(0);
+    const prevUnitsRef = useRef(units);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const tooltipRef = useRef<HTMLDivElement | null>(null);
     const tooltipArrowRef = useRef<HTMLDivElement | null>(null);
@@ -371,6 +373,12 @@ export function RouteStatsBar() {
             return;
         }
 
+        if (prevUnitsRef.current !== units) {
+            prevUnitsRef.current = units;
+            chartRef.current?.destroy();
+            chartRef.current = null;
+        }
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
@@ -381,13 +389,23 @@ export function RouteStatsBar() {
         sampledRef.current = sampled;
         segmentMapRef.current = buildSegmentMap(sampled);
 
+        const totalDist =
+            units === 'mi'
+                ? (sampled[sampled.length - 1]?.distanceKm ?? 0) * 0.621371
+                : (sampled[sampled.length - 1]?.distanceKm ?? 0);
+        totalDistRef.current = totalDist;
+
+        const chartData = sampled.map((p) => ({
+            x: units === 'mi' ? p.distanceKm * 0.621371 : p.distanceKm,
+            y: units === 'mi' ? Math.round(p.ele * 3.28084) : p.ele,
+        }));
+
         if (chartRef.current) {
-            chartRef.current.data.labels = sampled.map((p) =>
-                units === 'mi' ? (p.distanceKm * 0.621371).toFixed(1) : p.distanceKm.toFixed(1)
-            );
-            chartRef.current.data.datasets[0]!.data = sampled.map((p) =>
-                units === 'mi' ? Math.round(p.ele * 3.28084) : p.ele
-            );
+            chartRef.current.data.datasets[0]!.data = chartData as any;
+            if (chartRef.current.options.scales?.x) {
+                chartRef.current.options.scales.x.min = 0;
+                chartRef.current.options.scales.x.max = Math.max(0.01, totalDist);
+            }
             chartRef.current.update('none');
             return;
         }
@@ -395,15 +413,10 @@ export function RouteStatsBar() {
         chartRef.current = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: sampled.map((p) =>
-                    units === 'mi' ? (p.distanceKm * 0.621371).toFixed(1) : p.distanceKm.toFixed(1)
-                ),
                 datasets: [
                     {
                         label: 'Elevation',
-                        data: sampled.map((p) =>
-                            units === 'mi' ? Math.round(p.ele * 3.28084) : p.ele
-                        ),
+                        data: chartData as any,
                         borderColor: '#863BFF',
                         borderWidth: 2.5,
                         fill: true,
@@ -432,7 +445,8 @@ export function RouteStatsBar() {
                 maintainAspectRatio: false,
                 interaction: {
                     intersect: false,
-                    mode: 'index',
+                    mode: 'nearest',
+                    axis: 'x',
                 },
                 plugins: {
                     legend: { display: false },
@@ -543,17 +557,30 @@ export function RouteStatsBar() {
                 },
                 scales: {
                     x: {
+                        type: 'linear',
+                        min: 0,
+                        max: Math.max(0.01, totalDist),
                         display: true,
                         grid: { display: false },
                         ticks: {
-                            maxTicksLimit: 10,
+                            maxTicksLimit: 8,
                             font: { size: 10 },
-                            callback: (val) =>
-                                `${
-                                    units === 'mi'
-                                        ? ((sampledRef.current[Number(val)]?.distanceKm ?? 0) * 0.621371).toFixed(0)
-                                        : (sampledRef.current[Number(val)]?.distanceKm.toFixed(0) ?? val)
-                                }${units === 'mi' ? 'mi' : 'km'}`,
+                            callback: (val) => {
+                                const num = Number(val);
+                                const curUnits = latestUnitsRef.current;
+                                const curTotalDist = totalDistRef.current;
+                                if (curUnits === 'mi') {
+                                    if (curTotalDist < 0.2) {
+                                        return `${Math.round(num * 5280)}ft`;
+                                    }
+                                    return `${parseFloat(num.toFixed(2))}mi`;
+                                } else {
+                                    if (curTotalDist < 1.0) {
+                                        return `${Math.round(num * 1000)}m`;
+                                    }
+                                    return `${parseFloat(num.toFixed(2))}km`;
+                                }
+                            },
                         },
                     },
                     y: {
@@ -562,7 +589,7 @@ export function RouteStatsBar() {
                         ticks: {
                             maxTicksLimit: 4,
                             font: { size: 10 },
-                            callback: (val) => `${val}${units === 'mi' ? 'ft' : 'm'}`,
+                            callback: (val) => `${val}${latestUnitsRef.current === 'mi' ? 'ft' : 'm'}`,
                         },
                     },
                 },
