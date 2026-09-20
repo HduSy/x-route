@@ -1,10 +1,15 @@
 /**
  * Elevation statistics computation with Strava-grade noise filtering.
  *
- * Implements:
- * 1. Distance-weighted moving window smoothing to eliminate discrete DEM step noise (micro-quantization).
- * 2. Peak-trough hysteresis threshold filter (Strava/Garmin gold standard: 3.0 meters / 10 feet)
- *    to eliminate phantom climbs and descents on flat or continuous gradient segments.
+ * Implements a 3-stage synergistic pipeline:
+ * 1. Physical Slope Limiter: Clamps unrealistic gradient changes (e.g. >25% grade)
+ *    to eliminate DEM cliff, bridge, and gorge spikes.
+ * 2. Spatial Gaussian Low-Pass Filter (sigma = 35m, radius = 105m):
+ *    Continuous distance-weighted smoothing eliminating 30m DEM grid Nyquist
+ *    aliasing and cross-slope contour ripples.
+ * 3. Dual-Threshold Hysteresis Deadband with Trend Latching (Strava DEM standard: 10.0m):
+ *    In a climbing phase, elevation dips below peak do NOT accumulate any descent
+ *    unless net continuous loss exceeds 10m. This eliminates phantom descent on long climbs.
  */
 
 export interface ElevationPoint {
@@ -22,54 +27,91 @@ export interface ElevationStats {
 
 export interface ElevationFilterOptions {
     /**
-     * Distance smoothing window in kilometers (default: 0.08 km = 80 meters).
-     * Blends out DEM single-point spikes and step quantization.
+     * Standard deviation for Gaussian spatial filter in kilometers (default: 0.035 km = 35 meters).
      */
-    windowKm?: number;
+    sigmaKm?: number;
     /**
-     * Hysteresis climbing threshold in meters (default: 3.0 meters).
-     * A vertical change must exceed this threshold before a new climb/descent trend is confirmed.
+     * Search radius for Gaussian smoothing in kilometers (default: sigmaKm * 3 = 0.105 km = 105 meters).
+     */
+    radiusKm?: number;
+    /**
+     * Maximum physically plausible slope grade as ratio (default: 0.25 = 25% grade).
+     * Filters out DEM cliff artifacts (bridges, tunnels, gorges).
+     */
+    maxGrade?: number;
+    /**
+     * Hysteresis climbing threshold in meters (Strava DEM standard: 10.0 meters).
+     * If not specified, automatically adapts based on route length:
+     * - < 1.0 km: 4.0 meters
+     * - < 3.0 km: 6.0 meters
+     * - >= 3.0 km: 10.0 meters
      */
     thresholdMeters?: number;
+    /**
+     * Legacy option: window size in kilometers (if specified, maps to sigmaKm = windowKm / 2).
+     */
+    windowKm?: number;
 }
 
 /**
- * Applies distance-window moving average smoothing on an elevation profile.
+ * Applies physical slope clamping and continuous distance-weighted Gaussian kernel smoothing.
  */
 export function smoothElevations(
     points: ElevationPoint[],
-    windowKm = 0.08
+    options?: ElevationFilterOptions | number
 ): number[] {
     const n = points.length;
     if (n === 0) return [];
     if (n === 1) return [points[0]!.ele];
 
+    const opts: ElevationFilterOptions =
+        typeof options === 'number'
+            ? { sigmaKm: options / 2 }
+            : (options ?? {});
+
+    const sigmaKm = opts.sigmaKm ?? (opts.windowKm ? opts.windowKm / 2 : 0.035);
+    const radiusKm = opts.radiusKm ?? sigmaKm * 3;
+    const maxGrade = opts.maxGrade ?? 0.25;
+    const twoSigmaSq = 2 * sigmaKm * sigmaKm;
+
+    // Step 1: Physical slope limiter (clamp unrealistic DEM cliff/bridge spikes)
+    const clamped: ElevationPoint[] = new Array(n);
+    clamped[0] = { ...points[0]! };
+    for (let i = 1; i < n; i++) {
+        const dDist = Math.max(0.001, points[i]!.distanceKm - clamped[i - 1]!.distanceKm);
+        const maxDelta = dDist * 1000 * maxGrade;
+        let ele = points[i]!.ele;
+        const diff = ele - clamped[i - 1]!.ele;
+        if (Math.abs(diff) > maxDelta) {
+            ele = clamped[i - 1]!.ele + Math.sign(diff) * maxDelta;
+        }
+        clamped[i] = { distanceKm: points[i]!.distanceKm, ele };
+    }
+
+    // Step 2: Distance-weighted Gaussian kernel convolution
     const smoothed: number[] = new Array(n);
-    const halfWindow = windowKm / 2;
-
-    let left = 0;
-    let right = 0;
-    let sumEle = 0;
-
     for (let i = 0; i < n; i++) {
-        const curDist = points[i]!.distanceKm;
-        const minDist = curDist - halfWindow;
-        const maxDist = curDist + halfWindow;
+        const curDist = clamped[i]!.distanceKm;
+        let wSum = 0;
+        let wEle = 0;
 
-        // Advance right boundary
-        while (right < n && points[right]!.distanceKm <= maxDist) {
-            sumEle += points[right]!.ele;
-            right++;
+        for (let j = i; j >= 0; j--) {
+            const d = curDist - clamped[j]!.distanceKm;
+            if (d > radiusKm) break;
+            const w = Math.exp(-(d * d) / twoSigmaSq);
+            wSum += w;
+            wEle += clamped[j]!.ele * w;
         }
 
-        // Advance left boundary
-        while (left < right && points[left]!.distanceKm < minDist) {
-            sumEle -= points[left]!.ele;
-            left++;
+        for (let j = i + 1; j < n; j++) {
+            const d = clamped[j]!.distanceKm - curDist;
+            if (d > radiusKm) break;
+            const w = Math.exp(-(d * d) / twoSigmaSq);
+            wSum += w;
+            wEle += clamped[j]!.ele * w;
         }
 
-        const count = right - left;
-        smoothed[i] = count > 0 ? sumEle / count : points[i]!.ele;
+        smoothed[i] = wSum > 0 ? wEle / wSum : clamped[i]!.ele;
     }
 
     return smoothed;
@@ -77,7 +119,7 @@ export function smoothElevations(
 
 /**
  * Computes cumulative elevation gain (ascent) and loss (descent) using
- * peak/trough hysteresis filtering matching Strava Route Builder logic.
+ * dual-threshold hysteresis deadband matching Strava Route Builder logic.
  *
  * Guarantees:
  * - ascent >= 0, descent >= 0
@@ -102,10 +144,12 @@ export function computeElevationStats(
         };
     }
 
-    const windowKm = options?.windowKm ?? 0.08;
-    const threshold = options?.thresholdMeters ?? 3.0;
+    const totalDistKm = points[n - 1]!.distanceKm - points[0]!.distanceKm;
+    const defaultThreshold =
+        totalDistKm < 1.0 ? 4.0 : totalDistKm < 3.0 ? 6.0 : 10.0;
+    const threshold = options?.thresholdMeters ?? defaultThreshold;
 
-    const smoothed = smoothElevations(points, windowKm);
+    const smoothed = smoothElevations(points, options);
 
     let ascent = 0;
     let descent = 0;

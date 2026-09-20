@@ -41,66 +41,83 @@ export function RouteStatsBar() {
         [selectedFileId]
     );
 
-    // Build data points
-    const pointsData = useMemo<ProfilePoint[]>(() => {
-        if (resultPoints.length >= 2) {
-            const list: ProfilePoint[] = [];
+    // Build data points and elevation statistics in a single pass
+    const { pointsData, eleStats } = useMemo(() => {
+        const build = (
+            rawPoints: { lat: number; lon: number; ele?: number }[]
+        ) => {
+            if (rawPoints.length < 2) {
+                return {
+                    pointsData: [] as ProfilePoint[],
+                    eleStats: {
+                        ascent: 0,
+                        descent: 0,
+                        minEle: 0,
+                        maxEle: 0,
+                        smoothedElevations: [],
+                    },
+                };
+            }
+            const list: { distanceKm: number; ele: number; lat: number; lon: number }[] = [];
             let totalDist = 0;
-            for (let i = 0; i < resultPoints.length; i++) {
-                const pt = resultPoints[i]!;
-                const lat = pt.attributes.lat;
-                const lon = pt.attributes.lon;
+            for (let i = 0; i < rawPoints.length; i++) {
+                const pt = rawPoints[i]!;
                 if (i > 0) {
-                    const prev = resultPoints[i - 1]!;
-                    totalDist +=
-                        distance(
-                            { lat: prev.attributes.lat, lon: prev.attributes.lon },
-                            { lat, lon }
-                        ) / 1000;
+                    const prev = rawPoints[i - 1]!;
+                    totalDist += distance(prev, pt) / 1000;
                 }
                 list.push({
                     distanceKm: totalDist,
-                    ele: Math.round(pt.ele ?? 0),
-                    lat,
-                    lon,
+                    ele: pt.ele ?? 0,
+                    lat: pt.lat,
+                    lon: pt.lon,
                 });
             }
-            const eleStats = computeElevationStats(list);
-            return list.map((p, idx) => ({
+            const stats = computeElevationStats(list);
+            const formattedPoints: ProfilePoint[] = list.map((p, idx) => ({
                 ...p,
-                ele: Math.round(eleStats.smoothedElevations[idx] ?? p.ele),
+                ele: Math.round(stats.smoothedElevations[idx] ?? p.ele),
             }));
+            return { pointsData: formattedPoints, eleStats: stats };
+        };
+
+        if (resultPoints.length >= 2) {
+            return build(
+                resultPoints.map((p) => ({
+                    lat: p.attributes.lat,
+                    lon: p.attributes.lon,
+                    ele: p.ele,
+                }))
+            );
         }
 
         if (selectedFile) {
             const file = new GPXFile(selectedFile);
             const trkpts = file.getTrackPoints();
-            if (trkpts.length < 2) return [];
-
-            const list: ProfilePoint[] = [];
-            let totalDist = 0;
-            for (let i = 0; i < trkpts.length; i++) {
-                const pt = trkpts[i]!;
-                const coords = pt.getCoordinates();
-                if (i > 0) {
-                    const prev = trkpts[i - 1]!.getCoordinates();
-                    totalDist += distance(prev, coords) / 1000;
-                }
-                list.push({
-                    distanceKm: totalDist,
-                    ele: Math.round(pt.ele ?? 0),
-                    lat: coords.lat,
-                    lon: coords.lon,
-                });
+            if (trkpts.length >= 2) {
+                return build(
+                    trkpts.map((p) => {
+                        const coords = p.getCoordinates();
+                        return {
+                            lat: coords.lat,
+                            lon: coords.lon,
+                            ele: p.ele,
+                        };
+                    })
+                );
             }
-            const eleStats = computeElevationStats(list);
-            return list.map((p, idx) => ({
-                ...p,
-                ele: Math.round(eleStats.smoothedElevations[idx] ?? p.ele),
-            }));
         }
 
-        return [];
+        return {
+            pointsData: [] as ProfilePoint[],
+            eleStats: {
+                ascent: 0,
+                descent: 0,
+                minEle: 0,
+                maxEle: 0,
+                smoothedElevations: [],
+            },
+        };
     }, [resultPoints, selectedFile]);
 
     // Statistics computation
@@ -118,7 +135,6 @@ export function RouteStatsBar() {
         }
 
         const totalKm = pointsData[pointsData.length - 1]!.distanceKm;
-        const eleStats = computeElevationStats(pointsData);
         const ascent = eleStats.ascent;
         const descent = eleStats.descent;
 
@@ -165,7 +181,7 @@ export function RouteStatsBar() {
             descentFormatted: `${eleLossVal} ${eleUnit}`,
             timeFormatted: timeStr,
         };
-    }, [pointsData, profile, units]);
+    }, [pointsData, eleStats, profile, units]);
 
     // Chart.js rendering
     useEffect(() => {
