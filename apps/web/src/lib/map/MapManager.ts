@@ -6,7 +6,9 @@ import {
     ScaleControl,
     setWorkerUrl,
     type LngLatBoundsLike,
+    type StyleSpecification,
 } from 'maplibre-gl';
+import { OVERLAYS } from './layers';
 // maplibre v6 is ESM-only and loads its worker from a separate runtime file;
 // Vite cannot rewrite that URL automatically — route it through the bundler.
 // https://www.maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide
@@ -57,14 +59,129 @@ class CompactAttributionControl extends AttributionControl {
 // all map operations go through this manager (vanilla access from anywhere,
 // no hooks rules inside map event callbacks).
 
-export type BasemapKey = 'bright' | 'liberty' | 'positron' | 'dark';
+export type BasemapKey =
+    | 'bright'
+    | 'liberty'
+    | 'positron'
+    | 'dark'
+    | 'esriSatellite'
+    | 'openTopoMap'
+    | 'cyclOSM'
+    | 'openStreetMap';
 
-export const BASEMAPS: Record<BasemapKey, { label: string; style: string }> = {
+export const BASEMAPS: Record<BasemapKey, { label: string; style: string | StyleSpecification }> = {
     bright: { label: 'Bright', style: 'https://tiles.openfreemap.org/styles/bright' },
     liberty: { label: 'Liberty', style: 'https://tiles.openfreemap.org/styles/liberty' },
     positron: { label: 'Positron', style: 'https://tiles.openfreemap.org/styles/positron' },
     dark: { label: 'Dark', style: 'https://tiles.openfreemap.org/styles/dark' },
+    esriSatellite: {
+        label: 'Satellite (Esri)',
+        style: {
+            version: 8,
+            sources: {
+                esriSatellite: {
+                    type: 'raster',
+                    tiles: [
+                        'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/WMTS/tile/1.0.0/World_Imagery/default/default028mm/{z}/{y}/{x}.jpg',
+                    ],
+                    tileSize: 256,
+                    maxzoom: 19,
+                    attribution: '© Esri',
+                },
+            },
+            layers: [{ id: 'esriSatellite', type: 'raster', source: 'esriSatellite' }],
+        },
+    },
+    openTopoMap: {
+        label: 'OpenTopoMap',
+        style: {
+            version: 8,
+            sources: {
+                openTopoMap: {
+                    type: 'raster',
+                    tiles: ['https://tile.opentopomap.org/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    maxzoom: 17,
+                    attribution: '© OpenTopoMap',
+                },
+            },
+            layers: [{ id: 'openTopoMap', type: 'raster', source: 'openTopoMap' }],
+        },
+    },
+    cyclOSM: {
+        label: 'CyclOSM',
+        style: {
+            version: 8,
+            sources: {
+                cyclOSM: {
+                    type: 'raster',
+                    tiles: [
+                        'https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+                        'https://b.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+                    ],
+                    tileSize: 256,
+                    maxzoom: 18,
+                    attribution: '© CyclOSM',
+                },
+            },
+            layers: [{ id: 'cyclOSM', type: 'raster', source: 'cyclOSM' }],
+        },
+    },
+    openStreetMap: {
+        label: 'OpenStreetMap',
+        style: {
+            version: 8,
+            sources: {
+                openStreetMap: {
+                    type: 'raster',
+                    tiles: [
+                        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    ],
+                    tileSize: 256,
+                    maxzoom: 19,
+                    attribution: '© OpenStreetMap',
+                },
+            },
+            layers: [{ id: 'openStreetMap', type: 'raster', source: 'openStreetMap' }],
+        },
+    },
 };
+
+const BASEMAP_STORAGE_KEY = 'x-route-basemap';
+
+function getSavedBasemap(): BasemapKey {
+    try {
+        const val = localStorage.getItem(BASEMAP_STORAGE_KEY);
+        if (val && val in BASEMAPS) return val as BasemapKey;
+    } catch {}
+    return 'bright';
+}
+
+function saveSavedBasemap(key: BasemapKey) {
+    try {
+        localStorage.setItem(BASEMAP_STORAGE_KEY, key);
+    } catch {}
+}
+
+const OVERLAYS_STORAGE_KEY = 'x-route-overlays';
+
+function getSavedOverlays(): string[] {
+    try {
+        const raw = localStorage.getItem(OVERLAYS_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter((id) => typeof id === 'string' && id in OVERLAYS);
+    } catch {}
+    return [];
+}
+
+function saveSavedOverlays(ids: string[]) {
+    try {
+        localStorage.setItem(OVERLAYS_STORAGE_KEY, JSON.stringify(ids));
+    } catch {}
+}
 
 const DEFAULT_CENTER: [number, number] = [4.4049, 50.7908]; // Brussels fallback
 const DEFAULT_ZOOM = 13;
@@ -134,7 +251,9 @@ function saveLastLocation(coords: { lon: number; lat: number } | null) {
 class MapManager {
     private map: MapLibreMap | null = null;
     private container: HTMLElement | null = null;
-    private basemap: BasemapKey = 'bright';
+    private basemap: BasemapKey = getSavedBasemap();
+    private activeOverlays = new Set<string>(getSavedOverlays());
+    private overlayChangeCallbacks = new Set<(activeIds: string[]) => void>();
     private cursorMarker: Marker | null = null;
     private userLocationMarker: Marker | null = null;
     private userLocationCoords: { lon: number; lat: number } | null = null;
@@ -179,6 +298,7 @@ class MapManager {
         // Guarantee collapsed state after initial style load
         map.once('load', () => {
             attribControl._container?.classList.remove('maplibregl-compact-show');
+            this.applyAllActiveOverlays();
         });
 
         // Use MapLibre's rock-solid native ScrollZoomHandler with calibrated rate:
@@ -386,16 +506,94 @@ class MapManager {
     setBasemap(key: BasemapKey) {
         if (key === this.basemap) return;
         this.basemap = key;
+        saveSavedBasemap(key);
         if (this.map) {
-            this.map.setStyle(BASEMAPS[key].style);
+            this.map.setStyle(BASEMAPS[key].style as any);
             // Dynamic sources/layers are wiped by setStyle. Wait out the style
             // diff window first: right after setStyle, getSource()/getLayer()
             // still return the PREVIOUS style's objects, so an immediate re-add
             // would no-op against dead objects and vanish once the new style
             // settles. A short delay plus readiness retry is the robust combo.
             setTimeout(() => {
-                this.onReady(() => this.styleReloadCallbacks.forEach((cb) => cb()));
+                this.onReady(() => {
+                    this.applyAllActiveOverlays();
+                    this.styleReloadCallbacks.forEach((cb) => cb());
+                });
             }, 500);
+        }
+    }
+
+    getActiveOverlays(): string[] {
+        return Array.from(this.activeOverlays);
+    }
+
+    isOverlayActive(id: string): boolean {
+        return this.activeOverlays.has(id);
+    }
+
+    toggleOverlay(id: string) {
+        if (this.activeOverlays.has(id)) {
+            this.setOverlay(id, false);
+        } else {
+            this.setOverlay(id, true);
+        }
+    }
+
+    setOverlay(id: string, enabled: boolean) {
+        if (enabled) {
+            this.activeOverlays.add(id);
+        } else {
+            this.activeOverlays.delete(id);
+        }
+        saveSavedOverlays(Array.from(this.activeOverlays));
+        this.applyOverlay(id, enabled);
+        this.overlayChangeCallbacks.forEach((cb) => cb(Array.from(this.activeOverlays)));
+    }
+
+    onOverlayChange(cb: (activeIds: string[]) => void): () => void {
+        this.overlayChangeCallbacks.add(cb);
+        return () => this.overlayChangeCallbacks.delete(cb);
+    }
+
+    private applyOverlay(id: string, enabled: boolean) {
+        if (!this.map) return;
+        const overlaySpec = OVERLAYS[id];
+        if (!overlaySpec) return;
+
+        const beforeLayerId =
+            this.map.getLayer('route-casing') ? 'route-casing' :
+            this.map.getLayer('gpx-track-outline') ? 'gpx-track-outline' :
+            undefined;
+
+        if (enabled) {
+            for (const [sourceId, sourceDef] of Object.entries(overlaySpec.sources || {})) {
+                if (!this.map.getSource(sourceId)) {
+                    this.map.addSource(sourceId, sourceDef as any);
+                }
+            }
+            for (const layerDef of overlaySpec.layers || []) {
+                if (!this.map.getLayer(layerDef.id)) {
+                    this.map.addLayer(layerDef as any, beforeLayerId);
+                }
+            }
+        } else {
+            for (const layerDef of overlaySpec.layers || []) {
+                if (this.map.getLayer(layerDef.id)) {
+                    this.map.removeLayer(layerDef.id);
+                }
+            }
+            for (const sourceId of Object.keys(overlaySpec.sources || {})) {
+                if (this.map.getSource(sourceId)) {
+                    this.map.removeSource(sourceId);
+                }
+            }
+        }
+    }
+
+    private applyAllActiveOverlays() {
+        if (!this.map) return;
+        for (const id of this.activeOverlays) {
+            this.applyOverlay(id, true);
         }
     }
 

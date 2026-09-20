@@ -6,6 +6,7 @@ import { saveGPXFile, updateGPXFile } from '@/lib/file-actions';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { GPXFile, Track, TrackSegment, distance } from '@x-route/gpx';
 import { cn } from '@/lib/utils';
+import { computeElevationStats } from '@/lib/elevation';
 
 export function SaveRouteModal() {
     const { t } = useT();
@@ -17,10 +18,10 @@ export function SaveRouteModal() {
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const editingFileId = useRoutingStore((s) => s.editingFileId);
 
-    const defaultName = useMemo(() => {
-        const today = new Date().toISOString().slice(0, 10);
-        return `Route ${today}`;
-    }, []);
+    const defaultName = `Route ${new Date().toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+    })}`;
 
     const [routeName, setRouteName] = useState(defaultName);
     const [description, setDescription] = useState('');
@@ -31,23 +32,28 @@ export function SaveRouteModal() {
     const summary = useMemo(() => {
         if (resultPoints.length < 2) return null;
         let km = 0;
-        let ascent = 0;
-        for (let i = 1; i < resultPoints.length; i++) {
-            const p1 = resultPoints[i - 1]!;
-            const p2 = resultPoints[i]!;
-            km +=
-                distance(
-                    { lat: p1.attributes.lat, lon: p1.attributes.lon },
-                    { lat: p2.attributes.lat, lon: p2.attributes.lon }
-                ) / 1000;
-            const diff = (p2.ele ?? 0) - (p1.ele ?? 0);
-            if (diff > 0) ascent += diff;
-        }
+        const pts = resultPoints.map((pt, i) => {
+            if (i > 0) {
+                const prev = resultPoints[i - 1]!;
+                km +=
+                    distance(
+                        { lat: prev.attributes.lat, lon: prev.attributes.lon },
+                        { lat: pt.attributes.lat, lon: pt.attributes.lon }
+                    ) / 1000;
+            }
+            return {
+                distanceKm: km,
+                ele: pt.ele ?? 0,
+            };
+        });
+
+        const eleStats = computeElevationStats(pts);
+        const ascent = eleStats.ascent;
 
         const distFormatted =
             units === 'mi' ? `${(km * 0.621371).toFixed(1)} mi` : `${km.toFixed(1)} km`;
         const eleFormatted =
-            units === 'mi' ? `+${Math.round(ascent * 3.28084)} ft` : `+${Math.round(ascent)} m`;
+            units === 'mi' ? `+${Math.round(ascent * 3.28084)} ft` : `+${ascent} m`;
 
         return {
             distFormatted,

@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils';
 
 Chart.register(...registerables);
 
+import { computeElevationStats } from '@/lib/elevation';
+
 interface ProfilePoint {
     distanceKm: number;
     ele: number;
@@ -63,7 +65,11 @@ export function RouteStatsBar() {
                     lon,
                 });
             }
-            return list;
+            const eleStats = computeElevationStats(list);
+            return list.map((p, idx) => ({
+                ...p,
+                ele: Math.round(eleStats.smoothedElevations[idx] ?? p.ele),
+            }));
         }
 
         if (selectedFile) {
@@ -87,7 +93,11 @@ export function RouteStatsBar() {
                     lon: coords.lon,
                 });
             }
-            return list;
+            const eleStats = computeElevationStats(list);
+            return list.map((p, idx) => ({
+                ...p,
+                ele: Math.round(eleStats.smoothedElevations[idx] ?? p.ele),
+            }));
         }
 
         return [];
@@ -108,14 +118,9 @@ export function RouteStatsBar() {
         }
 
         const totalKm = pointsData[pointsData.length - 1]!.distanceKm;
-        let ascent = 0;
-        let descent = 0;
-
-        for (let i = 1; i < pointsData.length; i++) {
-            const diff = pointsData[i]!.ele - pointsData[i - 1]!.ele;
-            if (diff > 0) ascent += diff;
-            else descent += Math.abs(diff);
-        }
+        const eleStats = computeElevationStats(pointsData);
+        const ascent = eleStats.ascent;
+        const descent = eleStats.descent;
 
         // Speed estimates per activity profile
         let speedKmh = 20; // Default ride
@@ -127,6 +132,8 @@ export function RouteStatsBar() {
             speedKmh = 13;
         } else if (profile === 'foot') {
             speedKmh = 9.5; // run
+        } else if (profile === 'hike') {
+            speedKmh = 4.5; // hike
         }
 
         const totalSecs = Math.round((totalKm / speedKmh) * 3600);
@@ -145,8 +152,8 @@ export function RouteStatsBar() {
 
         const distVal = units === 'mi' ? totalKm * 0.621371 : totalKm;
         const distUnit = units === 'mi' ? 'mi' : 'km';
-        const eleGainVal = units === 'mi' ? Math.round(ascent * 3.28084) : Math.round(ascent);
-        const eleLossVal = units === 'mi' ? Math.round(descent * 3.28084) : Math.round(descent);
+        const eleGainVal = units === 'mi' ? Math.round(ascent * 3.28084) : ascent;
+        const eleLossVal = units === 'mi' ? Math.round(descent * 3.28084) : descent;
         const eleUnit = units === 'mi' ? 'ft' : 'm';
 
         return {
@@ -155,7 +162,7 @@ export function RouteStatsBar() {
             ascent,
             ascentFormatted: `+${eleGainVal} ${eleUnit}`,
             descent,
-            descentFormatted: `-${eleLossVal} ${eleUnit}`,
+            descentFormatted: `${eleLossVal} ${eleUnit}`,
             timeFormatted: timeStr,
         };
     }, [pointsData, profile, units]);

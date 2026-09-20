@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Compass, Focus, Layers, Minus, Plus, Route, Splin
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
+import { OVERLAY_METAS, type OverlayCategory } from '@/lib/map/layers';
 import { gpxLayers } from '@/lib/map/gpx-layer';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { lassoModeStore } from '@/store/lasso-store';
@@ -44,6 +45,27 @@ export function MapView() {
     const [is3D, setIs3D] = useState(false);
     const [bearing, setBearing] = useState(0);
     const [basemapOpen, setBasemapOpen] = useState(false);
+    const [activeOverlays, setActiveOverlays] = useState<string[]>(() => mapManager.getActiveOverlays());
+    const [layerTab, setLayerTab] = useState<'basemaps' | 'overlays'>('basemaps');
+    const layerPopoverRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        return mapManager.onOverlayChange((ids) => {
+            setActiveOverlays(ids);
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!basemapOpen) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (layerPopoverRef.current && !layerPopoverRef.current.contains(e.target as Node)) {
+                setBasemapOpen(false);
+            }
+        };
+        window.addEventListener('mousedown', handleClickOutside);
+        return () => window.removeEventListener('mousedown', handleClickOutside);
+    }, [basemapOpen]);
+
     const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
     const lassoStartRef = useRef<{ x: number; y: number } | null>(null);
     const isLassoActiveRef = useRef(false);
@@ -536,47 +558,134 @@ export function MapView() {
                     sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
                 )}
             >
-                {/* Basemap selector popover button */}
+                {/* Layers & Overlays popover button */}
                 <div className="relative">
                     <button
                         onClick={() => setBasemapOpen(!basemapOpen)}
                         className={cn(
-                            'flex size-8 items-center justify-center rounded-lg border border-border bg-white dark:bg-card shadow-sm transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer',
+                            'flex size-8 items-center justify-center rounded-lg border border-border bg-white dark:bg-card shadow-sm transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer relative',
                             basemapOpen ? 'border-[#863BFF] text-[#863BFF]' : 'text-muted-foreground'
                         )}
-                        title={t.basemap}
+                        title={t.layersAndOverlays}
                     >
                         <Layers className="size-4" />
+                        {activeOverlays.length > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 px-0.5 items-center justify-center rounded-full bg-[#863BFF] text-[9px] font-black text-white leading-none">
+                                {activeOverlays.length}
+                            </span>
+                        )}
                     </button>
                     {basemapOpen && (
-                        <div className="absolute bottom-10 left-0 z-50 min-w-40 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-xl animate-in fade-in zoom-in-95">
-                            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                {t.basemap}
-                            </div>
-                            {(Object.keys(BASEMAPS) as BasemapKey[]).map((key) => {
-                                const isCurrent = mapManager.getBasemap() === key;
-                                return (
-                                    <button
-                                        key={key}
-                                        onClick={() => {
-                                             mapManager.setBasemap(key);
-                                            setBasemapOpen(false);
-                                        }}
-                                        className={cn(
-                                            'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs transition cursor-pointer',
-                                            isCurrent
-                                                ? 'bg-[#863BFF]/10 font-bold text-[#863BFF]'
-                                                : 'hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] text-foreground'
-                                        )}
-                                    >
-                                        <span>
-                                            {t.basemaps[key as keyof typeof t.basemaps] ??
-                                                BASEMAPS[key].label}
+                        <div
+                            ref={layerPopoverRef}
+                            className="absolute bottom-10 left-0 z-50 w-72 sm:w-80 max-h-[440px] flex flex-col rounded-xl border border-border bg-white dark:bg-card p-2 shadow-2xl animate-in fade-in zoom-in-95"
+                        >
+                            {/* Tabs Switcher */}
+                            <div className="flex border-b border-border/80 pb-1.5 mb-1.5 gap-1 shrink-0">
+                                <button
+                                    onClick={() => setLayerTab('basemaps')}
+                                    className={cn(
+                                        'flex-1 py-1.5 text-xs font-bold rounded-lg transition text-center cursor-pointer',
+                                        layerTab === 'basemaps'
+                                            ? 'bg-[#863BFF]/15 text-[#863BFF]'
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                                    )}
+                                >
+                                    {t.basemapTitle}
+                                </button>
+                                <button
+                                    onClick={() => setLayerTab('overlays')}
+                                    className={cn(
+                                        'flex-1 py-1.5 text-xs font-bold rounded-lg transition text-center cursor-pointer flex items-center justify-center gap-1.5',
+                                        layerTab === 'overlays'
+                                            ? 'bg-[#863BFF]/15 text-[#863BFF]'
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                                    )}
+                                >
+                                    <span>{t.overlaysTitle}</span>
+                                    {activeOverlays.length > 0 && (
+                                        <span className="rounded-full bg-[#863BFF] text-white text-[10px] font-black px-1.5 py-0.5 leading-none">
+                                            {activeOverlays.length}
                                         </span>
-                                        {isCurrent && <Check className="size-3 text-[#863BFF]" />}
-                                    </button>
-                                );
-                            })}
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Tab Content */}
+                            <div className="overflow-y-auto max-h-[350px] pr-1 space-y-1.5 text-xs">
+                                {layerTab === 'basemaps' ? (
+                                    (Object.keys(BASEMAPS) as BasemapKey[]).map((key) => {
+                                        const isCurrent = mapManager.getBasemap() === key;
+                                        return (
+                                            <button
+                                                key={key}
+                                                onClick={() => {
+                                                    mapManager.setBasemap(key);
+                                                }}
+                                                className={cn(
+                                                    'flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition cursor-pointer',
+                                                    isCurrent
+                                                        ? 'bg-[#863BFF]/10 font-bold text-[#863BFF]'
+                                                        : 'hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] text-foreground'
+                                                )}
+                                            >
+                                                <span>
+                                                    {t.basemaps[key as keyof typeof t.basemaps] ??
+                                                        BASEMAPS[key].label}
+                                                </span>
+                                                {isCurrent && <Check className="size-3.5 text-[#863BFF] stroke-[3]" />}
+                                            </button>
+                                        );
+                                    })
+                                ) : (
+                                    (['trails', 'infrastructure', 'switzerland', 'france'] as OverlayCategory[]).map(
+                                        (cat) => {
+                                            const items = OVERLAY_METAS.filter((m) => m.category === cat);
+                                            if (items.length === 0) return null;
+                                            return (
+                                                <div key={cat} className="space-y-0.5">
+                                                    <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                        {t.overlayCategories[cat] ?? cat}
+                                                    </div>
+                                                    {items.map((meta) => {
+                                                        const isActive = activeOverlays.includes(meta.id);
+                                                        return (
+                                                            <button
+                                                                key={meta.id}
+                                                                onClick={() => mapManager.toggleOverlay(meta.id)}
+                                                                className={cn(
+                                                                    'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition cursor-pointer',
+                                                                    isActive
+                                                                        ? 'bg-[#863BFF]/10 font-bold text-[#863BFF]'
+                                                                        : 'hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] text-foreground'
+                                                                )}
+                                                            >
+                                                                <span className="truncate mr-2">
+                                                                    {t.overlayLabels[
+                                                                        meta.id as keyof typeof t.overlayLabels
+                                                                    ] ?? meta.label}
+                                                                </span>
+                                                                <div
+                                                                    className={cn(
+                                                                        'size-4 rounded flex items-center justify-center border transition shrink-0',
+                                                                        isActive
+                                                                            ? 'bg-[#863BFF] border-[#863BFF] text-white'
+                                                                            : 'border-border bg-background'
+                                                                    )}
+                                                                >
+                                                                    {isActive && (
+                                                                        <Check className="size-3 stroke-[3]" />
+                                                                    )}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        }
+                                    )
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
