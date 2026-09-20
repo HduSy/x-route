@@ -8,7 +8,6 @@ import {
     type LngLatBoundsLike,
     type StyleSpecification,
 } from 'maplibre-gl';
-import { OVERLAYS } from './layers';
 // maplibre v6 is ESM-only and loads its worker from a separate runtime file;
 // Vite cannot rewrite that URL automatically — route it through the bundler.
 // https://www.maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide
@@ -165,24 +164,6 @@ function saveSavedBasemap(key: BasemapKey) {
     } catch {}
 }
 
-const OVERLAYS_STORAGE_KEY = 'x-route-overlays';
-
-function getSavedOverlays(): string[] {
-    try {
-        const raw = localStorage.getItem(OVERLAYS_STORAGE_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed.filter((id) => typeof id === 'string' && id in OVERLAYS);
-    } catch {}
-    return [];
-}
-
-function saveSavedOverlays(ids: string[]) {
-    try {
-        localStorage.setItem(OVERLAYS_STORAGE_KEY, JSON.stringify(ids));
-    } catch {}
-}
-
 const DEFAULT_CENTER: [number, number] = [4.4049, 50.7908]; // Brussels fallback
 const DEFAULT_ZOOM = 13;
 const VIEWPORT_STORAGE_KEY = 'x-route-viewport';
@@ -252,8 +233,6 @@ class MapManager {
     private map: MapLibreMap | null = null;
     private container: HTMLElement | null = null;
     private basemap: BasemapKey = getSavedBasemap();
-    private activeOverlays = new Set<string>(getSavedOverlays());
-    private overlayChangeCallbacks = new Set<(activeIds: string[]) => void>();
     private cursorMarker: Marker | null = null;
     private userLocationMarker: Marker | null = null;
     private userLocationCoords: { lon: number; lat: number } | null = null;
@@ -298,7 +277,6 @@ class MapManager {
         // Guarantee collapsed state after initial style load
         map.once('load', () => {
             attribControl._container?.classList.remove('maplibregl-compact-show');
-            this.applyAllActiveOverlays();
         });
 
         // Use MapLibre's rock-solid native ScrollZoomHandler with calibrated rate:
@@ -516,84 +494,9 @@ class MapManager {
             // settles. A short delay plus readiness retry is the robust combo.
             setTimeout(() => {
                 this.onReady(() => {
-                    this.applyAllActiveOverlays();
                     this.styleReloadCallbacks.forEach((cb) => cb());
                 });
             }, 500);
-        }
-    }
-
-    getActiveOverlays(): string[] {
-        return Array.from(this.activeOverlays);
-    }
-
-    isOverlayActive(id: string): boolean {
-        return this.activeOverlays.has(id);
-    }
-
-    toggleOverlay(id: string) {
-        if (this.activeOverlays.has(id)) {
-            this.setOverlay(id, false);
-        } else {
-            this.setOverlay(id, true);
-        }
-    }
-
-    setOverlay(id: string, enabled: boolean) {
-        if (enabled) {
-            this.activeOverlays.add(id);
-        } else {
-            this.activeOverlays.delete(id);
-        }
-        saveSavedOverlays(Array.from(this.activeOverlays));
-        this.applyOverlay(id, enabled);
-        this.overlayChangeCallbacks.forEach((cb) => cb(Array.from(this.activeOverlays)));
-    }
-
-    onOverlayChange(cb: (activeIds: string[]) => void): () => void {
-        this.overlayChangeCallbacks.add(cb);
-        return () => this.overlayChangeCallbacks.delete(cb);
-    }
-
-    private applyOverlay(id: string, enabled: boolean) {
-        if (!this.map) return;
-        const overlaySpec = OVERLAYS[id];
-        if (!overlaySpec) return;
-
-        const beforeLayerId =
-            this.map.getLayer('route-casing') ? 'route-casing' :
-            this.map.getLayer('gpx-track-outline') ? 'gpx-track-outline' :
-            undefined;
-
-        if (enabled) {
-            for (const [sourceId, sourceDef] of Object.entries(overlaySpec.sources || {})) {
-                if (!this.map.getSource(sourceId)) {
-                    this.map.addSource(sourceId, sourceDef as any);
-                }
-            }
-            for (const layerDef of overlaySpec.layers || []) {
-                if (!this.map.getLayer(layerDef.id)) {
-                    this.map.addLayer(layerDef as any, beforeLayerId);
-                }
-            }
-        } else {
-            for (const layerDef of overlaySpec.layers || []) {
-                if (this.map.getLayer(layerDef.id)) {
-                    this.map.removeLayer(layerDef.id);
-                }
-            }
-            for (const sourceId of Object.keys(overlaySpec.sources || {})) {
-                if (this.map.getSource(sourceId)) {
-                    this.map.removeSource(sourceId);
-                }
-            }
-        }
-    }
-
-    private applyAllActiveOverlays() {
-        if (!this.map) return;
-        for (const id of this.activeOverlays) {
-            this.applyOverlay(id, true);
         }
     }
 
