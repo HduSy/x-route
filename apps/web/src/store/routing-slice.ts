@@ -222,7 +222,6 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
             anchors: sampleAnchors,
             past: [],
             future: [],
-            myRoutesOpen: false,
         });
     },
 }));

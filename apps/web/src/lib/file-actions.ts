@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { db } from './db';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
+import { mapManager } from '@/lib/map/MapManager';
 import type { ParseResponse } from '@/workers/gpx.worker';
 
 // --- GPX parse worker (keeps large XML parsing off the main thread) ---
@@ -79,20 +80,48 @@ export async function importFiles(list: File[]): Promise<GPXFile[]> {
 
 async function addFiles(files: GPXFile[]) {
     const select = useSelectionStore.getState();
+    const routing = useRoutingStore.getState();
     let firstId: string | null = null;
+    let firstFile: GPXFile | null = null;
+    const newIds: string[] = [];
 
     await db.transaction('rw', db.files, db.fileids, async () => {
         for (const file of files) {
             const id = crypto.randomUUID();
             file._data.id = id;
-            if (firstId === null) firstId = id;
+            if (firstId === null) {
+                firstId = id;
+                firstFile = file;
+            }
+            newIds.push(id);
             await db.files.put(file, id);
             await db.fileids.put(id, id);
         }
     });
 
-    if (firstId !== null) {
+    if (firstId !== null && firstFile !== null) {
+        // 1. Add all new files to loaded files so they are highlighted in My Routes and rendered on the map
+        for (const id of newIds) {
+            select.addLoadedFile(id);
+        }
         select.selectFile(firstId);
+
+        // 2. Load the newly imported route into the routing planner (active editing with nodes)
+        const trkpts = (firstFile as GPXFile).getTrackPoints();
+        if (trkpts.length >= 2) {
+            const coords = trkpts.map((pt) => pt.getCoordinates());
+            routing.loadRouteFromPoints(coords);
+            routing.setEditingFileId(firstId);
+            routing.setSidebarCollapsed(false);
+        }
+
+        // 3. Fit camera bounds to the newly imported route
+        const { global } = (firstFile as GPXFile).getStatistics();
+        if (global?.bounds) {
+            const sw = global.bounds.southWest;
+            const ne = global.bounds.northEast;
+            mapManager.fitBounds([[sw.lon, sw.lat], [ne.lon, ne.lat]], 80);
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+    AlertTriangle,
     Bookmark,
     Check,
     Clock,
@@ -44,6 +45,7 @@ export function MyRoutesDrawer() {
     const clearLoadedFiles = useSelectionStore((s) => s.clearLoadedFiles);
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
     const fileIds = useLiveQuery(() => db.fileids.toArray()) ?? [];
     const files = useLiveQuery(() => db.files.toArray());
@@ -289,7 +291,10 @@ export function MyRoutesDrawer() {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => void handleDeleteRoute(id)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDeleteConfirmTarget({ id, name });
+                                                }}
                                                 className="rounded-md p-1 text-muted-foreground transition hover:bg-red-50 hover:text-destructive cursor-pointer"
                                                 title={t.delete}
                                             >
@@ -396,6 +401,49 @@ export function MyRoutesDrawer() {
                     )}
                 </div>
             </aside>
+
+            {/* Delete route confirmation modal */}
+            {deleteConfirmTarget && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+                    <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl animate-in zoom-in-95 duration-150">
+                        <div className="flex items-start gap-3">
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-950/60 text-red-600">
+                                <AlertTriangle className="size-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-sm font-bold text-foreground">
+                                    {t.confirmDeleteRouteTitle}
+                                </h3>
+                                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                    {t.confirmDeleteRouteBody.replace('{name}', deleteConfirmTarget.name)}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteConfirmTarget(null)}
+                                className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
+                            >
+                                {t.cancel}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    const target = deleteConfirmTarget;
+                                    setDeleteConfirmTarget(null);
+                                    if (target) {
+                                        await handleDeleteRoute(target.id);
+                                    }
+                                }}
+                                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition cursor-pointer shadow-xs"
+                            >
+                                {t.confirmDelete}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

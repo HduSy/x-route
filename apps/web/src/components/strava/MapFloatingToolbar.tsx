@@ -159,7 +159,6 @@ export function MapFloatingToolbar() {
         clear();
         routingLayer.clear();
         useSelectionStore.getState().selectFile(null);
-        useSelectionStore.getState().clearLoadedFiles();
     };
 
     // Sync lassoMode React state → singleton so MapView can subscribe
