@@ -57,6 +57,41 @@ export function triggerFileInput() {
     input.click();
 }
 
+async function computeTextHash(text: string): Promise<string> {
+    try {
+        const buffer = new TextEncoder().encode(text.trim());
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+        return '';
+    }
+}
+
+function getRouteGeometryFingerprint(file: GPXFileType): string {
+    const gpx = file instanceof GPXFile ? file : new GPXFile(file);
+    const trkpts = gpx.getTrackPoints();
+    if (trkpts.length === 0) {
+        return `empty:${(gpx.metadata?.name || '').trim().toLowerCase()}`;
+    }
+
+    const { global } = gpx.getStatistics();
+    const pointCount = trkpts.length;
+    const totalDist = Math.round(global.distance.total * 100);
+    const totalAscent = Math.round(global.elevation.gain);
+
+    const sample: string[] = [];
+    const step = Math.max(1, Math.floor(pointCount / 10));
+    for (let i = 0; i < pointCount; i += step) {
+        const c = trkpts[i]!.getCoordinates();
+        sample.push(`${c.lat.toFixed(4)},${c.lon.toFixed(4)}`);
+    }
+    const end = trkpts[pointCount - 1]!.getCoordinates();
+    sample.push(`${end.lat.toFixed(4)},${end.lon.toFixed(4)}`);
+
+    return `${pointCount}|${totalDist}|${totalAscent}|${sample.join(';')}`;
+}
+
 export async function importFiles(list: File[]): Promise<GPXFile[]> {
     const parsed: GPXFile[] = [];
 
@@ -66,11 +101,15 @@ export async function importFiles(list: File[]): Promise<GPXFile[]> {
             for (const entry of Object.values(zip.files)) {
                 if (entry.dir || !entry.name.toLowerCase().endsWith('.gpx')) continue;
                 const xml = await entry.async('text');
-                parsed.push(await parseInWorker(entry.name, xml));
+                const gpx = await parseInWorker(entry.name, xml);
+                gpx._data.rawHash = await computeTextHash(xml);
+                parsed.push(gpx);
             }
         } else {
             const xml = await file.text();
-            parsed.push(await parseInWorker(file.name, xml));
+            const gpx = await parseInWorker(file.name, xml);
+            gpx._data.rawHash = await computeTextHash(xml);
+            parsed.push(gpx);
         }
     }
 
@@ -81,32 +120,98 @@ export async function importFiles(list: File[]): Promise<GPXFile[]> {
 async function addFiles(files: GPXFile[]) {
     const select = useSelectionStore.getState();
     const routing = useRoutingStore.getState();
+
+    // Query existing saved routes from Dexie to detect duplicate imports
+    const existingStored = await db.files.toArray();
+    const existingFingerprints = new Map<string, string>();
+    const existingRawHashes = new Map<string, string>();
+
+    for (const stored of existingStored) {
+        const id = stored._data?.id;
+        if (!id) continue;
+        if (stored._data?.rawHash) {
+            existingRawHashes.set(stored._data.rawHash, id);
+        }
+        try {
+            const fp = getRouteGeometryFingerprint(stored);
+            existingFingerprints.set(fp, id);
+        } catch {
+            // ignore corrupt entries
+        }
+    }
+
     let firstId: string | null = null;
     let firstFile: GPXFile | null = null;
-    const newIds: string[] = [];
+    const targetFileIds: string[] = [];
+    const filesToInsert: { file: GPXFile; id: string }[] = [];
 
-    await db.transaction('rw', db.files, db.fileids, async () => {
-        for (const file of files) {
-            const id = crypto.randomUUID();
-            file._data.id = id;
+    for (const file of files) {
+        let matchedId: string | null = null;
+
+        // 1. Check raw XML hash match
+        if (file._data?.rawHash && existingRawHashes.has(file._data.rawHash)) {
+            matchedId = existingRawHashes.get(file._data.rawHash)!;
+        }
+
+        // 2. Check geometry fingerprint match
+        if (!matchedId) {
+            try {
+                const fp = getRouteGeometryFingerprint(file);
+                if (existingFingerprints.has(fp)) {
+                    matchedId = existingFingerprints.get(fp)!;
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        if (matchedId) {
+            // Duplicate found! Reuse existing route ID without creating duplicate card
+            targetFileIds.push(matchedId);
             if (firstId === null) {
-                firstId = id;
+                firstId = matchedId;
                 firstFile = file;
             }
-            newIds.push(id);
-            await db.files.put(file, id);
-            await db.fileids.put(id, id);
+        } else {
+            // New route: generate UUID and schedule database write
+            const newId = crypto.randomUUID();
+            file._data.id = newId;
+            targetFileIds.push(newId);
+            if (firstId === null) {
+                firstId = newId;
+                firstFile = file;
+            }
+            filesToInsert.push({ file, id: newId });
+
+            // Record into maps so multiple duplicate files in the same batch import are also deduplicated
+            if (file._data?.rawHash) {
+                existingRawHashes.set(file._data.rawHash, newId);
+            }
+            try {
+                existingFingerprints.set(getRouteGeometryFingerprint(file), newId);
+            } catch {
+                // ignore
+            }
         }
-    });
+    }
+
+    if (filesToInsert.length > 0) {
+        await db.transaction('rw', db.files, db.fileids, async () => {
+            for (const { file, id } of filesToInsert) {
+                await db.files.put(file, id);
+                await db.fileids.put(id, id);
+            }
+        });
+    }
 
     if (firstId !== null && firstFile !== null) {
-        // 1. Add all new files to loaded files so they are highlighted in My Routes and rendered on the map
-        for (const id of newIds) {
+        // 1. Add all target files to loaded files so they are highlighted in My Routes and rendered on the map
+        for (const id of targetFileIds) {
             select.addLoadedFile(id);
         }
         select.selectFile(firstId);
 
-        // 2. Load the newly imported route into the routing planner (active editing with nodes)
+        // 2. Load the primary route into the routing planner (active editing with nodes)
         const trkpts = (firstFile as GPXFile).getTrackPoints();
         if (trkpts.length >= 2) {
             const coords = trkpts.map((pt) => pt.getCoordinates());
@@ -115,7 +220,7 @@ async function addFiles(files: GPXFile[]) {
             routing.setSidebarCollapsed(false);
         }
 
-        // 3. Fit camera bounds to the newly imported route
+        // 3. Fit camera bounds to the route
         const { global } = (firstFile as GPXFile).getStatistics();
         if (global?.bounds) {
             const sw = global.bounds.southWest;
