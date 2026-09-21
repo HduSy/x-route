@@ -323,7 +323,7 @@ export function MyRoutesDrawer() {
                                     </div>
 
                                     {/* Bottom Status */}
-                                    <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between">
+                                    <div className="mt-2 pt-2 border-t border-border/60 flex items-center">
                                         <span className="text-[10px] font-medium text-muted-foreground">
                                             {isCurrentEditing ? (
                                                 <span className="inline-flex items-center gap-1.5 text-[#863BFF] font-semibold">
@@ -331,7 +331,14 @@ export function MyRoutesDrawer() {
                                                     {t.currentlyEditing}
                                                 </span>
                                             ) : isLoaded ? (
-                                                <span className="inline-flex items-center gap-1 text-[#863BFF] font-semibold">
+                                                <span
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleLoadRoute(id);
+                                                    }}
+                                                    className="inline-flex items-center gap-1 text-[#863BFF] font-semibold hover:underline cursor-pointer"
+                                                    title="点击切换为当前编辑"
+                                                >
                                                     <Check className="size-3 text-[#863BFF]" />
                                                     {t.loaded}
                                                 </span>
@@ -339,18 +346,6 @@ export function MyRoutesDrawer() {
                                                 <span>{t.readyToLoad}</span>
                                             )}
                                         </span>
-                                        {isLoaded && !isCurrentEditing && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleLoadRoute(id);
-                                                }}
-                                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-[#863BFF] hover:bg-[#863BFF]/10 transition cursor-pointer"
-                                            >
-                                                <span>编辑节点</span>
-                                            </button>
-                                        )}
                                     </div>
                                 </div>
                             );
