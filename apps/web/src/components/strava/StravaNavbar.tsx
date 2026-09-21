@@ -8,12 +8,9 @@ import { cn } from '@/lib/utils';
 export function StravaNavbar() {
     const { t, lang, toggleLanguage } = useT();
 
-    const active = useRoutingStore((s) => s.active);
+    const isPanelActive = useRoutingStore((s) => s.active && !s.sidebarCollapsed);
     const setActive = useRoutingStore((s) => s.setActive);
-    const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
-
-    const isPanelActive = active && !sidebarCollapsed;
 
     const handleToggleRoutePanel = () => {
         if (isPanelActive) {

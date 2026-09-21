@@ -441,10 +441,16 @@ export function RouteStatsBar() {
             y: units === 'mi' ? Number((p.ele * 3.28084).toFixed(1)) : p.ele,
         }));
 
-        // Dynamic vertical range (BRouter Heightgraph formula)
-        const yValues = chartData.map((d) => d.y);
-        const minY = yValues.length > 0 ? Math.min(...yValues) : 0;
-        const maxY = yValues.length > 0 ? Math.max(...yValues) : 100;
+        // Dynamic vertical range (BRouter Heightgraph formula) - single pass O(n) loop
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (let i = 0; i < chartData.length; i++) {
+            const y = chartData[i]!.y;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+        if (!Number.isFinite(minY)) minY = 0;
+        if (!Number.isFinite(maxY)) maxY = 100;
         const rangeY = maxY - minY;
         const padY = rangeY < 10 ? 10 : Math.max(4, rangeY * 0.12);
         const yMinScale = Math.max(0, Math.floor(minY - padY));

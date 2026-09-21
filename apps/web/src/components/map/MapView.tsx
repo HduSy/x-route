@@ -70,7 +70,7 @@ export function MapView() {
     const loadedFileIds = useSelectionStore((state) => state.loadedFileIds);
     const selectedFileId = useSelectionStore((state) => state.selectedFileId);
     const editingFileId = useRoutingStore((s) => s.editingFileId);
-    const anchorsCount = useRoutingStore((s) => s.anchors.length);
+    const hasActiveRouteAnchors = useRoutingStore((s) => s.anchors.length >= 2);
 
     const files = useLiveQuery(() => db.files.toArray());
     const fileMap = useMemo(() => {
@@ -159,13 +159,13 @@ export function MapView() {
         if (loadedFileIds.length === 0) return [];
         const idsToRender = new Set(loadedFileIds);
         // If an editing route is actively rendered by routingLayer with nodes, don't duplicate it in gpxLayers
-        if (editingFileId && anchorsCount >= 2) {
+        if (editingFileId && hasActiveRouteAnchors) {
             idsToRender.delete(editingFileId);
         }
         return Array.from(idsToRender)
             .map((id) => ({ fileId: id, file: fileMap.get(id) }))
             .filter((entry): entry is { fileId: string; file: GPXFileType } => !!entry.file);
-    }, [loadedFileIds, editingFileId, anchorsCount, fileMap]);
+    }, [loadedFileIds, editingFileId, hasActiveRouteAnchors, fileMap]);
 
     useEffect(() => {
         gpxLayers.sync(gpxLayerFiles, editingFileId ?? selectedFileId);

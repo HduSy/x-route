@@ -11,9 +11,14 @@ import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
 
 export function SaveRouteModal() {
+    const saveModalOpen = useRoutingStore((s) => s.saveModalOpen);
+    if (!saveModalOpen) return null;
+    return <SaveRouteModalDialog />;
+}
+
+function SaveRouteModalDialog() {
     const { t } = useT();
 
-    const saveModalOpen = useRoutingStore((s) => s.saveModalOpen);
     const setSaveModalOpen = useRoutingStore((s) => s.setSaveModalOpen);
     const resultPoints = useRoutingStore((s) => s.resultPoints);
     const units = useRoutingStore((s) => s.units);
@@ -62,8 +67,6 @@ export function SaveRouteModal() {
             eleFormatted,
         };
     }, [resultPoints, units]);
-
-    if (!saveModalOpen) return null;
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();

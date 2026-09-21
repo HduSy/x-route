@@ -63,28 +63,36 @@ export function RouteBuilderSidebar() {
             window.clearTimeout(searchTimeoutRef.current);
         }
 
+        const controller = new AbortController();
+
         searchTimeoutRef.current = window.setTimeout(async () => {
             setSearching(true);
             try {
                 const res = await fetch(
                     `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
                         trimmed
-                    )}&limit=5`
+                    )}&limit=5`,
+                    { signal: controller.signal }
                 );
                 if (res.ok) {
                     const data = (await res.json()) as SearchResult[];
                     setSearchResults(data);
                     setShowDropdown(data.length > 0);
                 }
-            } catch (err) {
-                console.error('Location search failed', err);
+            } catch (err: any) {
+                if (err?.name !== 'AbortError') {
+                    console.error('Location search failed', err);
+                }
             } finally {
-                setSearching(false);
+                if (!controller.signal.aborted) {
+                    setSearching(false);
+                }
             }
         }, 350);
 
         return () => {
             if (searchTimeoutRef.current) window.clearTimeout(searchTimeoutRef.current);
+            controller.abort();
         };
     }, [searchQuery]);
 

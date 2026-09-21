@@ -11,6 +11,27 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/maplibre-gl')) {
+            return 'maplibre';
+          }
+          if (id.includes('node_modules/chart.js')) {
+            return 'chart';
+          }
+          if (
+            id.includes('node_modules/react') ||
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/zustand')
+          ) {
+            return 'vendor';
+          }
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       // AD-5: local dev relay to bypass graphhopper.gpx.studio CORS restriction

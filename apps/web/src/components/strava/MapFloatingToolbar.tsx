@@ -30,9 +30,10 @@ import { cn } from '@/lib/utils';
 export function MapFloatingToolbar() {
     const { t } = useT();
 
-    // Store state
-    const anchors = useRoutingStore((s) => s.anchors);
-    const resultPoints = useRoutingStore((s) => s.resultPoints);
+    // Store state (use boolean derived selectors to prevent re-renders on every point/waypoint change)
+    const canReverse = useRoutingStore((s) => s.anchors.length >= 2);
+    const canClear = useRoutingStore((s) => s.anchors.length > 0);
+    const canSave = useRoutingStore((s) => s.resultPoints.length >= 2);
     const active = useRoutingStore((s) => s.active);
     const undo = useRoutingStore((s) => s.undo);
     const redo = useRoutingStore((s) => s.redo);
@@ -206,7 +207,7 @@ export function MapFloatingToolbar() {
                     <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />
                     <button
                         onClick={reverseAnchors}
-                        disabled={anchors.length < 2}
+                        disabled={!canReverse}
                         className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-[#F5F0FF] hover:text-[#863BFF] disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.reverseRoute}
                     >
@@ -231,7 +232,7 @@ export function MapFloatingToolbar() {
                     <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />
                     <button
                         onClick={handleClear}
-                        disabled={anchors.length === 0}
+                        disabled={!canClear}
                         className="flex size-6 sm:size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-destructive disabled:opacity-40 transition cursor-pointer disabled:cursor-not-allowed"
                         title={t.clearRoute}
                     >
@@ -325,10 +326,10 @@ export function MapFloatingToolbar() {
                 {/* Save Route Button */}
                 <button
                     onClick={() => setSaveModalOpen(true)}
-                    disabled={resultPoints.length < 2}
+                    disabled={!canSave}
                     className={cn(
                         'group flex h-8 sm:h-9 items-center gap-1.5 rounded-lg px-2.5 sm:px-4 text-xs font-bold tracking-tight transition-all duration-150 select-none',
-                        resultPoints.length >= 2
+                        canSave
                             ? 'bg-[#863BFF] text-white shadow-sm hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
                             : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-700 cursor-not-allowed shadow-none opacity-100'
                     )}
@@ -337,7 +338,7 @@ export function MapFloatingToolbar() {
                     <BookmarkPlus
                         className={cn(
                             'size-3.5 sm:size-4 stroke-[2.2]',
-                            resultPoints.length >= 2 && 'transition-transform group-hover:scale-110'
+                            canSave && 'transition-transform group-hover:scale-110'
                         )}
                     />
                     <span className="hidden sm:inline">{t.saveRoute}</span>
