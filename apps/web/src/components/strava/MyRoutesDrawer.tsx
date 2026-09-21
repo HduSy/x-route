@@ -42,7 +42,6 @@ export function MyRoutesDrawer() {
     const loadedFileIds = useSelectionStore((s) => s.loadedFileIds);
     const addLoadedFile = useSelectionStore((s) => s.addLoadedFile);
     const removeLoadedFile = useSelectionStore((s) => s.removeLoadedFile);
-    const clearLoadedFiles = useSelectionStore((s) => s.clearLoadedFiles);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; name: string } | null>(null);
@@ -102,12 +101,12 @@ export function MyRoutesDrawer() {
         await deleteFile(fileId);
     };
 
-    const handleClearAllLoaded = () => {
-        clearLoadedFiles();
-        clear(true);
-        routingLayer.clear();
-        selectFile(null);
-        mapManager.clearUserLocation();
+    const handleToggleRoute = (fileId: string, currentlyLoaded: boolean) => {
+        if (currentlyLoaded) {
+            handleUnloadRoute(fileId);
+        } else {
+            handleLoadRoute(fileId);
+        }
     };
 
     return (
@@ -143,16 +142,6 @@ export function MyRoutesDrawer() {
                         )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                        {loadedFileIds.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={handleClearAllLoaded}
-                                className="text-[11px] font-semibold text-muted-foreground hover:text-red-500 transition px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
-                                title={t.clearLoaded}
-                            >
-                                {t.clearLoaded} ({loadedFileIds.length})
-                            </button>
-                        )}
                         <button
                             type="button"
                             onClick={() => setMyRoutesOpen(false)}
@@ -248,25 +237,36 @@ export function MyRoutesDrawer() {
                             return (
                                 <div
                                     key={id}
+                                    onClick={() => handleToggleRoute(id, isLoaded)}
                                     className={cn(
-                                        'group relative flex flex-col rounded-xl border p-3 shadow-xs transition-all duration-200 hover:shadow-sm',
+                                        'group relative flex flex-col rounded-xl border p-3 shadow-xs transition-all duration-200 cursor-pointer select-none',
                                         isLoaded
                                             ? isCurrentEditing
-                                                ? 'border-[#863BFF] ring-2 ring-[#863BFF]/40 bg-[#FBF9FF] dark:bg-[#281648]'
-                                                : 'border-[#863BFF] bg-[#FAF7FF] dark:bg-[#201235]'
-                                            : 'border-border/80 bg-white dark:bg-card hover:border-[#863BFF]/70'
+                                                ? 'border-[#863BFF] ring-2 ring-[#863BFF]/40 bg-[#FBF9FF] dark:bg-[#281648] shadow-sm'
+                                                : 'border-[#863BFF] bg-[#FAF7FF] dark:bg-[#201235] shadow-xs'
+                                            : 'border-border/80 bg-white dark:bg-card hover:border-[#863BFF]/60 hover:shadow-xs'
                                     )}
                                 >
                                     {/* Card Header */}
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#863BFF]/10 text-[#863BFF] mt-0.5">
-                                                <FileJson className="size-4" />
+                                            <div
+                                                className={cn(
+                                                    'flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors mt-0.5',
+                                                    isLoaded
+                                                        ? 'bg-[#863BFF] text-white shadow-2xs'
+                                                        : 'bg-[#863BFF]/10 text-[#863BFF] group-hover:bg-[#863BFF]/20'
+                                                )}
+                                            >
+                                                {isLoaded ? (
+                                                    <Check className="size-4 stroke-[2.5]" />
+                                                ) : (
+                                                    <FileJson className="size-4" />
+                                                )}
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <h3
-                                                    onClick={() => handleLoadRoute(id)}
-                                                    className="truncate text-xs font-bold text-foreground cursor-pointer transition hover:text-[#863BFF]"
+                                                    className="truncate text-xs font-bold text-foreground transition group-hover:text-[#863BFF]"
                                                     title={name}
                                                 >
                                                     {name}
@@ -283,7 +283,10 @@ export function MyRoutesDrawer() {
                                         <div className="flex items-center gap-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
                                             <button
                                                 type="button"
-                                                onClick={() => void exportFile(id)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void exportFile(id);
+                                                }}
                                                 className="rounded-md p-1 text-muted-foreground transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
                                                 title={t.exportGpx}
                                             >
@@ -348,50 +351,42 @@ export function MyRoutesDrawer() {
                                                     {t.loaded}
                                                 </span>
                                             ) : (
-                                                t.readyToLoad
+                                                <span>{t.readyToLoad}</span>
                                             )}
                                         </span>
                                         <div className="flex items-center gap-1.5">
-                                            {isLoaded ? (
-                                                <>
-                                                    {!isCurrentEditing && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleLoadRoute(id);
-                                                            }}
-                                                            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold text-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] transition cursor-pointer"
-                                                        >
-                                                            <span>编辑节点</span>
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleUnloadRoute(id);
-                                                        }}
-                                                        className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition cursor-pointer"
-                                                        title={t.unloadRoute}
-                                                    >
-                                                        <EyeOff className="size-3" />
-                                                        <span>{t.unloadRoute}</span>
-                                                    </button>
-                                                </>
-                                            ) : (
+                                            {isLoaded && !isCurrentEditing && (
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleLoadRoute(id);
                                                     }}
-                                                    className="group/btn inline-flex items-center gap-1 rounded-lg bg-[#863BFF] px-2.5 py-1 text-xs font-bold text-white shadow-2xs transition hover:bg-[#7424F8] active:scale-98 cursor-pointer"
+                                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-[#863BFF] hover:bg-[#863BFF]/10 transition cursor-pointer"
                                                 >
-                                                    <Plus className="size-3 stroke-[3]" />
-                                                    <span>{t.loadRoute}</span>
+                                                    <span>编辑节点</span>
                                                 </button>
                                             )}
+                                            <span
+                                                className={cn(
+                                                    'inline-flex items-center gap-1 text-[10px] font-medium transition',
+                                                    isLoaded
+                                                        ? 'text-muted-foreground group-hover:text-red-500'
+                                                        : 'text-muted-foreground group-hover:text-[#863BFF]'
+                                                )}
+                                            >
+                                                {isLoaded ? (
+                                                    <>
+                                                        <EyeOff className="size-3" />
+                                                        <span>{t.unloadRoute}</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Plus className="size-3 stroke-[2.5]" />
+                                                        <span>{t.loadRoute}</span>
+                                                    </>
+                                                )}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
