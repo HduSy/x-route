@@ -7,6 +7,8 @@ import { GPXFile, Track, TrackSegment, distance } from '@x-route/gpx';
 import { cn } from '@/lib/utils';
 import { computeElevationStats } from '@/lib/elevation';
 import { useSelectionStore } from '@/store/selection-slice';
+import { routingLayer } from '@/lib/map/routing-layer';
+import { mapManager } from '@/lib/map/MapManager';
 
 export function SaveRouteModal() {
     const { t } = useT();
@@ -98,12 +100,19 @@ export function SaveRouteModal() {
                 setSavedSuccess(false);
                 setSaveModalOpen(false);
 
-                // Activate the saved route as loaded and keep it visible on map
+                // 1. Activate the saved route as loaded on the map (via gpxLayers)
                 if (targetFileId) {
-                    useRoutingStore.getState().setEditingFileId(targetFileId);
                     useSelectionStore.getState().addLoadedFile(targetFileId);
                     useSelectionStore.getState().selectFile(targetFileId);
                 }
+
+                // 2. Clear editing planner so editor is in ready state for continuous creation
+                useRoutingStore.getState().clear(true);
+                routingLayer.clear();
+                useRoutingStore.getState().setEditingFileId(null);
+                mapManager.clearUserLocation();
+
+                // 3. Open My Routes drawer
                 setMyRoutesOpen(true);
             }, 800);
         } catch (err) {
