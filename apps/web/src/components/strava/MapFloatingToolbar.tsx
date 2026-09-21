@@ -116,7 +116,7 @@ export function MapFloatingToolbar() {
                     console.warn('Geolocation fallback error:', err);
                     setIsLocating(false);
                 },
-                { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 5000 }
             );
         };
 
@@ -126,7 +126,7 @@ export function MapFloatingToolbar() {
                 console.warn('Geolocation high accuracy error, trying fallback:', err);
                 tryLowAccuracy();
             },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 10000 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 5000 }
         );
     };
 

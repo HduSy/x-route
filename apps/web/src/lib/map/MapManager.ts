@@ -200,35 +200,6 @@ function saveViewport(center: [number, number], zoom: number) {
     } catch {}
 }
 
-const LAST_LOCATION_STORAGE_KEY = 'x-route-last-location';
-
-function getLastLocation(): { lon: number; lat: number } | null {
-    try {
-        const raw = localStorage.getItem(LAST_LOCATION_STORAGE_KEY);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        if (
-            typeof parsed.lon === 'number' &&
-            typeof parsed.lat === 'number' &&
-            Number.isFinite(parsed.lon) &&
-            Number.isFinite(parsed.lat)
-        ) {
-            return parsed;
-        }
-    } catch {}
-    return null;
-}
-
-function saveLastLocation(coords: { lon: number; lat: number } | null) {
-    try {
-        if (!coords) {
-            localStorage.removeItem(LAST_LOCATION_STORAGE_KEY);
-        } else {
-            localStorage.setItem(LAST_LOCATION_STORAGE_KEY, JSON.stringify(coords));
-        }
-    } catch {}
-}
-
 class MapManager {
     private map: MapLibreMap | null = null;
     private container: HTMLElement | null = null;
@@ -328,11 +299,6 @@ class MapManager {
         requestAnimationFrame(() => this.map?.resize());
         setTimeout(() => this.map?.resize(), 100);
 
-        const lastLoc = getLastLocation();
-        if (lastLoc) {
-            this.setUserLocation(lastLoc);
-        }
-
         return map;
     }
 
@@ -399,7 +365,6 @@ class MapManager {
     }
 
     setUserLocation(coords: { lon: number; lat: number } | null) {
-        saveLastLocation(coords);
         if (!this.map) return;
         if (!coords) {
             this.userLocationMarker?.remove();
@@ -470,7 +435,7 @@ class MapManager {
     }
 
     getUserLocation(): { lon: number; lat: number } | null {
-        return this.userLocationCoords ?? getLastLocation();
+        return this.userLocationCoords;
     }
 
     getMap(): MapLibreMap | null {
