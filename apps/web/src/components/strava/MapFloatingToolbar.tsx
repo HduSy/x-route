@@ -159,9 +159,7 @@ export function MapFloatingToolbar() {
         clear();
         routingLayer.clear();
         useSelectionStore.getState().selectFile(null);
-        // Trash clears only the unsaved drawn route — saved-track lines stay on
-        // the map until deleted from the My Routes panel. The user location dot
-        // is never touched either.
+        useSelectionStore.getState().clearLoadedFiles();
     };
 
     // Sync lassoMode React state → singleton so MapView can subscribe

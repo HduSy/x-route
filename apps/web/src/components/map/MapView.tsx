@@ -30,8 +30,6 @@ function TrackPopupContent({ file }: { file: GPXFileType }) {
     );
 }
 
-const EMPTY_IDS: string[] = [];
-
 export function MapView() {
     useRoutingSync();
     const { t } = useT();
@@ -69,10 +67,10 @@ export function MapView() {
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
     const units = useRoutingStore((s) => s.units);
-    const selectedFileId = useSelectionStore((state) => state.selectedFileId);
-    const selectFile = useSelectionStore((state) => state.selectFile);
+    const loadedFileIds = useSelectionStore((state) => state.loadedFileIds);
+    const editingFileId = useRoutingStore((s) => s.editingFileId);
+    const anchorsCount = useRoutingStore((s) => s.anchors.length);
 
-    const fileIds = useLiveQuery(() => db.fileids.toArray()) ?? EMPTY_IDS;
     const files = useLiveQuery(() => db.files.toArray());
     const fileMap = useMemo(() => {
         const map = new Map<string, GPXFileType>();
@@ -88,11 +86,23 @@ export function MapView() {
     }, [fileMap]);
 
     useEffect(() => {
-        gpxLayers.onFileClick = (fileId) => selectFile(fileId);
+        gpxLayers.onFileClick = (fileId) => {
+            const fileData = fileMapRef.current.get(fileId);
+            if (!fileData) return;
+            const file = new GPXFile(fileData);
+            const trkpts = file.getTrackPoints();
+            if (trkpts.length >= 2) {
+                const coords = trkpts.map((pt) => pt.getCoordinates());
+                useRoutingStore.getState().loadRouteFromPoints(coords);
+                useRoutingStore.getState().setEditingFileId(fileId);
+                useSelectionStore.getState().addLoadedFile(fileId);
+                useSelectionStore.getState().selectFile(fileId);
+            }
+        };
         return () => {
             gpxLayers.onFileClick = null;
         };
-    }, [selectFile]);
+    }, []);
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -144,23 +154,32 @@ export function MapView() {
         mapManager.setScaleUnit(units === 'mi' ? 'imperial' : 'metric');
     }, [units]);
 
-    useEffect(() => {
-        const layerFiles = fileIds
+    const gpxLayerFiles = useMemo(() => {
+        if (loadedFileIds.length === 0) return [];
+        const idsToRender = new Set(loadedFileIds);
+        // If an editing route is actively rendered by routingLayer with nodes, don't duplicate it in gpxLayers
+        if (editingFileId && anchorsCount >= 2) {
+            idsToRender.delete(editingFileId);
+        }
+        return Array.from(idsToRender)
             .map((id) => ({ fileId: id, file: fileMap.get(id) }))
             .filter((entry): entry is { fileId: string; file: GPXFileType } => !!entry.file);
-        gpxLayers.sync(layerFiles, selectedFileId);
+    }, [loadedFileIds, editingFileId, anchorsCount, fileMap]);
 
-        if (layerFiles.length > prevCountRef.current) {
-            const bounds = gpxLayers.getBounds(layerFiles);
-            // Only auto-fit while the viewport is still pristine (hydration /
-            // first import). Never yank the camera away from a user who is
-            // inspecting their route or actively creating one.
-            if (bounds && !mapManager.hasUserInteracted() && useRoutingStore.getState().anchors.length === 0) {
-                mapManager.fitBounds(bounds, 60, true);
+    useEffect(() => {
+        gpxLayers.sync(gpxLayerFiles, editingFileId);
+
+        if (loadedFileIds.length > prevCountRef.current) {
+            const allLoadedFiles = loadedFileIds
+                .map((id) => ({ fileId: id, file: fileMap.get(id) }))
+                .filter((entry): entry is { fileId: string; file: GPXFileType } => !!entry.file);
+            const bounds = gpxLayers.getBounds(allLoadedFiles);
+            if (bounds) {
+                mapManager.fitBounds(bounds, 60, false);
             }
         }
-        prevCountRef.current = layerFiles.length;
-    }, [fileIds, fileMap, selectedFileId]);
+        prevCountRef.current = loadedFileIds.length;
+    }, [gpxLayerFiles, editingFileId, loadedFileIds, fileMap]);
 
     // Lasso box-select: attach canvas events when lassoMode is active
     useEffect(() => {

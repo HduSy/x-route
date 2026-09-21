@@ -7,6 +7,8 @@ import { routingLayer } from '@/lib/map/routing-layer';
 import { GPXFile, Track, TrackSegment, distance } from '@x-route/gpx';
 import { cn } from '@/lib/utils';
 import { computeElevationStats } from '@/lib/elevation';
+import { useSelectionStore } from '@/store/selection-slice';
+import { mapManager } from '@/lib/map/MapManager';
 
 export function SaveRouteModal() {
     const { t } = useT();
@@ -88,17 +90,20 @@ export function SaveRouteModal() {
             });
 
             if (editingFileId) {
-                await updateGPXFile(editingFileId, file);
+                await updateGPXFile(editingFileId, file, false);
             } else {
-                await saveGPXFile(file);
+                await saveGPXFile(file, false);
             }
             setSavedSuccess(true);
             setTimeout(() => {
                 setSavedSuccess(false);
                 setSaveModalOpen(false);
-                // Automatically clear drawn nodes and route from map after saving
+                // Clear the saved route from map silently without secondary confirmation dialog
                 useRoutingStore.getState().clear(true);
                 routingLayer.clear();
+                useSelectionStore.getState().selectFile(null);
+                useSelectionStore.getState().clearLoadedFiles();
+                mapManager.clearUserLocation();
                 setMyRoutesOpen(true);
             }, 800);
         } catch (err) {

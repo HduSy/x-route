@@ -2,27 +2,17 @@ import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { mapManager } from './MapManager';
 
-// gpx.studio's file color palette (gpx-layer.ts)
-const PALETTE = [
-    '#ff0000',
-    '#0000ff',
-    '#46e646',
-    '#00ccff',
-    '#ff9900',
-    '#ff00ff',
-    '#ffff32',
-    '#288228',
-];
+// Unified route color across x-route (signature vibrant purple)
+export const UNIFIED_ROUTE_COLOR = '#863BFF';
 
 interface LayerFile {
     fileId: string;
     file: GPXFileType;
 }
 
-function fileToGeoJSON(fileId: string, file: GPXFileType, color: string, selected: boolean) {
+function fileToGeoJSON(fileId: string, file: GPXFileType, _color: string, _selected: boolean) {
     const gpxFile = new GPXFile(file);
     const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
-    
 
     gpxFile.forEachSegment((segment, trackIndex, segmentIndex) => {
         const coordinates = segment.trkpt.map((point) => {
@@ -35,9 +25,9 @@ function fileToGeoJSON(fileId: string, file: GPXFileType, color: string, selecte
             type: 'Feature',
             properties: {
                 fileId,
-                color,
-                width: selected ? 7 : 4,
-                opacity: selected ? 1 : 0.8,
+                color: UNIFIED_ROUTE_COLOR,
+                width: 5,
+                opacity: 0.95,
                 trackSegmentId: `${trackIndex}-${segmentIndex}`,
                 name: gpxFile.metadata?.name ?? 'Untitled',
             },
@@ -50,7 +40,6 @@ function fileToGeoJSON(fileId: string, file: GPXFileType, color: string, selecte
 
 class GPXLayerController {
     private colors = new Map<string, string>();
-    private colorIndex = 0;
 
     /** Set by the React layer; fires when a track line is clicked. */
     onFileClick: ((fileId: string) => void) | null = null;
@@ -58,16 +47,6 @@ class GPXLayerController {
     /** Layer ids currently on the map (used for hit-testing / delegation). */
     getLayerIds(): string[] {
         return Array.from(this.colors.keys());
-    }
-
-    private assignColor(fileId: string): string {
-        let color = this.colors.get(fileId);
-        if (!color) {
-            color = PALETTE[this.colorIndex % PALETTE.length]!;
-            this.colorIndex++;
-            this.colors.set(fileId, color);
-        }
-        return color;
     }
 
     private lastFiles: LayerFile[] = [];
@@ -148,8 +127,13 @@ class GPXLayerController {
         return `${fileId}-direction`;
     }
 
+    private casingLayerId(fileId: string) {
+        return `${fileId}-casing`;
+    }
+
     private syncFileLayer(map: MapLibreMap, fileId: string, file: GPXFileType, selected: boolean) {
-        const color = this.assignColor(fileId);
+        const color = UNIFIED_ROUTE_COLOR;
+        this.colors.set(fileId, color);
         const geojson = fileToGeoJSON(fileId, file, color, selected);
         if (geojson.features.length === 0) return;
 
@@ -167,6 +151,27 @@ class GPXLayerController {
             source?.setData(geojson);
         }
 
+        // White casing underlay for crisp contrast across all basemap styles
+        if (!map.getLayer(this.casingLayerId(fileId))) {
+            map.addLayer(
+                {
+                    id: this.casingLayerId(fileId),
+                    type: 'line',
+                    source: fileId,
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round',
+                    },
+                    paint: {
+                        'line-color': '#FFFFFF',
+                        'line-width': 8,
+                        'line-opacity': 0.9,
+                    },
+                },
+                map.getLayer(this.lineLayerId(fileId)) ? this.lineLayerId(fileId) : undefined
+            );
+        }
+
         if (!map.getLayer(this.lineLayerId(fileId))) {
             map.addLayer({
                 id: this.lineLayerId(fileId),
@@ -177,9 +182,9 @@ class GPXLayerController {
                     'line-cap': 'round',
                 },
                 paint: {
-                    'line-color': ['get', 'color'],
-                    'line-width': ['get', 'width'],
-                    'line-opacity': ['get', 'opacity'],
+                    'line-color': UNIFIED_ROUTE_COLOR,
+                    'line-width': 5,
+                    'line-opacity': 0.95,
                 },
             });
 
@@ -215,7 +220,7 @@ class GPXLayerController {
                         'symbol-spacing': 80,
                     },
                     paint: {
-                        'text-color': color,
+                        'text-color': UNIFIED_ROUTE_COLOR,
                         'text-halo-width': 1,
                         'text-halo-color': '#ffffff',
                     },
@@ -229,7 +234,7 @@ class GPXLayerController {
         const alive = new Set(files.map((f) => f.fileId));
         for (const [fileId] of this.colors) {
             if (alive.has(fileId)) continue;
-            for (const layerId of [this.directionLayerId(fileId), this.lineLayerId(fileId)]) {
+            for (const layerId of [this.directionLayerId(fileId), this.lineLayerId(fileId), this.casingLayerId(fileId)]) {
                 if (map.getLayer(layerId)) map.removeLayer(layerId);
             }
             if (map.getSource(fileId)) map.removeSource(fileId);
