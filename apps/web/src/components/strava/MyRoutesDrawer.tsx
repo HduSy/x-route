@@ -273,17 +273,6 @@ export function MyRoutesDrawer() {
                                                     <span>{global.length} {t.pts}</span>
                                                     <span>·</span>
                                                     <span>GPX Track</span>
-                                                    {isCurrentEditing ? (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-[#863BFF] px-1.5 py-0.2 text-[9px] font-black text-white shadow-2xs">
-                                                            <span className="size-1 rounded-full bg-white animate-pulse" />
-                                                            {t.currentlyEditing}
-                                                        </span>
-                                                    ) : isLoaded ? (
-                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-[#863BFF]/15 px-1.5 py-0.2 text-[9px] font-bold text-[#863BFF]">
-                                                            <Check className="size-2.5 stroke-[2.5]" />
-                                                            {t.loaded}
-                                                        </span>
-                                                    ) : null}
                                                 </div>
                                             </div>
                                         </div>
