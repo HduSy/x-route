@@ -963,11 +963,8 @@ export class RoutingLayerController {
     }
 
     private ensureLayers(map: MapLibreMap) {
-        if (!map.isStyleLoaded()) {
+        if (!map.getStyle()) {
             map.once('style.load', () => this.ensureLayers(map));
-            map.once('styledata', () => {
-                if (map.isStyleLoaded()) this.ensureLayers(map);
-            });
             return;
         }
 
@@ -1337,11 +1334,8 @@ export class RoutingLayerController {
 
             // Source (and layers) don't exist yet — creating them requires a
             // loaded style, so defer only the creation path.
-            if (!map.isStyleLoaded()) {
+            if (!map.getStyle()) {
                 map.once('style.load', () => this.setResult(points));
-                map.once('styledata', () => {
-                    if (map.isStyleLoaded()) this.setResult(points);
-                });
                 return;
             }
             this.ensureLayers(map);
@@ -1354,7 +1348,7 @@ export class RoutingLayerController {
         if (!map) return;
 
         const doResync = () => {
-            if (!map.isStyleLoaded()) {
+            if (!map.getStyle()) {
                 map.once('style.load', doResync);
                 return;
             }
@@ -1376,11 +1370,8 @@ export class RoutingLayerController {
             }
         };
 
-        if (!map.isStyleLoaded()) {
+        if (!map.getStyle()) {
             map.once('style.load', doResync);
-            map.once('styledata', () => {
-                if (map.isStyleLoaded()) doResync();
-            });
             return;
         }
 

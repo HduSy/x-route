@@ -56,18 +56,12 @@ class GPXLayerController {
         this.lastFiles = files;
         this.lastSelected = selectedFileId;
         mapManager.onReady((map) => {
-            // Removals are safe in any style state and must never be deferred —
-            // a deferred sync could leave a deleted track on screen forever
-            // ('styledata' does not fire for source data updates).
-            this.removeStaleLayers(map, files);
-            if (!map.isStyleLoaded()) {
-                // Re-read CURRENT state on retry — never replay a captured file
-                // list. A deferred sync holding stale files would resurrect
-                // deleted tracks when it eventually fires.
-                map.once('style.load', () => this.sync(this.lastFiles, this.lastSelected));
-                map.once('styledata', () => this.sync(this.lastFiles, this.lastSelected));
-                return;
+            if (!map.getStyle()) {
+                throw new Error('Map style is not loaded yet');
             }
+            // Removals are safe in any style state and must never be deferred —
+            // a deferred sync could leave a deleted track on screen forever.
+            this.removeStaleLayers(map, files);
             for (const { fileId, file } of files) {
                 this.syncFileLayer(map, fileId, file, selectedFileId === fileId);
             }
@@ -81,16 +75,17 @@ class GPXLayerController {
         }
     }
 
-    /** Fade unselected files when one is selected (source-project behavior). */
+    /** Emphasize selected file; if no selection, show all at full opacity. */
     applySelection(selectedFileId: string | null) {
+        this.lastSelected = selectedFileId;
         const map = mapManager.getMap();
-        if (!map) return;
+        if (!map || !map.getStyle()) return;
         for (const [fileId] of this.colors) {
             const layerId = this.lineLayerId(fileId);
             if (!map.getLayer(layerId)) continue;
-            const selected = fileId === selectedFileId;
-            map.setPaintProperty(layerId, 'line-opacity', selected ? 1 : 0.35);
-            map.setPaintProperty(layerId, 'line-width', selected ? 7 : 4);
+            const isHighlight = selectedFileId === null || fileId === selectedFileId;
+            map.setPaintProperty(layerId, 'line-opacity', isHighlight ? 0.95 : 0.45);
+            map.setPaintProperty(layerId, 'line-width', fileId === selectedFileId ? 6 : 5);
         }
     }
 
@@ -183,7 +178,7 @@ class GPXLayerController {
                 },
                 paint: {
                     'line-color': UNIFIED_ROUTE_COLOR,
-                    'line-width': 5,
+                    'line-width': selected ? 6 : 5,
                     'line-opacity': 0.95,
                 },
             });
@@ -205,28 +200,25 @@ class GPXLayerController {
         }
 
         if (!map.getLayer(this.directionLayerId(fileId))) {
-            map.addLayer(
-                {
-                    id: this.directionLayerId(fileId),
-                    type: 'symbol',
-                    source: fileId,
-                    layout: {
-                        'text-field': '»',
-                        'text-offset': [0, -0.1],
-                        'text-keep-upright': false,
-                        'text-max-angle': 361,
-                        'text-allow-overlap': true,
-                        'symbol-placement': 'line',
-                        'symbol-spacing': 80,
-                    },
-                    paint: {
-                        'text-color': UNIFIED_ROUTE_COLOR,
-                        'text-halo-width': 1,
-                        'text-halo-color': '#ffffff',
-                    },
+            map.addLayer({
+                id: this.directionLayerId(fileId),
+                type: 'symbol',
+                source: fileId,
+                layout: {
+                    'text-field': '»',
+                    'text-offset': [0, -0.1],
+                    'text-keep-upright': false,
+                    'text-max-angle': 361,
+                    'text-allow-overlap': true,
+                    'symbol-placement': 'line',
+                    'symbol-spacing': 80,
                 },
-                this.lineLayerId(fileId)
-            );
+                paint: {
+                    'text-color': '#FFFFFF',
+                    'text-halo-width': 1,
+                    'text-halo-color': UNIFIED_ROUTE_COLOR,
+                },
+            });
         }
     }
 

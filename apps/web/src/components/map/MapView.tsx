@@ -68,6 +68,7 @@ export function MapView() {
     const setManualMode = useRoutingStore((s) => s.setManualMode);
     const units = useRoutingStore((s) => s.units);
     const loadedFileIds = useSelectionStore((state) => state.loadedFileIds);
+    const selectedFileId = useSelectionStore((state) => state.selectedFileId);
     const editingFileId = useRoutingStore((s) => s.editingFileId);
     const anchorsCount = useRoutingStore((s) => s.anchors.length);
 
@@ -167,7 +168,7 @@ export function MapView() {
     }, [loadedFileIds, editingFileId, anchorsCount, fileMap]);
 
     useEffect(() => {
-        gpxLayers.sync(gpxLayerFiles, editingFileId);
+        gpxLayers.sync(gpxLayerFiles, editingFileId ?? selectedFileId);
 
         if (loadedFileIds.length > prevCountRef.current) {
             const allLoadedFiles = loadedFileIds
@@ -179,7 +180,7 @@ export function MapView() {
             }
         }
         prevCountRef.current = loadedFileIds.length;
-    }, [gpxLayerFiles, editingFileId, loadedFileIds, fileMap]);
+    }, [gpxLayerFiles, editingFileId, selectedFileId, loadedFileIds, fileMap]);
 
     // Lasso box-select: attach canvas events when lassoMode is active
     useEffect(() => {
