@@ -1,8 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
-import { route, getManualRoute } from '@/lib/routing';
+import {
+    computeRoute,
+    getManualRoute,
+    areAllSegmentsCached,
+    cancelAllPendingRouting,
+} from '@/lib/routing';
 
 // Stale-response guard: only the latest request may write its result.
 let requestSeq = 0;
@@ -18,6 +23,9 @@ export function useRoutingSync() {
     const showRoutePath = useRoutingStore((s) => s.showRoutePath);
     const units = useRoutingStore((s) => s.units);
     const elevationPreference = useRoutingStore((s) => s.elevationPreference);
+
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Map interactions -> store (wired once)
     useEffect(() => {
@@ -71,43 +79,88 @@ export function useRoutingSync() {
         routingLayer.setResult(resultPoints);
     }, [resultPoints]);
 
+    // Cleanup abort controllers and debounce timers on component unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+                debounceTimerRef.current = null;
+            }
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+            cancelAllPendingRouting();
+        };
+    }, []);
+
     // Route computation on anchors/profile/manualMode change
     useEffect(() => {
-        const myRequest = ++requestSeq;
+        // Clear pending debounce timer
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+
         if (anchors.length < 2) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+            cancelAllPendingRouting();
             const state = useRoutingStore.getState();
             state.setResult([], null);
             state.setRouting(false);
             return;
         }
 
-        const state = useRoutingStore.getState();
-        state.setRouting(true);
+        // If all segments are already cached (e.g. Undo/Redo or revisit), debounce is 0ms (instant).
+        // Otherwise, 50ms micro-debounce coalesces rapid clicks and drag events.
+        const allCached = areAllSegmentsCached(anchors, profile, manualMode, elevationPreference);
+        const debounceMs = allCached ? 0 : 50;
 
-        route(anchors, profile, manualMode, elevationPreference)
-            .then((points) => {
-                // Stale-response guard: sequence number AND identity of the anchors
-                // that started this request. clear() swaps in a new anchors array
-                // before the next effect pass bumps requestSeq — the reference
-                // check closes that window so a cleared route can't be resurrected
-                // by a late response.
-                const state = useRoutingStore.getState();
-                if (myRequest !== requestSeq || state.anchors !== anchors) return;
-                state.setResult(points, null);
-            })
-            .catch((error: Error) => {
-                const state = useRoutingStore.getState();
-                if (myRequest !== requestSeq || state.anchors !== anchors) return;
-                console.warn('Routing error, falling back to straight-line segments:', error);
-                // Fallback to straight lines so the route line NEVER vanishes
-                const fallbackPoints = getManualRoute(anchors);
-                state.setResult(fallbackPoints, error.message);
-            })
-            .finally(() => {
-                if (myRequest === requestSeq) {
-                    useRoutingStore.getState().setRouting(false);
-                }
-            });
+        debounceTimerRef.current = setTimeout(() => {
+            debounceTimerRef.current = null;
+
+            // Abort previous in-flight route computation
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
+            const myRequest = ++requestSeq;
+            const state = useRoutingStore.getState();
+            state.setRouting(true);
+
+            computeRoute(anchors, profile, manualMode, elevationPreference, controller.signal)
+                .then((res) => {
+                    const state = useRoutingStore.getState();
+                    if (controller.signal.aborted || myRequest !== requestSeq || state.anchors !== anchors) return;
+                    state.setResult(res.points, res.error);
+                })
+                .catch((error: Error) => {
+                    if (error.name === 'AbortError' || controller.signal.aborted) return;
+                    const state = useRoutingStore.getState();
+                    if (myRequest !== requestSeq || state.anchors !== anchors) return;
+                    console.warn('Routing error, falling back to straight-line segments:', error);
+                    // Fallback to straight lines so the route line NEVER vanishes
+                    const fallbackPoints = getManualRoute(anchors);
+                    state.setResult(fallbackPoints, error.message);
+                })
+                .finally(() => {
+                    if (myRequest === requestSeq && !controller.signal.aborted) {
+                        useRoutingStore.getState().setRouting(false);
+                    }
+                });
+        }, debounceMs);
+
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+                debounceTimerRef.current = null;
+            }
+        };
     }, [anchors, profile, manualMode, elevationPreference]);
 
     // When draw mode turns ON, ensure markers and route are synced to map layer

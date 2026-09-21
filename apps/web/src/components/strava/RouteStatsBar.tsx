@@ -697,38 +697,6 @@ export function RouteStatsBar() {
                         if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
                     }}
                 >
-                    {/* Slope Grade Color Legend (BRouter-Web style with modern translucency) */}
-                    <div className="absolute top-1.5 right-3 hidden sm:flex items-center gap-2 text-[10px] text-muted-foreground bg-background/85 backdrop-blur-xs px-2.5 py-0.5 rounded-md border border-border/60 pointer-events-none z-10 shadow-2xs">
-                        <span className="font-semibold text-foreground/80">{t.slope}:</span>
-                        <div className="flex items-center gap-1">
-                            <span className="size-2 rounded-full bg-[#0284C7]" />
-                            <span>&lt; 0%</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="size-2 rounded-full bg-[#10B981]" />
-                            <span>0%</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="size-2 rounded-full bg-[#FACC15]" />
-                            <span>1-3%</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="size-2 rounded-full bg-[#F59E0B]" />
-                            <span>4-6%</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="size-2 rounded-full bg-[#F97316]" />
-                            <span>7-9%</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="size-2 rounded-full bg-[#EF4444]" />
-                            <span>10-15%</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="size-2 rounded-full bg-[#863BFF]" />
-                            <span>&gt; 15%</span>
-                        </div>
-                    </div>
 
                     {/* Floating Elevation Tooltip pinned to curve point */}
                     <div
