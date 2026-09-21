@@ -182,7 +182,7 @@ export function MyRoutesDrawer() {
                         onClick={triggerFileInput}
                         className="group flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#863BFF]/40 bg-white dark:bg-card py-2 px-3 text-xs font-bold text-[#863BFF] transition-all hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] active:scale-98 cursor-pointer shadow-2xs"
                     >
-                        <UploadCloud className="size-3.5 stroke-[2.2] transition-transform group-hover:-translate-y-0.5" />
+                        <UploadCloud className="size-3.5 stroke-[2.2]" />
                         <span>{t.importBtn}</span>
                     </button>
                 </div>
@@ -197,16 +197,9 @@ export function MyRoutesDrawer() {
                             <p className="text-sm font-bold text-foreground mb-1">
                                 {t.noRoutesSaved}
                             </p>
-                            <p className="text-xs text-muted-foreground max-w-xs mb-3.5 leading-relaxed">
+                            <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
                                 {t.noRoutesSavedHint}
                             </p>
-                            <button
-                                type="button"
-                                onClick={triggerFileInput}
-                                className="rounded-lg border border-border bg-white dark:bg-card px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-xs transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer"
-                            >
-                                {t.importNow}
-                            </button>
                         </div>
                     ) : filteredFileIds.length === 0 ? (
                         <div className="flex h-48 flex-col items-center justify-center text-center px-4 text-muted-foreground">
