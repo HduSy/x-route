@@ -86,15 +86,22 @@ export function useRoutingSync() {
 
         route(anchors, profile, manualMode, elevationPreference)
             .then((points) => {
-                if (myRequest !== requestSeq) return;
-                useRoutingStore.getState().setResult(points, null);
+                // Stale-response guard: sequence number AND identity of the anchors
+                // that started this request. clear() swaps in a new anchors array
+                // before the next effect pass bumps requestSeq — the reference
+                // check closes that window so a cleared route can't be resurrected
+                // by a late response.
+                const state = useRoutingStore.getState();
+                if (myRequest !== requestSeq || state.anchors !== anchors) return;
+                state.setResult(points, null);
             })
             .catch((error: Error) => {
-                if (myRequest !== requestSeq) return;
+                const state = useRoutingStore.getState();
+                if (myRequest !== requestSeq || state.anchors !== anchors) return;
                 console.warn('Routing error, falling back to straight-line segments:', error);
                 // Fallback to straight lines so the route line NEVER vanishes
                 const fallbackPoints = getManualRoute(anchors);
-                useRoutingStore.getState().setResult(fallbackPoints, error.message);
+                state.setResult(fallbackPoints, error.message);
             })
             .finally(() => {
                 if (myRequest === requestSeq) {

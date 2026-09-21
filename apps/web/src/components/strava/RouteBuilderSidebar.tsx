@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
     Bike,
-    Bookmark,
     ChevronDown,
     Compass,
     Crosshair,
@@ -47,8 +46,6 @@ export function RouteBuilderSidebar() {
     const setUnits = useRoutingStore((s) => s.setUnits);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
-    const myRoutesOpen = useRoutingStore((s) => s.myRoutesOpen);
-    const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const addAnchor = useRoutingStore((s) => s.addAnchor);
 
     // Geocoding search
@@ -126,20 +123,6 @@ export function RouteBuilderSidebar() {
                         {t.buildYourRoute}
                     </h2>
                     <div className="flex items-center gap-1">
-                        <button
-                            type="button"
-                            onClick={() => setMyRoutesOpen(!myRoutesOpen)}
-                            className={cn(
-                                'flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition cursor-pointer',
-                                myRoutesOpen
-                                    ? 'bg-[#863BFF]/15 text-[#863BFF]'
-                                    : 'text-muted-foreground hover:bg-accent hover:text-[#863BFF]'
-                            )}
-                            title={t.myRoutes}
-                        >
-                            <Bookmark className={cn('size-3.5', myRoutesOpen ? 'text-[#863BFF] fill-[#863BFF]' : 'text-[#863BFF]')} />
-                            <span className="text-[11px] font-medium">{t.myRoutes}</span>
-                        </button>
                         <button
                             type="button"
                             className="rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"

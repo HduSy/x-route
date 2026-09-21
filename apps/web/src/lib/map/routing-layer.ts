@@ -1301,6 +1301,42 @@ export class RoutingLayerController {
     setResult(points: TrackPoint[]) {
         this.currentPoints = points;
         mapManager.onReady((map) => {
+            // Fast path: when the geojson source already exists, setData is safe in
+            // any style state and must NOT be deferred. Source data updates never
+            // emit 'styledata', and isStyleLoaded() stays false after a setData —
+            // so the old deferral silently dropped updates (most visibly: the
+            // clear() right after a route was drawn never wiped the line).
+            const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+            if (source) {
+                if (points.length < 2) {
+                    source.setData({ type: 'FeatureCollection', features: [] });
+                    this.removeGhostMarker();
+                    this.updateDistanceMarkers();
+                    return;
+                }
+                source.setData({
+                    type: 'FeatureCollection',
+                    features: [
+                        {
+                            type: 'Feature',
+                            properties: {},
+                            geometry: {
+                                type: 'LineString',
+                                coordinates: points.map((p) => [
+                                    p.attributes.lon,
+                                    p.attributes.lat,
+                                ]),
+                            },
+                        },
+                    ],
+                });
+                this.updateDistanceMarkers();
+                this.alignMarkersToRoute();
+                return;
+            }
+
+            // Source (and layers) don't exist yet — creating them requires a
+            // loaded style, so defer only the creation path.
             if (!map.isStyleLoaded()) {
                 map.once('style.load', () => this.setResult(points));
                 map.once('styledata', () => {
@@ -1309,32 +1345,6 @@ export class RoutingLayerController {
                 return;
             }
             this.ensureLayers(map);
-            const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
-            if (!source) return;
-            if (points.length < 2) {
-                source.setData({ type: 'FeatureCollection', features: [] });
-                this.removeGhostMarker();
-                this.updateDistanceMarkers();
-                return;
-            }
-            source.setData({
-                type: 'FeatureCollection',
-                features: [
-                    {
-                        type: 'Feature',
-                        properties: {},
-                        geometry: {
-                            type: 'LineString',
-                            coordinates: points.map((p) => [
-                                p.attributes.lon,
-                                p.attributes.lat,
-                            ]),
-                        },
-                    },
-                ],
-            });
-            this.updateDistanceMarkers();
-            this.alignMarkersToRoute();
         });
     }
 

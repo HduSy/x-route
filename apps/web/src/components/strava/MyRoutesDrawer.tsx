@@ -8,7 +8,6 @@ import {
     Download,
     FileJson,
     Mountain,
-    Plus,
     Route,
     Search,
     Trash2,
@@ -29,7 +28,6 @@ export function MyRoutesDrawer() {
     const myRoutesOpen = useRoutingStore((s) => s.myRoutesOpen);
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
-    const clear = useRoutingStore((s) => s.clear);
     const loadRouteFromPoints = useRoutingStore((s) => s.loadRouteFromPoints);
     const setEditingFileId = useRoutingStore((s) => s.setEditingFileId);
     const selectFile = useSelectionStore((s) => s.selectFile);
@@ -77,14 +75,6 @@ export function MyRoutesDrawer() {
         setMyRoutesOpen(false);
     };
 
-    const handleNewRoute = () => {
-        clear();
-        selectFile(null);
-        useRoutingStore.getState().setActive(true);
-        setSidebarCollapsed(false);
-        setMyRoutesOpen(false);
-    };
-
     return (
         <>
             {/* Mobile backdrop only */}
@@ -102,9 +92,6 @@ export function MyRoutesDrawer() {
                     myRoutesOpen ? 'translate-x-0 pointer-events-auto' : 'translate-x-full pointer-events-none'
                 )}
             >
-                {/* Top Accent Gradient Line */}
-                <div className="h-1 w-full shrink-0 bg-gradient-to-r from-[#863BFF] via-[#A855F7] to-[#C084FC]" />
-
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-border/80 px-4 py-3.5">
                     <div className="flex items-center gap-2 min-w-0">
@@ -121,15 +108,6 @@ export function MyRoutesDrawer() {
                         )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                            type="button"
-                            onClick={handleNewRoute}
-                            className="flex items-center gap-1 rounded-lg bg-[#863BFF] px-2.5 py-1 text-xs font-bold text-white shadow-xs transition hover:bg-[#7424F8] active:scale-98 cursor-pointer"
-                            title={t.newRoute}
-                        >
-                            <Plus className="size-3.5 stroke-[3]" />
-                            <span>{t.newRoute}</span>
-                        </button>
                         <button
                             type="button"
                             onClick={() => setMyRoutesOpen(false)}

@@ -77,14 +77,18 @@ class GPXLayerController {
         this.lastFiles = files;
         this.lastSelected = selectedFileId;
         mapManager.onReady((map) => {
+            // Removals are safe in any style state and must never be deferred —
+            // a deferred sync could leave a deleted track on screen forever
+            // ('styledata' does not fire for source data updates).
+            this.removeStaleLayers(map, files);
             if (!map.isStyleLoaded()) {
-                map.once('style.load', () => this.sync(files, selectedFileId));
-                map.once('styledata', () => {
-                    if (map.isStyleLoaded()) this.sync(files, selectedFileId);
-                });
+                // Re-read CURRENT state on retry — never replay a captured file
+                // list. A deferred sync holding stale files would resurrect
+                // deleted tracks when it eventually fires.
+                map.once('style.load', () => this.sync(this.lastFiles, this.lastSelected));
+                map.once('styledata', () => this.sync(this.lastFiles, this.lastSelected));
                 return;
             }
-            this.removeStaleLayers(map, files);
             for (const { fileId, file } of files) {
                 this.syncFileLayer(map, fileId, file, selectedFileId === fileId);
             }
@@ -235,3 +239,4 @@ class GPXLayerController {
 }
 
 export const gpxLayers = new GPXLayerController();
+(globalThis as { __xroute_gpx?: GPXLayerController }).__xroute_gpx = gpxLayers;

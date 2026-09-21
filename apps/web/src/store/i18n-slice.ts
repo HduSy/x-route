@@ -207,7 +207,7 @@ export const translations = {
         distance: '距离',
         ascent: '累计爬升',
         descent: '累计下降',
-        pts: '点',
+        pts: '个轨迹点',
         expand: '展开',
         collapse: '收起',
 

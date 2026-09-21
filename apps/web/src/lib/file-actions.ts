@@ -3,6 +3,7 @@ import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import { db } from './db';
 import { useSelectionStore } from '@/store/selection-slice';
+import { useRoutingStore } from '@/store/routing-slice';
 import type { ParseResponse } from '@/workers/gpx.worker';
 
 // --- GPX parse worker (keeps large XML parsing off the main thread) ---
@@ -109,25 +110,29 @@ export async function exportFile(fileId: string) {
 
 // --- Save a computed route as a new file ---
 
-export async function saveGPXFile(file: GPXFile): Promise<string> {
+export async function saveGPXFile(file: GPXFile, autoSelect = true): Promise<string> {
     const id = crypto.randomUUID();
     file._data.id = id;
     await db.transaction('rw', db.files, db.fileids, async () => {
         await db.files.put(file, id);
         await db.fileids.put(id, id);
     });
-    useSelectionStore.getState().selectFile(id);
+    if (autoSelect) {
+        useSelectionStore.getState().selectFile(id);
+    }
     return id;
 }
 
 /** Update an existing route in-place (editing mode). Does NOT create a new UUID. */
-export async function updateGPXFile(fileId: string, file: GPXFile): Promise<void> {
+export async function updateGPXFile(fileId: string, file: GPXFile, autoSelect = true): Promise<void> {
     file._data.id = fileId;
     await db.transaction('rw', db.files, db.fileids, async () => {
         await db.files.put(file, fileId);
         // fileids entry already exists — no need to re-insert
     });
-    useSelectionStore.getState().selectFile(fileId);
+    if (autoSelect) {
+        useSelectionStore.getState().selectFile(fileId);
+    }
 }
 
 // --- Delete ---
@@ -142,6 +147,13 @@ export async function deleteFile(fileId: string) {
     if (select.selectedFileId === fileId) {
         const remaining = await db.fileids.toArray();
         select.selectFile(remaining[0] ?? null);
+    }
+
+    // If the deleted route is loaded in the editor, clear the drawn route too
+    // so it disappears from the map completely.
+    const routing = useRoutingStore.getState();
+    if (routing.editingFileId === fileId) {
+        routing.clear();
     }
 }
 
