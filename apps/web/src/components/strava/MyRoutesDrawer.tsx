@@ -7,10 +7,8 @@ import {
     Clock,
     Compass,
     Download,
-    EyeOff,
     FileJson,
     Mountain,
-    Plus,
     Route,
     Search,
     Trash2,
@@ -239,30 +237,17 @@ export function MyRoutesDrawer() {
                                     key={id}
                                     onClick={() => handleToggleRoute(id, isLoaded)}
                                     className={cn(
-                                        'group relative flex flex-col rounded-xl border p-3 shadow-xs transition-all duration-200 cursor-pointer select-none',
+                                        'group relative flex flex-col rounded-xl border p-3 shadow-2xs transition-all duration-150 cursor-pointer select-none',
                                         isLoaded
-                                            ? isCurrentEditing
-                                                ? 'border-[#863BFF] ring-2 ring-[#863BFF]/40 bg-[#FBF9FF] dark:bg-[#281648] shadow-sm'
-                                                : 'border-[#863BFF] bg-[#FAF7FF] dark:bg-[#201235] shadow-xs'
-                                            : 'border-border/80 bg-white dark:bg-card hover:border-[#863BFF]/60 hover:shadow-xs'
+                                            ? 'border-[#863BFF] bg-[#863BFF]/[0.03] dark:bg-[#863BFF]/10'
+                                            : 'border-border bg-white dark:bg-card hover:border-[#863BFF]/40'
                                     )}
                                 >
                                     {/* Card Header */}
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                            <div
-                                                className={cn(
-                                                    'flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors mt-0.5',
-                                                    isLoaded
-                                                        ? 'bg-[#863BFF] text-white shadow-2xs'
-                                                        : 'bg-[#863BFF]/10 text-[#863BFF] group-hover:bg-[#863BFF]/20'
-                                                )}
-                                            >
-                                                {isLoaded ? (
-                                                    <Check className="size-4 stroke-[2.5]" />
-                                                ) : (
-                                                    <FileJson className="size-4" />
-                                                )}
+                                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#863BFF]/10 text-[#863BFF] mt-0.5">
+                                                <FileJson className="size-4" />
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <h3
@@ -337,11 +322,11 @@ export function MyRoutesDrawer() {
                                         </div>
                                     </div>
 
-                                    {/* Bottom Load CTA */}
+                                    {/* Bottom Status */}
                                     <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between">
                                         <span className="text-[10px] font-medium text-muted-foreground">
                                             {isCurrentEditing ? (
-                                                <span className="inline-flex items-center gap-1 text-[#863BFF] font-bold">
+                                                <span className="inline-flex items-center gap-1.5 text-[#863BFF] font-semibold">
                                                     <span className="size-1.5 rounded-full bg-[#863BFF] animate-pulse" />
                                                     {t.currentlyEditing}
                                                 </span>
@@ -354,40 +339,18 @@ export function MyRoutesDrawer() {
                                                 <span>{t.readyToLoad}</span>
                                             )}
                                         </span>
-                                        <div className="flex items-center gap-1.5">
-                                            {isLoaded && !isCurrentEditing && (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleLoadRoute(id);
-                                                    }}
-                                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-[#863BFF] hover:bg-[#863BFF]/10 transition cursor-pointer"
-                                                >
-                                                    <span>编辑节点</span>
-                                                </button>
-                                            )}
-                                            <span
-                                                className={cn(
-                                                    'inline-flex items-center gap-1 text-[10px] font-medium transition',
-                                                    isLoaded
-                                                        ? 'text-muted-foreground group-hover:text-red-500'
-                                                        : 'text-muted-foreground group-hover:text-[#863BFF]'
-                                                )}
+                                        {isLoaded && !isCurrentEditing && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleLoadRoute(id);
+                                                }}
+                                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-[#863BFF] hover:bg-[#863BFF]/10 transition cursor-pointer"
                                             >
-                                                {isLoaded ? (
-                                                    <>
-                                                        <EyeOff className="size-3" />
-                                                        <span>{t.unloadRoute}</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Plus className="size-3 stroke-[2.5]" />
-                                                        <span>{t.loadRoute}</span>
-                                                    </>
-                                                )}
-                                            </span>
-                                        </div>
+                                                <span>编辑节点</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );
