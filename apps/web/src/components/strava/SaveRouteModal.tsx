@@ -3,12 +3,10 @@ import { Bookmark, Check, Mountain, Route, X } from 'lucide-react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useT } from '@/store/i18n-slice';
 import { saveGPXFile, updateGPXFile } from '@/lib/file-actions';
-import { routingLayer } from '@/lib/map/routing-layer';
 import { GPXFile, Track, TrackSegment, distance } from '@x-route/gpx';
 import { cn } from '@/lib/utils';
 import { computeElevationStats } from '@/lib/elevation';
 import { useSelectionStore } from '@/store/selection-slice';
-import { mapManager } from '@/lib/map/MapManager';
 
 export function SaveRouteModal() {
     const { t } = useT();
@@ -89,21 +87,23 @@ export function SaveRouteModal() {
                 },
             });
 
+            let targetFileId = editingFileId;
             if (editingFileId) {
                 await updateGPXFile(editingFileId, file, false);
             } else {
-                await saveGPXFile(file, false);
+                targetFileId = await saveGPXFile(file, false);
             }
             setSavedSuccess(true);
             setTimeout(() => {
                 setSavedSuccess(false);
                 setSaveModalOpen(false);
-                // Clear the saved route from map silently without secondary confirmation dialog
-                useRoutingStore.getState().clear(true);
-                routingLayer.clear();
-                useSelectionStore.getState().selectFile(null);
-                useSelectionStore.getState().clearLoadedFiles();
-                mapManager.clearUserLocation();
+
+                // Activate the saved route as loaded and keep it visible on map
+                if (targetFileId) {
+                    useRoutingStore.getState().setEditingFileId(targetFileId);
+                    useSelectionStore.getState().addLoadedFile(targetFileId);
+                    useSelectionStore.getState().selectFile(targetFileId);
+                }
                 setMyRoutesOpen(true);
             }, 800);
         } catch (err) {

@@ -7,7 +7,6 @@ import {
     Clock,
     Compass,
     Download,
-    FileJson,
     Mountain,
     Route,
     Search,
@@ -240,7 +239,7 @@ export function MyRoutesDrawer() {
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-start gap-2.5 min-w-0 flex-1">
                                             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#863BFF]/10 text-[#863BFF] mt-0.5">
-                                                <FileJson className="size-4" />
+                                                <Route className="size-4 stroke-[2.2]" />
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <h3
