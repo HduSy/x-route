@@ -100,7 +100,7 @@ export function MapView() {
             const trkpts = file.getTrackPoints();
             if (trkpts.length >= 2) {
                 const coords = trkpts.map((pt) => pt.getCoordinates());
-                useRoutingStore.getState().loadRouteFromPoints(coords);
+                useRoutingStore.getState().loadRouteFromPoints(coords, trkpts);
                 useRoutingStore.getState().setEditingFileId(fileId);
                 useSelectionStore.getState().addLoadedFile(fileId);
                 useSelectionStore.getState().selectFile(fileId);
@@ -198,7 +198,6 @@ export function MapView() {
         const onLassoChange = (enabled: boolean) => {
             isLassoActiveRef.current = enabled;
             setIsLassoActive(enabled);
-            routingLayer.setOptions({ isLassoMode: enabled });
             // When lasso mode is active, disable map dragPan so dragging selects nodes instead of panning map
             const map = mapManager.getMap();
             if (map) {
@@ -222,6 +221,14 @@ export function MapView() {
         const onMouseDown = (e: MouseEvent) => {
             if (!isLassoActiveRef.current || isSpacePanRef.current) return;
             if (e.button !== 0) return;
+            // Presses on the route line or its anchor markers belong to the
+            // edit interactions (ghost insert / marker drag) — the routing
+            // layer intercepts line hits itself; markers handle their own drag.
+            const targetEl = e.target as HTMLElement | null;
+            if (targetEl && targetEl.closest('.maplibregl-marker')) return;
+            // Re-assert disabled pan on every press: marker/ghost drags re-enable
+            // dragPan on release, which would make empty-map drags pan AND box-select.
+            mapManager.getMap()?.dragPan.disable();
             const rect = container.getBoundingClientRect();
             lassoStartRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
             isDraggingBoxRef.current = false;
@@ -387,7 +394,6 @@ export function MapView() {
             window.removeEventListener('mousemove', onMouseMove, { capture: true });
             window.removeEventListener('mouseup', onMouseUp, { capture: true });
             container.removeEventListener('click', onClickCapture, { capture: true });
-            routingLayer.setOptions({ isLassoMode: false });
             // Always re-enable drag pan on cleanup
             mapManager.getMap()?.dragPan.enable();
         };

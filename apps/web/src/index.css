@@ -182,18 +182,15 @@
   cursor: pointer !important;
 }
 
-/* Lasso box-select mode: ensure crosshair cursor across canvas and markers, and disable marker interception */
+/* Lasso box-select mode: crosshair cursor for box drawing on the map.
+   Markers and the route line keep their edit interactions (drag-to-move,
+   ghost insert) at higher priority than box selection — they must stay
+   pointer-interactive, so no pointer-events disabling here. */
 .lasso-mode-active,
 .lasso-mode-active .maplibregl-canvas-container,
 .lasso-mode-active .maplibregl-canvas-container.maplibregl-interactive,
 .lasso-mode-active canvas.maplibregl-canvas {
   cursor: crosshair !important;
-}
-
-.lasso-mode-active .maplibregl-marker,
-.lasso-mode-active .x-route-anchor-marker {
-  cursor: crosshair !important;
-  pointer-events: none !important;
 }
 
 /* Space-pan mode: pressing Space turns cursor into a hand (grab) for panning.

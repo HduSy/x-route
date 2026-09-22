@@ -215,7 +215,7 @@ async function addFiles(files: GPXFile[]) {
         const trkpts = (firstFile as GPXFile).getTrackPoints();
         if (trkpts.length >= 2) {
             const coords = trkpts.map((pt) => pt.getCoordinates());
-            routing.loadRouteFromPoints(coords);
+            routing.loadRouteFromPoints(coords, trkpts);
             routing.setEditingFileId(firstId);
             routing.setSidebarCollapsed(false);
         }

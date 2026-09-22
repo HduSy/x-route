@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { useRoutingStore } from '@/store/routing-slice';
-import { lassoModeStore } from '@/store/lasso-store';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
 import {
@@ -39,12 +38,10 @@ export function useRoutingSync() {
         routingLayer.onInsertAnchor = (index, lngLat) => {
             mapManager.markInteracted();
             const state = useRoutingStore.getState();
-            if (lassoModeStore.active) return;
             state.insertAnchor(index, lngLat);
         };
         routingLayer.onMarkerDrag = (index, to) => {
             mapManager.markInteracted();
-            if (lassoModeStore.active) return;
             useRoutingStore.getState().moveAnchor(index, to);
         };
         routingLayer.onMarkerRightClick = (index) => {
@@ -105,6 +102,15 @@ export function useRoutingSync() {
             debounceTimerRef.current = null;
         }
 
+        // Consume the one-shot skip flag from file loads on EVERY pass (even
+        // anchors < 2) so it can never leak into a later draw cycle; it is only
+        // honored below when the seeded line is actually drawable.
+        let skipCompute = false;
+        if (useRoutingStore.getState().skipNextRouteComputation) {
+            useRoutingStore.setState({ skipNextRouteComputation: false });
+            skipCompute = true;
+        }
+
         if (anchors.length < 2) {
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
@@ -114,6 +120,18 @@ export function useRoutingSync() {
             const state = useRoutingStore.getState();
             state.setResult([], null);
             state.setRouting(false);
+            return;
+        }
+
+        // File-load pass: the line was seeded from the source track and the
+        // segment cache pre-filled — zero network needed until a real edit.
+        if (skipCompute) {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                abortControllerRef.current = null;
+            }
+            cancelAllPendingRouting();
+            useRoutingStore.getState().setRouting(false);
             return;
         }
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Coordinates, TrackPoint } from '@x-route/gpx';
+import { routingSegmentCache, getSegmentKey } from '@/lib/routing';
 
 export interface RoutingAnchor extends Coordinates {}
 
@@ -15,6 +16,9 @@ interface RoutingState {
     elevationPreference: ElevationPreference;
     manualMode: boolean;
     resultPoints: TrackPoint[];
+    /** One-shot flag: the next route-computation pass is skipped because the
+     *  line was seeded from a loaded file (zero-network load). */
+    skipNextRouteComputation: boolean;
     routing: boolean;
     error: string | null;
     past: RoutingAnchor[][];
@@ -60,7 +64,7 @@ interface RoutingState {
     setMyRoutesOpen: (open: boolean) => void;
     setSaveModalOpen: (open: boolean) => void;
     setEditingFileId: (id: string | null) => void;
-    loadRouteFromPoints: (points: Coordinates[]) => void;
+    loadRouteFromPoints: (points: Coordinates[], resultSeed?: TrackPoint[]) => void;
 }
 
 export const useRoutingStore = create<RoutingState>()((set, get) => ({
@@ -71,6 +75,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     elevationPreference: 'any',
     manualMode: false,
     resultPoints: [],
+    skipNextRouteComputation: false,
     routing: false,
     error: null,
     past: [],
@@ -206,22 +211,48 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     setSaveModalOpen: (saveModalOpen) => set({ saveModalOpen }),
     setEditingFileId: (editingFileId) => set({ editingFileId }),
 
-    loadRouteFromPoints: (points) => {
+    loadRouteFromPoints: (points, resultSeed) => {
         if (points.length < 2) return;
         // Sample down to key anchors if there are many points, or use start, intermediates, end
         const step = Math.max(1, Math.floor(points.length / 10));
         const sampleAnchors: RoutingAnchor[] = [];
+        const sampleIndices: number[] = [];
         for (let i = 0; i < points.length; i += step) {
+            sampleIndices.push(i);
             sampleAnchors.push(points[i]!);
         }
         if (sampleAnchors[sampleAnchors.length - 1] !== points[points.length - 1]) {
+            sampleIndices.push(points.length - 1);
             sampleAnchors.push(points[points.length - 1]!);
         }
         set({
             active: true,
             anchors: sampleAnchors,
+            // Seed the route line from the source track: it renders instantly and
+            // the skip flag keeps this load completely off the network. The next
+            // real edit (node drag/add, profile change) computes normally.
+            resultPoints: resultSeed ?? [],
+            error: null,
             past: [],
             future: [],
+            skipNextRouteComputation: true,
         });
+
+        // Pre-fill the segment cache with the source track's own geometry
+        // between adjacent anchors: the first node edit then refetches only the
+        // changed segments while untouched parts keep the original track shape.
+        if (resultSeed && resultSeed.length === points.length && !get().manualMode) {
+            const profileKey = get().profile;
+            const elevationPreference = get().elevationPreference;
+            for (let s = 0; s < sampleIndices.length - 1; s++) {
+                const segment = resultSeed.slice(sampleIndices[s]!, sampleIndices[s + 1]! + 1);
+                if (segment.length >= 2) {
+                    routingSegmentCache.set(
+                        getSegmentKey(sampleAnchors[s]!, sampleAnchors[s + 1]!, profileKey, elevationPreference),
+                        segment
+                    );
+                }
+            }
+        }
     },
 }));

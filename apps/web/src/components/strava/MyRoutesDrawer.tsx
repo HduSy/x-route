@@ -110,7 +110,7 @@ export function MyRoutesDrawer() {
         const trkpts = file.getTrackPoints();
         if (trkpts.length >= 2) {
             const coords = trkpts.map((pt) => pt.getCoordinates());
-            loadRouteFromPoints(coords);
+            loadRouteFromPoints(coords, trkpts);
             setEditingFileId(fileId);
             setSidebarCollapsed(false);
         }

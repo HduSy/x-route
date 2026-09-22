@@ -1,7 +1,6 @@
 import { Marker, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
 import { mapManager } from './MapManager';
 import { useRoutingStore, type RoutingAnchor, type UnitType } from '@/store/routing-slice';
-import { lassoModeStore } from '@/store/lasso-store';
 import { TrackPoint, distance } from '@x-route/gpx';
 import { getClosestLinePoint } from '@/lib/utils';
 import { translations, useI18nStore } from '@/store/i18n-slice';
@@ -305,9 +304,6 @@ export class RoutingLayerController {
     /** Flag to temporarily suppress map click (e.g. during space-bar pan mode or right after marker drag) */
     suppressClick = false;
 
-    /** Whether box-select lasso mode is active on map */
-    isLassoMode = false;
-
     /** Set by the React layer. */
     onMapClick: ((lngLat: { lon: number; lat: number }) => void) | null = null;
     onInsertAnchor: ((index: number, lngLat: { lon: number; lat: number }) => void) | null = null;
@@ -447,10 +443,6 @@ export class RoutingLayerController {
         const container = map.getCanvasContainer();
 
         this.containerMouseMoveHandler = (e: MouseEvent) => {
-            if (this.isLassoMode || lassoModeStore.active) {
-                this.removeGhostMarker();
-                return;
-            }
             if (this.isDraggingLine) return;
             if (map.isMoving() || map.isZooming()) return;
             if (this.currentPoints.length < 2) return;
@@ -485,7 +477,6 @@ export class RoutingLayerController {
         // Captures pointerdown AND mousedown on the map container when clicking on the route line.
         // Synchronously stops propagation and disables map dragPan BEFORE MapLibre can initiate a map pan!
         this.containerPointerDownHandler = (e: MouseEvent | PointerEvent) => {
-            if (this.isLassoMode || lassoModeStore.active) return;
             if (e.button !== 0) return;
             if (this.isDraggingLine) {
                 e.stopPropagation();
@@ -905,7 +896,7 @@ export class RoutingLayerController {
         const el = anchorElement(kind, index, total);
         const marker = new Marker({
             element: el,
-            draggable: !this.isLassoMode && !lassoModeStore.active,
+            draggable: true,
             anchor: 'center',
             subpixelPositioning: true,
         })
@@ -913,17 +904,14 @@ export class RoutingLayerController {
             .addTo(map);
 
         el.addEventListener('pointerdown', () => {
-            if (this.isLassoMode || lassoModeStore.active) return;
             el.style.cursor = 'grabbing';
         });
 
         el.addEventListener('mousedown', () => {
-            if (this.isLassoMode || lassoModeStore.active) return;
             el.style.cursor = 'grabbing';
         });
 
         el.addEventListener('mouseup', () => {
-            if (this.isLassoMode || lassoModeStore.active) return;
             el.style.cursor = 'grab';
             // Safety: guarantee map panning is never stuck disabled if a click did not start a drag
             map.dragPan.enable();
@@ -1150,17 +1138,7 @@ export class RoutingLayerController {
         showRoutePath?: boolean;
         units?: UnitType;
         isDrawMode?: boolean;
-        isLassoMode?: boolean;
     }) {
-        if (options.isLassoMode !== undefined) {
-            this.isLassoMode = options.isLassoMode;
-            for (const marker of this.markers) {
-                marker.setDraggable(!this.isLassoMode);
-            }
-            if (this.isLassoMode) {
-                this.removeGhostMarker();
-            }
-        }
         if (options.isDrawMode !== undefined && this.isDrawMode !== options.isDrawMode) {
             this.isDrawMode = options.isDrawMode;
         }
