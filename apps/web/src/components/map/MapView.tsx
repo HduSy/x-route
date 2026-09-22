@@ -716,13 +716,10 @@ export function MapView() {
                     )}
                 </div>
 
-                {/* 3D toggle button */}
+                {/* 3D toggle button — appearance stays constant, only the label flips */}
                 <button
                     onClick={handleToggle3D}
-                    className={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-white dark:bg-card text-xs font-black shadow-sm transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer active:scale-98',
-                        is3D ? 'bg-[#863BFF]/15 text-[#863BFF] border-[#863BFF]' : 'text-foreground'
-                    )}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-white dark:bg-card text-xs font-black text-foreground shadow-sm transition hover:border-[#863BFF] hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer active:scale-98"
                     title={t.toggle3D}
                 >
                     {is3D ? '2D' : '3D'}
