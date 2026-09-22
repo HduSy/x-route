@@ -162,14 +162,22 @@ export function MapFloatingToolbar() {
         useSelectionStore.getState().selectFile(null);
     };
 
-    // Sync lassoMode React state → singleton so MapView can subscribe
+    // Sync with lassoModeStore bidirectional
     useEffect(() => {
-        lassoModeStore.set(lassoMode);
-    }, [lassoMode]);
+        const unsub = lassoModeStore.subscribe((val) => {
+            setLassoMode(val);
+        });
+        return () => {
+            unsub();
+        };
+    }, []);
 
     // Exit lasso mode when routing becomes inactive
     useEffect(() => {
-        if (!active) setLassoMode(false);
+        if (!active) {
+            setLassoMode(false);
+            lassoModeStore.set(false);
+        }
     }, [active]);
 
     const handleTrackAction = async (name: string, fn: () => Promise<void>) => {
@@ -242,7 +250,7 @@ export function MapFloatingToolbar() {
                         <>
                             <div className="h-3.5 sm:h-4 w-px bg-border mx-0.5" />
                             <button
-                                onClick={() => setLassoMode((m) => !m)}
+                                onClick={() => lassoModeStore.set(!lassoMode)}
                                 className={cn(
                                     'flex size-6 sm:size-7 items-center justify-center rounded-md transition cursor-pointer',
                                     lassoMode

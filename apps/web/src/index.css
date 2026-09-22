@@ -199,6 +199,20 @@
   cursor: grabbing !important;
 }
 
+/* Lasso box-select mode: ensure crosshair cursor across canvas and markers, and disable marker interception */
+.lasso-mode-active,
+.lasso-mode-active .maplibregl-canvas-container,
+.lasso-mode-active .maplibregl-canvas-container.maplibregl-interactive,
+.lasso-mode-active canvas.maplibregl-canvas {
+  cursor: crosshair !important;
+}
+
+.lasso-mode-active .maplibregl-marker,
+.lasso-mode-active .x-route-anchor-marker {
+  cursor: crosshair !important;
+  pointer-events: none !important;
+}
+
 /* Marker hover animation via child dot — leaves outer MapLibre translate transform unaffected */
 .x-route-anchor-marker:hover .x-route-anchor-dot {
   transform: scale(1.22);

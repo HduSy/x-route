@@ -4,11 +4,15 @@ export const lassoModeStore = {
     active: false,
     listeners: new Set<(v: boolean) => void>(),
     set(v: boolean) {
+        if (this.active === v) return;
         this.active = v;
         this.listeners.forEach((fn) => fn(v));
     },
     subscribe(fn: (v: boolean) => void) {
         this.listeners.add(fn);
-        return () => this.listeners.delete(fn);
+        fn(this.active);
+        return () => {
+            this.listeners.delete(fn);
+        };
     },
 };

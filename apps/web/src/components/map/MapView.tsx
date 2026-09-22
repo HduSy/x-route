@@ -57,7 +57,11 @@ export function MapView() {
 
     const [lassoRect, setLassoRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
     const lassoStartRef = useRef<{ x: number; y: number } | null>(null);
+    const isDraggingBoxRef = useRef(false);
+    const suppressNextClickRef = useRef(false);
+    const suppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isLassoActiveRef = useRef(false);
+    const [isLassoActive, setIsLassoActive] = useState(false);
     const [lassoConfirmIndices, setLassoConfirmIndices] = useState<number[] | null>(null);
 
     const active = useRoutingStore((s) => s.active);
@@ -191,7 +195,9 @@ export function MapView() {
 
         const onLassoChange = (enabled: boolean) => {
             isLassoActiveRef.current = enabled;
-            // Toggle MapLibre's built-in drag-pan when lasso is active
+            setIsLassoActive(enabled);
+            routingLayer.setOptions({ isLassoMode: enabled });
+            // When lasso mode is active, disable map dragPan so dragging selects nodes instead of panning map
             const map = mapManager.getMap();
             if (map) {
                 if (enabled) {
@@ -200,19 +206,23 @@ export function MapView() {
                     map.dragPan.enable();
                 }
             }
+            if (!enabled) {
+                lassoStartRef.current = null;
+                isDraggingBoxRef.current = false;
+                suppressNextClickRef.current = false;
+                routingLayer.suppressClick = false;
+                setLassoRect(null);
+            }
         };
 
         unsubscribe = lassoModeStore.subscribe(onLassoChange);
 
         const onMouseDown = (e: MouseEvent) => {
-            if (!isLassoActiveRef.current || routingLayer.suppressClick) return;
-            // Only left-button and only on map canvas itself
+            if (!isLassoActiveRef.current) return;
             if (e.button !== 0) return;
-            e.preventDefault();
-            e.stopPropagation();
             const rect = container.getBoundingClientRect();
             lassoStartRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-            setLassoRect({ x: e.clientX - rect.left, y: e.clientY - rect.top, w: 0, h: 0 });
+            isDraggingBoxRef.current = false;
         };
 
         const onMouseMove = (e: MouseEvent) => {
@@ -220,28 +230,82 @@ export function MapView() {
             const rect = container.getBoundingClientRect();
             const curX = e.clientX - rect.left;
             const curY = e.clientY - rect.top;
-            const x = Math.min(lassoStartRef.current.x, curX);
-            const y = Math.min(lassoStartRef.current.y, curY);
-            const w = Math.abs(curX - lassoStartRef.current.x);
-            const h = Math.abs(curY - lassoStartRef.current.y);
-            setLassoRect({ x, y, w, h });
+            const dx = Math.abs(curX - lassoStartRef.current.x);
+            const dy = Math.abs(curY - lassoStartRef.current.y);
+
+            // Once movement exceeds 5px, transition into box selection dragging
+            if (!isDraggingBoxRef.current && (dx >= 5 || dy >= 5)) {
+                isDraggingBoxRef.current = true;
+                suppressNextClickRef.current = true;
+                routingLayer.suppressClick = true;
+            }
+
+            if (isDraggingBoxRef.current) {
+                e.preventDefault();
+                e.stopPropagation();
+                const x = Math.min(lassoStartRef.current.x, curX);
+                const y = Math.min(lassoStartRef.current.y, curY);
+                setLassoRect({ x, y, w: dx, h: dy });
+            }
         };
 
         const onMouseUp = (e: MouseEvent) => {
             if (!isLassoActiveRef.current || !lassoStartRef.current) return;
+
+            const start = lassoStartRef.current;
+            const wasDragging = isDraggingBoxRef.current;
+
+            lassoStartRef.current = null;
+            isDraggingBoxRef.current = false;
+            setLassoRect(null);
+
+            if (!wasDragging) {
+                // User just clicked!
+                // Check if they clicked directly on an existing anchor (within 15px radius)
+                const map = mapManager.getMap();
+                if (map) {
+                    const { anchors } = useRoutingStore.getState();
+                    const clickedOnAnchor = anchors.some((a) => {
+                        const p = map.project([a.lon, a.lat]);
+                        return Math.hypot(p.x - start.x, p.y - start.y) <= 15;
+                    });
+                    if (clickedOnAnchor) {
+                        // Suppress duplicate point creation on top of an existing anchor
+                        suppressNextClickRef.current = true;
+                        routingLayer.suppressClick = true;
+                        setTimeout(() => {
+                            suppressNextClickRef.current = false;
+                            routingLayer.suppressClick = false;
+                        }, 100);
+                        return;
+                    }
+                }
+                // Allow the click event to add a node to the route!
+                suppressNextClickRef.current = false;
+                routingLayer.suppressClick = false;
+                return;
+            }
+
+            // User dragged a selection box!
+            // CRITICAL: Suppress click event so release NEVER adds a node to the map!
             e.preventDefault();
+            e.stopPropagation();
+            suppressNextClickRef.current = true;
+            routingLayer.suppressClick = true;
+            if (suppressTimerRef.current) clearTimeout(suppressTimerRef.current);
+            suppressTimerRef.current = setTimeout(() => {
+                suppressNextClickRef.current = false;
+                routingLayer.suppressClick = false;
+            }, 250);
+
             const rect = container.getBoundingClientRect();
             const curX = e.clientX - rect.left;
             const curY = e.clientY - rect.top;
-            const x0 = Math.min(lassoStartRef.current.x, curX);
-            const y0 = Math.min(lassoStartRef.current.y, curY);
-            const x1 = Math.max(lassoStartRef.current.x, curX);
-            const y1 = Math.max(lassoStartRef.current.y, curY);
+            const x0 = Math.min(start.x, curX);
+            const y0 = Math.min(start.y, curY);
+            const x1 = Math.max(start.x, curX);
+            const y1 = Math.max(start.y, curY);
 
-            lassoStartRef.current = null;
-            setLassoRect(null);
-
-            // Only proceed if the box has a meaningful size (not just a click)
             if (x1 - x0 < 5 || y1 - y0 < 5) return;
 
             const map = mapManager.getMap();
@@ -299,15 +363,29 @@ export function MapView() {
             }
         };
 
+        const onClickCapture = (e: MouseEvent) => {
+            if (suppressNextClickRef.current) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                suppressNextClickRef.current = false;
+                routingLayer.suppressClick = false;
+            }
+        };
+
         container.addEventListener('mousedown', onMouseDown, { capture: true });
-        container.addEventListener('mousemove', onMouseMove, { capture: true });
-        container.addEventListener('mouseup', onMouseUp, { capture: true });
+        window.addEventListener('mousemove', onMouseMove, { capture: true });
+        window.addEventListener('mouseup', onMouseUp, { capture: true });
+        container.addEventListener('click', onClickCapture, { capture: true });
 
         return () => {
             unsubscribe?.();
+            if (suppressTimerRef.current) clearTimeout(suppressTimerRef.current);
             container.removeEventListener('mousedown', onMouseDown, { capture: true });
-            container.removeEventListener('mousemove', onMouseMove, { capture: true });
-            container.removeEventListener('mouseup', onMouseUp, { capture: true });
+            window.removeEventListener('mousemove', onMouseMove, { capture: true });
+            window.removeEventListener('mouseup', onMouseUp, { capture: true });
+            container.removeEventListener('click', onClickCapture, { capture: true });
+            routingLayer.setOptions({ isLassoMode: false });
             // Always re-enable drag pan on cleanup
             mapManager.getMap()?.dragPan.enable();
         };
@@ -328,6 +406,14 @@ export function MapView() {
         };
 
         const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (lassoConfirmIndices) {
+                    setLassoConfirmIndices(null);
+                } else if (isLassoActiveRef.current) {
+                    lassoModeStore.set(false);
+                }
+                return;
+            }
             if (e.code !== 'Space') return;
             if (isTargetEditable(e.target)) return;
 
@@ -467,7 +553,7 @@ export function MapView() {
         <div className="relative h-full w-full">
             <div
                 ref={containerRef}
-                className={cn('h-full w-full', active && 'route-building-cursor', !sidebarCollapsed && 'sidebar-open', myRoutesOpen && 'my-routes-open')}
+                className={cn('h-full w-full', active && 'route-building-cursor', !sidebarCollapsed && 'sidebar-open', myRoutesOpen && 'my-routes-open', isLassoActive && 'lasso-mode-active')}
             />
 
             {/* Lasso selection rectangle overlay */}

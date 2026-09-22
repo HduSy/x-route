@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRoutingStore } from '@/store/routing-slice';
+import { lassoModeStore } from '@/store/lasso-store';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
 import {
@@ -38,10 +39,12 @@ export function useRoutingSync() {
         routingLayer.onInsertAnchor = (index, lngLat) => {
             mapManager.markInteracted();
             const state = useRoutingStore.getState();
+            if (lassoModeStore.active) return;
             state.insertAnchor(index, lngLat);
         };
         routingLayer.onMarkerDrag = (index, to) => {
             mapManager.markInteracted();
+            if (lassoModeStore.active) return;
             useRoutingStore.getState().moveAnchor(index, to);
         };
         routingLayer.onMarkerRightClick = (index) => {
