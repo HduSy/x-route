@@ -8,6 +8,7 @@
     "build": "pnpm --filter @x-route/gpx build && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
     "deploy": "pnpm build && wrangler pages deploy dist --project-name=x-route --branch=main"
   },
@@ -43,6 +44,7 @@
     "tailwindcss": "^4.1.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
+    "vitest": "^3.2.7",
     "wrangler": "^4.135.0"
   }
 }

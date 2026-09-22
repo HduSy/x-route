@@ -278,6 +278,7 @@ export async function deleteFile(fileId: string) {
     });
 
     const select = useSelectionStore.getState();
+    select.removeLoadedFile(fileId);
     if (select.selectedFileId === fileId) {
         const remaining = await db.fileids.toArray();
         select.selectFile(remaining[0] ?? null);

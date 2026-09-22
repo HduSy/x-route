@@ -160,6 +160,8 @@ export const translations = {
         // Lasso delete confirmation
         confirmDeleteLassoTitle: 'Delete {count} selected waypoint(s)?',
         confirmDeleteLassoBody: 'This will remove the selected waypoints from the route. Are you sure?',
+        confirmDeleteAllLassoTitle: 'Delete entire route?',
+        confirmDeleteAllLassoBody: 'All waypoints on this route are selected — deleting them will remove the entire route. Continue?',
 
         profiles: {
             bike: 'Bike',
@@ -338,6 +340,8 @@ export const translations = {
         // 框选删除二次确认
         confirmDeleteLassoTitle: '确认删除框选的 {count} 个节点？',
         confirmDeleteLassoBody: '这将从路线中移除选中的节点，操作不可撤销，确定继续？',
+        confirmDeleteAllLassoTitle: '删除整条路线？',
+        confirmDeleteAllLassoBody: '已选中路线上的全部节点，删除将移除整条路线。确定继续？',
 
         profiles: {
             bike: '标准骑行',

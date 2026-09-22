@@ -44,7 +44,9 @@ export function MapFloatingToolbar() {
     const setSaveModalOpen = useRoutingStore((s) => s.setSaveModalOpen);
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
-    const selectedFileId = useSelectionStore((s) => s.selectedFileId);
+    // Track tools may only touch the route that is actually loaded into the
+    // editor — not merely loaded/selected tracks on the map.
+    const editingFileId = useRoutingStore((s) => s.editingFileId);
 
     const [toolsOpen, setToolsOpen] = useState(false);
     const [toolActionStatus, setToolActionStatus] = useState<string | null>(null);
@@ -280,10 +282,10 @@ export function MapFloatingToolbar() {
                     {toolsOpen && (
                         <div className="absolute left-0 top-10 sm:top-11 z-50 min-w-48 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
                             <button
-                                disabled={!selectedFileId}
+                                disabled={!editingFileId}
                                 onClick={() =>
-                                    selectedFileId &&
-                                    handleTrackAction('reversed', () => reverseTrack(selectedFileId))
+                                    editingFileId &&
+                                    handleTrackAction('reversed', () => reverseTrack(editingFileId))
                                 }
                                 className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
@@ -292,10 +294,10 @@ export function MapFloatingToolbar() {
                                 {toolActionStatus === 'reversed' && <Check className="ml-auto size-3 text-green-600" />}
                             </button>
                             <button
-                                disabled={!selectedFileId}
+                                disabled={!editingFileId}
                                 onClick={() =>
-                                    selectedFileId &&
-                                    handleTrackAction('simplified', () => simplifyTrack(selectedFileId))
+                                    editingFileId &&
+                                    handleTrackAction('simplified', () => simplifyTrack(editingFileId))
                                 }
                                 className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
@@ -304,10 +306,10 @@ export function MapFloatingToolbar() {
                                 {toolActionStatus === 'simplified' && <Check className="ml-auto size-3 text-green-600" />}
                             </button>
                             <button
-                                disabled={!selectedFileId}
+                                disabled={!editingFileId}
                                 onClick={() =>
-                                    selectedFileId &&
-                                    handleTrackAction('split', () => splitTrackAtMiddle(selectedFileId))
+                                    editingFileId &&
+                                    handleTrackAction('split', () => splitTrackAtMiddle(editingFileId))
                                 }
                                 className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >
@@ -316,10 +318,10 @@ export function MapFloatingToolbar() {
                                 {toolActionStatus === 'split' && <Check className="ml-auto size-3 text-green-600" />}
                             </button>
                             <button
-                                disabled={!selectedFileId}
+                                disabled={!editingFileId}
                                 onClick={() =>
-                                    selectedFileId &&
-                                    handleTrackAction('loop', () => closeLoop(selectedFileId))
+                                    editingFileId &&
+                                    handleTrackAction('loop', () => closeLoop(editingFileId))
                                 }
                                 className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                             >

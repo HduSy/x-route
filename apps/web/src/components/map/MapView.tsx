@@ -12,6 +12,7 @@ import { lassoModeStore } from '@/store/lasso-store';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
+import { deleteFile } from '@/lib/file-actions';
 import { useT } from '@/store/i18n-slice';
 import { cn } from '@/lib/utils';
 
@@ -73,6 +74,7 @@ export function MapView() {
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
     const units = useRoutingStore((s) => s.units);
+    const anchorCount = useRoutingStore((s) => s.anchors.length);
     const loadedFileIds = useSelectionStore((state) => state.loadedFileIds);
     const selectedFileId = useSelectionStore((state) => state.selectedFileId);
     const editingFileId = useRoutingStore((s) => s.editingFileId);
@@ -745,12 +747,25 @@ export function MapView() {
                                 <AlertTriangle className="size-5 text-destructive" />
                             </div>
                             <div>
-                                <h3 className="text-sm font-bold text-foreground">
-                                    {t.confirmDeleteLassoTitle.replace('{count}', String(lassoConfirmIndices.length))}
-                                </h3>
-                                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                                    {t.confirmDeleteLassoBody}
-                                </p>
+                                {anchorCount > 0 && lassoConfirmIndices.length >= anchorCount ? (
+                                    <>
+                                        <h3 className="text-sm font-bold text-foreground">
+                                            {t.confirmDeleteAllLassoTitle}
+                                        </h3>
+                                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                            {t.confirmDeleteAllLassoBody}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <h3 className="text-sm font-bold text-foreground">
+                                            {t.confirmDeleteLassoTitle.replace('{count}', String(lassoConfirmIndices.length))}
+                                        </h3>
+                                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                            {t.confirmDeleteLassoBody}
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </div>
                         <div className="mt-5 flex justify-end gap-2">
@@ -762,10 +777,14 @@ export function MapView() {
                             </button>
                             <button
                                 onClick={() => {
-                                    const { removeAnchors, clear } = useRoutingStore.getState();
+                                    const { removeAnchors, clear, editingFileId } = useRoutingStore.getState();
                                     const currentAnchors = useRoutingStore.getState().anchors;
                                     if (lassoConfirmIndices.length >= currentAnchors.length) {
+                                        if (editingFileId) {
+                                            void deleteFile(editingFileId);
+                                        }
                                         clear();
+                                        routingLayer.clear();
                                     } else {
                                         removeAnchors(lassoConfirmIndices);
                                     }
