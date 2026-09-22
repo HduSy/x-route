@@ -182,7 +182,23 @@
   cursor: pointer !important;
 }
 
-/* Space-pan mode: pressing Space turns cursor into a hand (grab) for panning, overriding crosshair */
+/* Lasso box-select mode: ensure crosshair cursor across canvas and markers, and disable marker interception */
+.lasso-mode-active,
+.lasso-mode-active .maplibregl-canvas-container,
+.lasso-mode-active .maplibregl-canvas-container.maplibregl-interactive,
+.lasso-mode-active canvas.maplibregl-canvas {
+  cursor: crosshair !important;
+}
+
+.lasso-mode-active .maplibregl-marker,
+.lasso-mode-active .x-route-anchor-marker {
+  cursor: crosshair !important;
+  pointer-events: none !important;
+}
+
+/* Space-pan mode: pressing Space turns cursor into a hand (grab) for panning.
+   MUST come after the lasso block — equal specificity, so cascade order makes
+   space-pan override the lasso crosshair while Space is held. */
 .space-pan-active,
 .space-pan-active .maplibregl-canvas-container,
 .space-pan-active .maplibregl-canvas-container.maplibregl-interactive,
@@ -197,20 +213,6 @@
 .space-pan-dragging .maplibregl-canvas-container.maplibregl-interactive,
 .space-pan-dragging canvas.maplibregl-canvas {
   cursor: grabbing !important;
-}
-
-/* Lasso box-select mode: ensure crosshair cursor across canvas and markers, and disable marker interception */
-.lasso-mode-active,
-.lasso-mode-active .maplibregl-canvas-container,
-.lasso-mode-active .maplibregl-canvas-container.maplibregl-interactive,
-.lasso-mode-active canvas.maplibregl-canvas {
-  cursor: crosshair !important;
-}
-
-.lasso-mode-active .maplibregl-marker,
-.lasso-mode-active .x-route-anchor-marker {
-  cursor: crosshair !important;
-  pointer-events: none !important;
 }
 
 /* Marker hover animation via child dot — leaves outer MapLibre translate transform unaffected */

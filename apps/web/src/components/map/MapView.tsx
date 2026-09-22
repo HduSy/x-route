@@ -63,6 +63,8 @@ export function MapView() {
     const isLassoActiveRef = useRef(false);
     const [isLassoActive, setIsLassoActive] = useState(false);
     const [lassoConfirmIndices, setLassoConfirmIndices] = useState<number[] | null>(null);
+    /** True while Space (temporary map-pan) is held — lasso gestures yield to it. */
+    const isSpacePanRef = useRef(false);
 
     const active = useRoutingStore((s) => s.active);
     const setActive = useRoutingStore((s) => s.setActive);
@@ -218,7 +220,7 @@ export function MapView() {
         unsubscribe = lassoModeStore.subscribe(onLassoChange);
 
         const onMouseDown = (e: MouseEvent) => {
-            if (!isLassoActiveRef.current) return;
+            if (!isLassoActiveRef.current || isSpacePanRef.current) return;
             if (e.button !== 0) return;
             const rect = container.getBoundingClientRect();
             lassoStartRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -226,7 +228,7 @@ export function MapView() {
         };
 
         const onMouseMove = (e: MouseEvent) => {
-            if (!isLassoActiveRef.current || !lassoStartRef.current) return;
+            if (!isLassoActiveRef.current || isSpacePanRef.current || !lassoStartRef.current) return;
             const rect = container.getBoundingClientRect();
             const curX = e.clientX - rect.left;
             const curY = e.clientY - rect.top;
@@ -250,7 +252,7 @@ export function MapView() {
         };
 
         const onMouseUp = (e: MouseEvent) => {
-            if (!isLassoActiveRef.current || !lassoStartRef.current) return;
+            if (!isLassoActiveRef.current || isSpacePanRef.current || !lassoStartRef.current) return;
 
             const start = lassoStartRef.current;
             const wasDragging = isDraggingBoxRef.current;
@@ -421,7 +423,15 @@ export function MapView() {
             e.preventDefault();
             if (isSpacePressed) return;
             isSpacePressed = true;
+            isSpacePanRef.current = true;
             routingLayer.suppressClick = true;
+
+            // A lasso box drag in progress yields to panning: cancel the box
+            if (lassoStartRef.current) {
+                lassoStartRef.current = null;
+                isDraggingBoxRef.current = false;
+                setLassoRect(null);
+            }
 
             container.classList.add('space-pan-active');
             const map = mapManager.getMap();
@@ -435,6 +445,7 @@ export function MapView() {
             if (isTargetEditable(e.target)) return;
 
             isSpacePressed = false;
+            isSpacePanRef.current = false;
             container.classList.remove('space-pan-active', 'space-pan-dragging');
 
             const map = mapManager.getMap();
@@ -467,6 +478,7 @@ export function MapView() {
         const onBlur = () => {
             if (isSpacePressed) {
                 isSpacePressed = false;
+                isSpacePanRef.current = false;
                 isMouseDown = false;
                 container.classList.remove('space-pan-active', 'space-pan-dragging');
                 const map = mapManager.getMap();
