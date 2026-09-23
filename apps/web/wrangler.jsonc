@@ -6,5 +6,9 @@
         "directory": "./dist",
         // SPA: unknown paths fall back to index.html
         "not_found_handling": "single-page-application"
-    }
+    },
+    "routes": [
+        { "pattern": "x-route.app", "custom_domain": true },
+        { "pattern": "www.x-route.app", "custom_domain": true }
+    ]
 }
