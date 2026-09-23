@@ -104,6 +104,9 @@ export function MyRoutesDrawer() {
     const handleLoadRoute = (fileId: string) => {
         const fileData = fileMap.get(fileId);
         if (!fileData) return;
+        // Explicit user choice of a route — auto camera behaviors (e.g. the
+        // union fit over all loaded tracks) must yield to the focus below.
+        mapManager.markInteracted();
         addLoadedFile(fileId);
         selectFile(fileId);
         const file = new GPXFile(fileData);
@@ -113,6 +116,20 @@ export function MyRoutesDrawer() {
             loadRouteFromPoints(coords, trkpts);
             setEditingFileId(fileId);
             setSidebarCollapsed(false);
+        }
+        // Focus the camera on the selected route via the shared focus
+        // capability — including when it is already the route being edited
+        // (loadRouteFromPoints just seeded resultPoints from its track).
+        if (trkpts.length >= 2) {
+            mapManager.fitToPlannerRoute();
+        } else {
+            // Degenerate track (<2 points): fall back to the file's own bounds.
+            const { global } = file.getStatistics();
+            if (global?.bounds) {
+                const sw = global.bounds.southWest;
+                const ne = global.bounds.northEast;
+                mapManager.fitBounds([[sw.lon, sw.lat], [ne.lon, ne.lat]], 80);
+            }
         }
     };
 

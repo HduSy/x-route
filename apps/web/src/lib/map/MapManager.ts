@@ -12,6 +12,7 @@ import {
 // Vite cannot rewrite that URL automatically — route it through the bundler.
 // https://www.maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import { useRoutingStore } from '@/store/routing-slice';
 
 setWorkerUrl(workerUrl);
 
@@ -484,6 +485,41 @@ class MapManager {
     fitBounds(bounds: LngLatBoundsLike, padding = 60, instant = false) {
         if (!this.map) return;
         this.map.fitBounds(bounds, { padding, duration: instant ? 0 : 600, maxZoom: 16 });
+    }
+
+    /** Fit the camera to the route currently in the planner: the rendered
+     *  result line first, anchor points as fallback. Single shared focus
+     *  implementation — used by the toolbar focus button and by card loading
+     *  (where resultPoints was just seeded from the file's own track). */
+    fitToPlannerRoute() {
+        if (!this.map) return;
+        const { resultPoints, anchors } = useRoutingStore.getState();
+
+        if (resultPoints.length >= 2) {
+            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+            for (const pt of resultPoints) {
+                const lon = pt.attributes.lon;
+                const lat = pt.attributes.lat;
+                if (lon < minLon) minLon = lon;
+                if (lat < minLat) minLat = lat;
+                if (lon > maxLon) maxLon = lon;
+                if (lat > maxLat) maxLat = lat;
+            }
+            this.fitBounds([minLon, minLat, maxLon, maxLat], 80);
+        } else if (anchors.length > 0) {
+            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+            for (const a of anchors) {
+                if (a.lon < minLon) minLon = a.lon;
+                if (a.lat < minLat) minLat = a.lat;
+                if (a.lon > maxLon) maxLon = a.lon;
+                if (a.lat > maxLat) maxLat = a.lat;
+            }
+            if (minLon === maxLon && minLat === maxLat) {
+                this.map.flyTo({ center: [minLon, minLat], zoom: 15, duration: 600 });
+            } else {
+                this.fitBounds([minLon, minLat, maxLon, maxLat], 80);
+            }
+        }
     }
 
     /** Run `callback` as soon as the style can accept addSource/addLayer.

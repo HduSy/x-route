@@ -178,7 +178,13 @@ export function MapView() {
     useEffect(() => {
         gpxLayers.sync(gpxLayerFiles, editingFileId ?? selectedFileId);
 
-        if (loadedFileIds.length > prevCountRef.current) {
+        if (
+            loadedFileIds.length > prevCountRef.current &&
+            !mapManager.hasUserInteracted()
+        ) {
+            // Pristine hydration/first-import only: fit everything loaded.
+            // Once the user has interacted (or explicitly loaded a card, which
+            // focuses its own route), never yank the camera to the union fit.
             const allLoadedFiles = loadedFileIds
                 .map((id) => ({ fileId: id, file: fileMap.get(id) }))
                 .filter((entry): entry is { fileId: string; file: GPXFileType } => !!entry.file);
@@ -522,36 +528,7 @@ export function MapView() {
         setBearing(0);
     };
     const handleFitRoute = () => {
-        const map = mapManager.getMap();
-        if (!map) return;
-        const resultPoints = useRoutingStore.getState().resultPoints;
-        const anchors = useRoutingStore.getState().anchors;
-
-        if (resultPoints.length >= 2) {
-            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
-            for (const pt of resultPoints) {
-                const lon = pt.attributes.lon;
-                const lat = pt.attributes.lat;
-                if (lon < minLon) minLon = lon;
-                if (lat < minLat) minLat = lat;
-                if (lon > maxLon) maxLon = lon;
-                if (lat > maxLat) maxLat = lat;
-            }
-            mapManager.fitBounds([minLon, minLat, maxLon, maxLat], 80);
-        } else if (anchors.length > 0) {
-            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
-            for (const a of anchors) {
-                if (a.lon < minLon) minLon = a.lon;
-                if (a.lat < minLat) minLat = a.lat;
-                if (a.lon > maxLon) maxLon = a.lon;
-                if (a.lat > maxLat) maxLat = a.lat;
-            }
-            if (minLon === maxLon && minLat === maxLat) {
-                map.flyTo({ center: [minLon, minLat], zoom: 15, duration: 600 });
-            } else {
-                mapManager.fitBounds([minLon, minLat, maxLon, maxLat], 80);
-            }
-        }
+        mapManager.fitToPlannerRoute();
     };
     const handleToggle3D = () => {
         const map = mapManager.getMap();

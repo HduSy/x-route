@@ -377,7 +377,9 @@ interface I18nState {
 export const useI18nStore = create<I18nState>()(
     persist(
         (set, get) => ({
-            language: (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('zh')) ? 'zh' : 'en',
+            // Default to English for first-time visitors; a manually toggled
+            // choice is still restored from localStorage by the persist middleware.
+            language: 'en',
             setLanguage: (language) => set({ language }),
             toggleLanguage: () => set({ language: get().language === 'en' ? 'zh' : 'en' }),
         }),
