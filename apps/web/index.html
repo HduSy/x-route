@@ -3,14 +3,65 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#863bff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="description" content="Route creation & planning tool with GPX editing and elevation profile" />
-    <title>x-route</title>
+
+    <!-- Primary SEO -->
+    <title>x-route — Free Route Planner for Cyclists & Runners (GPX + Elevation)</title>
+    <meta name="description" content="Plan cycling and running routes along real roads with BRouter-grade routing, Strava-grade elevation & slope analysis, and GPX import/export. Free, no account — your tracks never leave your device." />
+    <meta name="keywords" content="route planner, cycling route planner, GPX editor, elevation profile, bike route planning, running route, BRouter, free route planner, no account" />
+    <link rel="canonical" href="https://x-route.app/" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph (social share preview) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="x-route" />
+    <meta property="og:url" content="https://x-route.app/" />
+    <meta property="og:title" content="x-route — Free Route Planner for Cyclists & Runners" />
+    <meta property="og:description" content="Plan routes along real roads with elevation & slope analysis, GPX import/export. Free, no account — 100% in your browser." />
+    <meta property="og:image" content="https://x-route.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="x-route — offline-first route planner for cyclists and runners" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="x-route — Free Route Planner for Cyclists & Runners" />
+    <meta name="twitter:description" content="BRouter-grade routing, Strava-grade elevation, GPX import/export. Free, no account — 100% in your browser." />
+    <meta name="twitter:image" content="https://x-route.app/og-image.png" />
+
+    <!-- Structured data: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "x-route",
+      "url": "https://x-route.app/",
+      "applicationCategory": "SportsApplication",
+      "operatingSystem": "Any (web browser)",
+      "description": "Offline-first route planner for cyclists and runners with BRouter-grade routing, Strava-grade elevation analysis, and GPX import/export. Free and account-free; all data stays on the device.",
+      "browserRequirements": "Requires JavaScript",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Route planning along real roads and trails",
+        "Per-activity profiles: road, gravel, MTB, run, hike",
+        "Elevation profile with slope categorization",
+        "GPX import and export",
+        "Manual off-road drawing",
+        "Local-first storage, no account required"
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
