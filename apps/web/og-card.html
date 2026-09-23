@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1200px;height:630px;background:#0d1117;font-family:-apple-system,'PingFang SC','Helvetica Neue',sans-serif;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.glow{position:absolute;width:900px;height:900px;border-radius:50%;background:radial-gradient(circle,rgba(134,59,255,.28),transparent 65%);top:-250px;right:-200px}
+.glow2{position:absolute;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(71,191,255,.15),transparent 65%);bottom:-300px;left:-150px}
+.route{position:absolute;bottom:70px;left:0;width:1200px;opacity:.9}
+.card{position:relative;z-index:2;display:flex;flex-direction:column;align-items:flex-start;gap:0;padding-left:110px}
+.brandrow{display:flex;align-items:center;gap:30px;margin-bottom:30px}
+.brandlogo{width:110px;height:110px;border-radius:28px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 16px 48px rgba(134,59,255,.45)}
+.brandlogo img{width:78px;height:auto}
+h1{font-size:110px;font-weight:800;color:#fff;letter-spacing:-2px;line-height:1}
+h1 span{color:#a675ff}
+.tag{font-size:31px;color:#9da7b3;line-height:1.55;margin-bottom:36px;max-width:760px}
+.feats{display:flex;gap:14px;flex-wrap:wrap;max-width:800px}
+.feat{padding:10px 22px;border:1px solid #30363d;border-radius:999px;color:#c9d1d9;font-size:23px;background:rgba(255,255,255,.04)}
+.url{margin-top:38px;font-size:26px;color:#6e7681;font-family:ui-monospace,monospace}
+</style></head>
+<body>
+<div class="glow"></div><div class="glow2"></div>
+<svg class="route" width="1200" height="200" viewBox="0 0 1200 200" fill="none">
+<path d="M-20 160 C 200 40, 350 190, 560 90 S 950 20, 1230 110" stroke="#863bff" stroke-width="5" stroke-dasharray="14 12" opacity=".5"/>
+</svg>
+<div class="card">
+  <div class="brandrow">
+    <div class="brandlogo"><img src="public/favicon.svg"></div>
+    <h1>x<span>-</span>route</h1>
+  </div>
+  <div class="tag">Offline-first route planner for cyclists &amp; runners.<br>BRouter-grade routing · Strava-grade elevation · 100% in-browser.</div>
+  <div class="feats">
+    <div class="feat">🚴 Road / Gravel / MTB</div>
+    <div class="feat">🏃 Run / Hike</div>
+    <div class="feat">⛰️ Elevation Analysis</div>
+    <div class="feat">📥 GPX Import / Export</div>
+  </div>
+  <div class="url">https://x-route.app</div>
+</div>
+</body></html>
