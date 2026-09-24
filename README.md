@@ -35,7 +35,7 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
   - 🚵‍♂️ **Mountain Bike (MTB)**: Prioritizes singletracks, dirt paths, and technical terrain.
   - 🏃 **Run**: Foot paths, pedestrian walkways, and parks.
   - 🥾 **Hike**: Hiking trails and elevation-conscious mountain paths.
-- **Manual Mode (Off-Road / Free Drawing)**: Draw direct straight-line connections across areas without mapped OSM roads.
+- **Manual Mode (Off-Road / Free Drawing)**: Draw direct straight-line connections across areas without mapped OSM roads. Applies only to newly added segments — existing road-following segments are never recomputed.
 - **Intuitive Point Editing**:
   - Click anywhere on the map to add waypoints.
   - Drag existing waypoints, start, or finish markers to dynamically re-calculate segments.

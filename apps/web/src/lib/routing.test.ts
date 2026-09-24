@@ -9,6 +9,71 @@ import {
     computeRoute,
 } from './routing';
 
+describe('per-segment modes (manual mode is incremental)', () => {
+    const p0 = { lat: 39.9, lon: 116.4 };
+    const p1 = { lat: 39.91, lon: 116.41 };
+    const p2 = { lat: 39.92, lon: 116.42 };
+
+    beforeEach(() => {
+        routingSegmentCache.clear();
+        vi.restoreAllMocks();
+    });
+
+    it('areAllSegmentsCached ignores manual segments', () => {
+        const key01 = getSegmentKey(p0, p1, 'bike', 'any');
+        routingSegmentCache.set(key01, [
+            new TrackPoint({ attributes: p0, ele: 0, extensions: {} }),
+            new TrackPoint({ attributes: p1, ele: 0, extensions: {} }),
+        ]);
+
+        // p1→p2 is manual: needs no cache entry and no network
+        expect(areAllSegmentsCached([p0, p1, p2], 'bike', ['route', 'manual'])).toBe(true);
+        expect(areAllSegmentsCached([p0, p1, p2], 'bike', ['route', 'route'])).toBe(false);
+    });
+
+    it('mixed modes: routed segment follows the road, manual segment is a straight line', async () => {
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+            const body = JSON.parse((init?.body as string) || '{}');
+            const [start, end] = body.points;
+            return {
+                ok: true,
+                json: async () => ({
+                    paths: [
+                        {
+                            points: {
+                                coordinates: [
+                                    [start[0], start[1], 10],
+                                    // bend off the straight line
+                                    [(start[0] + end[0]) / 2 + 0.005, (start[1] + end[1]) / 2 + 0.005, 12],
+                                    [end[0], end[1], 15],
+                                ],
+                            },
+                        },
+                    ],
+                }),
+            } as Response;
+        });
+
+        const res = await computeRoute([p0, p1, p2], 'bike', ['route', 'manual']);
+        // only the routed segment hits the network; the manual one is geometry
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+        // p0→p1 kept its road bend: the first 3 points are the fetched segment
+        expect(res.points[1]!.getLatitude()).toBeCloseTo((p0.lat + p1.lat) / 2 + 0.005, 6);
+
+        // everything from p1 on is collinear with p1→p2 (straight manual segment)
+        const tail = res.points.slice(2); // starts at p1 (segment stitch point)
+        for (const pt of tail) {
+            const cross =
+                (pt.getLatitude() - p1.lat) * (p2.lon - p1.lon) -
+                (pt.getLongitude() - p1.lon) * (p2.lat - p1.lat);
+            expect(Math.abs(cross)).toBeLessThan(1e-9);
+        }
+        expect(tail[tail.length - 1]!.getLatitude()).toBeCloseTo(p2.lat, 6);
+    });
+});
+
+
 describe('SegmentLRUCache', () => {
     it('sets and retrieves cached items', () => {
         const cache = new SegmentLRUCache<string, number>(3);

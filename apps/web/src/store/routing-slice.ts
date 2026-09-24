@@ -1,16 +1,29 @@
 import { create } from 'zustand';
 import type { Coordinates, TrackPoint } from '@x-route/gpx';
-import { routingSegmentCache, getSegmentKey } from '@/lib/routing';
+import { routingSegmentCache, getSegmentKey, type SegmentMode } from '@/lib/routing';
 
 export interface RoutingAnchor extends Coordinates {}
+
+export type { SegmentMode };
 
 export type UnitType = 'km' | 'mi';
 export type RoutingPreference = 'popular' | 'flat' | 'direct';
 export type ElevationPreference = 'any' | 'min' | 'max';
 
+/** Undo/redo entry: anchors and their per-segment modes restore together. */
+interface RoutingHistoryEntry {
+    anchors: RoutingAnchor[];
+    segmentModes: SegmentMode[];
+}
+
 interface RoutingState {
     active: boolean;
     anchors: RoutingAnchor[];
+    /** Generation mode of each segment between adjacent anchors
+     *  (length = max(0, anchors.length - 1)). Manual mode only decides the
+     *  mode of segments created while it is on — existing segments are never
+     *  recomputed when it toggles. */
+    segmentModes: SegmentMode[];
     profile: string;
     routingPreference: RoutingPreference;
     elevationPreference: ElevationPreference;
@@ -21,8 +34,8 @@ interface RoutingState {
     skipNextRouteComputation: boolean;
     routing: boolean;
     error: string | null;
-    past: RoutingAnchor[][];
-    future: RoutingAnchor[][];
+    past: RoutingHistoryEntry[];
+    future: RoutingHistoryEntry[];
 
     // Strava Route Builder UI States
     showSurfaceType: boolean;
@@ -67,9 +80,35 @@ interface RoutingState {
     loadRouteFromPoints: (points: Coordinates[], resultSeed?: TrackPoint[]) => void;
 }
 
+/** Derives segment modes after anchor removal: adjacent survivors keep their
+ *  segment's original mode; a gap between survivor indices means the removed
+ *  anchors were merged into one brand-new segment, created under `newMode`.
+ *  `?? 'route'` keeps calls that setState anchors directly (tests, partial
+ *  restores) safe when the modes array is stale. */
+function modesAfterRemoval(
+    survivors: { anchor: RoutingAnchor; index: number }[],
+    segmentModes: SegmentMode[],
+    newMode: SegmentMode
+): SegmentMode[] {
+    const modes: SegmentMode[] = [];
+    for (let j = 0; j < survivors.length - 1; j++) {
+        const from = survivors[j]!.index;
+        const to = survivors[j + 1]!.index;
+        modes.push(to === from + 1 ? (segmentModes[from] ?? 'route') : newMode);
+    }
+    return modes;
+}
+
+/** Defensive length sync: there is exactly one mode per adjacent anchor pair,
+ *  so a stale array (e.g. after a partial setState of anchors) is trimmed. */
+function normalizedModes(anchorCount: number, segmentModes: SegmentMode[]): SegmentMode[] {
+    return segmentModes.slice(0, Math.max(0, anchorCount - 1));
+}
+
 export const useRoutingStore = create<RoutingState>()((set, get) => ({
     active: true, // Default is route creation mode (crosshair cursor); allows instant click-to-route on refresh
     anchors: [],
+    segmentModes: [],
     profile: 'racing_bike',
     routingPreference: 'popular',
     elevationPreference: 'any',
@@ -98,56 +137,95 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     setManualMode: (manualMode) => set({ manualMode }),
 
     addAnchor: (anchor) => {
-        const { anchors, past } = get();
-        set({ active: true, anchors: [...anchors, anchor], past: [...past, anchors], future: [] });
+        const { anchors, segmentModes, past, manualMode } = get();
+        const modes = normalizedModes(anchors.length, segmentModes);
+        set({
+            active: true,
+            anchors: [...anchors, anchor],
+            // Only the newly appended segment adopts the current mode; the
+            // very first anchor creates no segment at all.
+            segmentModes:
+                anchors.length === 0 ? [] : [...modes, manualMode ? 'manual' : 'route'],
+            past: [...past, { anchors, segmentModes: modes }],
+            future: [],
+        });
     },
 
     insertAnchor: (index, anchor) => {
-        const { anchors, past } = get();
+        const { anchors, segmentModes, past, manualMode } = get();
+        const modes = normalizedModes(anchors.length, segmentModes);
         const clampedIndex = Math.max(0, Math.min(index, anchors.length));
         const next = [
             ...anchors.slice(0, clampedIndex),
             anchor,
             ...anchors.slice(clampedIndex),
         ];
-        set({ active: true, anchors: next, past: [...past, anchors], future: [] });
+        // Inserting replaces old segment (clampedIndex-1 -> clampedIndex) with
+        // two new segments; every other segment survives with its mode.
+        const mode: SegmentMode = manualMode ? 'manual' : 'route';
+        const nextModes =
+            clampedIndex === 0
+                ? [mode, ...modes]
+                : clampedIndex >= anchors.length
+                    ? [...modes, mode]
+                    : [...modes.slice(0, clampedIndex - 1), mode, mode, ...modes.slice(clampedIndex)];
+        set({
+            active: true,
+            anchors: next,
+            segmentModes: nextModes,
+            past: [...past, { anchors, segmentModes: modes }],
+            future: [],
+        });
     },
 
     moveAnchor: (index, to) => {
-        const { anchors, past } = get();
+        const { anchors, past, segmentModes } = get();
         const next = anchors.map((a, i) => (i === index ? { ...to } : a));
-        set({ anchors: next, past: [...past, anchors], future: [] });
+        const modes = normalizedModes(anchors.length, segmentModes);
+        // Modes are untouched: moving an endpoint refetches geometry for its
+        // two segments, but each keeps its generation mode.
+        set({ anchors: next, segmentModes: modes, past: [...past, { anchors, segmentModes: modes }], future: [] });
     },
 
     removeAnchor: (index) => {
-        const { anchors, past } = get();
-        const next = anchors.filter((_, i) => i !== index);
+        const { anchors, segmentModes, past, manualMode } = get();
+        const modes = normalizedModes(anchors.length, segmentModes);
+        const survivors = anchors
+            .map((anchor, i) => ({ anchor, index: i }))
+            .filter(({ index: i }) => i !== index);
         set({
-            anchors: next,
-            past: [...past, anchors],
+            anchors: survivors.map(({ anchor }) => anchor),
+            segmentModes: modesAfterRemoval(survivors, modes, manualMode ? 'manual' : 'route'),
+            past: [...past, { anchors, segmentModes: modes }],
             future: [],
             active: true,
         });
     },
 
     removeAnchors: (indices: number[]) => {
-        const { anchors, past } = get();
+        const { anchors, segmentModes, past, manualMode } = get();
+        const modes = normalizedModes(anchors.length, segmentModes);
         const indexSet = new Set(indices);
-        const next = anchors.filter((_, i) => !indexSet.has(i));
+        const survivors = anchors
+            .map((anchor, i) => ({ anchor, index: i }))
+            .filter(({ index: i }) => !indexSet.has(i));
+        const next = survivors.map(({ anchor }) => anchor);
         if (next.length === 0) {
             set({
                 active: true,
                 anchors: [],
+                segmentModes: [],
                 resultPoints: [],
                 error: null,
                 editingFileId: null,
-                past: [...past, anchors],
+                past: [...past, { anchors, segmentModes: modes }],
                 future: [],
             });
         } else {
             set({
                 anchors: next,
-                past: [...past, anchors],
+                segmentModes: modesAfterRemoval(survivors, modes, manualMode ? 'manual' : 'route'),
+                past: [...past, { anchors, segmentModes: modes }],
                 future: [],
                 active: true,
             });
@@ -155,21 +233,29 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     },
 
     reverseAnchors: () => {
-        const { anchors, past } = get();
+        const { anchors, segmentModes, past } = get();
+        const modes = normalizedModes(anchors.length, segmentModes);
         if (anchors.length < 2) return;
-        const next = [...anchors].reverse();
-        set({ anchors: next, past: [...past, anchors], future: [] });
+        // Each segment spans the same anchor pair after reversing, so modes reverse with them
+        set({
+            anchors: [...anchors].reverse(),
+            segmentModes: [...modes].reverse(),
+            past: [...past, { anchors, segmentModes: modes }],
+            future: [],
+        });
     },
 
     clear: (resetHistory = false) => {
-        const { anchors, past } = get();
+        const { anchors, segmentModes, past } = get();
+        const modes = normalizedModes(anchors.length, segmentModes);
         set({
             active: true,
             anchors: [],
+            segmentModes: [],
             resultPoints: [],
             error: null,
             editingFileId: null,
-            past: resetHistory ? [] : [...past, anchors],
+            past: resetHistory ? [] : [...past, { anchors, segmentModes: modes }],
             future: [],
         });
     },
@@ -178,23 +264,25 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     setRouting: (routing) => set({ routing }),
 
     undo: () => {
-        const { past, future, anchors } = get();
+        const { past, future, anchors, segmentModes } = get();
         if (past.length === 0) return;
         const previous = past[past.length - 1]!;
         set({
-            anchors: previous,
+            anchors: previous.anchors,
+            segmentModes: previous.segmentModes,
             past: past.slice(0, -1),
-            future: [anchors, ...future],
+            future: [{ anchors, segmentModes }, ...future],
         });
     },
 
     redo: () => {
-        const { past, future, anchors } = get();
+        const { past, future, anchors, segmentModes } = get();
         if (future.length === 0) return;
         const next = future[0]!;
         set({
-            anchors: next,
-            past: [...past, anchors],
+            anchors: next.anchors,
+            segmentModes: next.segmentModes,
+            past: [...past, { anchors, segmentModes }],
             future: future.slice(1),
         });
     },
@@ -228,6 +316,9 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         set({
             active: true,
             anchors: sampleAnchors,
+            // A loaded track's segments are historical geometry: all road mode.
+            // Manual mode (if on) only affects segments appended afterwards.
+            segmentModes: new Array(Math.max(0, sampleAnchors.length - 1)).fill('route'),
             // Seed the route line from the source track: it renders instantly and
             // the skip flag keeps this load completely off the network. The next
             // real edit (node drag/add, profile change) computes normally.
@@ -241,7 +332,7 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         // Pre-fill the segment cache with the source track's own geometry
         // between adjacent anchors: the first node edit then refetches only the
         // changed segments while untouched parts keep the original track shape.
-        if (resultSeed && resultSeed.length === points.length && !get().manualMode) {
+        if (resultSeed && resultSeed.length === points.length) {
             const profileKey = get().profile;
             const elevationPreference = get().elevationPreference;
             for (let s = 0; s < sampleIndices.length - 1; s++) {

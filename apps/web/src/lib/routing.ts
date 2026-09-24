@@ -6,6 +6,10 @@ import { TrackPoint, distance, type Coordinates } from '@x-route/gpx';
 
 export type RoutingEngine = 'graphhopper' | 'brouter';
 
+/** How a single anchor-to-anchor segment was generated. Manual mode affects
+ *  only the segments created while it is on — never existing ones. */
+export type SegmentMode = 'route' | 'manual';
+
 export interface RoutingProfile {
     engine: RoutingEngine;
     profile: string;
@@ -119,15 +123,17 @@ export function getSegmentKey(
     return `${profileKey}:${elevationPreference}:${getCoordKey(from)}->${getCoordKey(to)}`;
 }
 
-/** Returns true if every adjacent segment in `points` is already present in cache. */
+/** Returns true if every road-following segment in `points` is already present
+ *  in cache. Manual segments are pure geometry and never need the cache. */
 export function areAllSegmentsCached(
     points: Coordinates[],
     profileKey: string,
-    manualMode = false,
+    segmentModes: SegmentMode[] = [],
     elevationPreference: 'any' | 'min' | 'max' = 'any'
 ): boolean {
-    if (manualMode || points.length < 2) return true;
+    if (points.length < 2) return true;
     for (let i = 0; i < points.length - 1; i++) {
+        if (segmentModes[i] === 'manual') continue;
         const key = getSegmentKey(points[i]!, points[i + 1]!, profileKey, elevationPreference);
         if (!routingSegmentCache.has(key)) {
             return false;
@@ -315,12 +321,15 @@ export interface RouteResult {
 
 /**
  * Computes a multi-waypoint route using segment caching, parallel fetching,
- * and individual segment fallback.
+ * and individual segment fallback. Each segment follows the mode it was
+ * created with: 'manual' segments are straight lines, 'route' segments follow
+ * the road network (cache → in-flight → network) — so recomputing after a
+ * mode toggle leaves already-generated segments untouched.
  */
 export async function computeRoute(
     points: Coordinates[],
     profileKey: string,
-    manualMode = false,
+    segmentModes: SegmentMode[] = [],
     elevationPreference: 'any' | 'min' | 'max' = 'any',
     signal?: AbortSignal
 ): Promise<RouteResult> {
@@ -328,23 +337,22 @@ export async function computeRoute(
         return { points: [], error: null };
     }
 
-    if (manualMode) {
-        cancelAllPendingRouting();
-        return { points: getManualRoute(points), error: null };
-    }
-
     if (signal?.aborted) {
         throw new DOMException('Aborted', 'AbortError');
     }
 
-    // Build the set of needed segment keys
+    // Build the set of needed segment keys (road segments only — manual
+    // segments need no fetch, so they must not keep requests alive)
     const neededKeys = new Set<string>();
-    const segmentPairs: { from: Coordinates; to: Coordinates }[] = [];
+    const segmentPairs: { from: Coordinates; to: Coordinates; mode: SegmentMode }[] = [];
     for (let i = 0; i < points.length - 1; i++) {
         const from = points[i]!;
         const to = points[i + 1]!;
-        neededKeys.add(getSegmentKey(from, to, profileKey, elevationPreference));
-        segmentPairs.push({ from, to });
+        const mode = segmentModes[i] ?? 'route';
+        if (mode === 'route') {
+            neededKeys.add(getSegmentKey(from, to, profileKey, elevationPreference));
+        }
+        segmentPairs.push({ from, to, mode });
     }
 
     // Abort in-flight segments that are no longer part of this route
@@ -354,7 +362,10 @@ export async function computeRoute(
 
     const segments = await mapConcurrent(
         segmentPairs,
-        async ({ from, to }) => {
+        async ({ from, to, mode }) => {
+            if (mode === 'manual') {
+                return getManualRoute([from, to]);
+            }
             if (signal?.aborted) {
                 throw new DOMException('Aborted', 'AbortError');
             }
@@ -399,11 +410,11 @@ export async function computeRoute(
 export async function route(
     points: Coordinates[],
     profileKey: string,
-    manualMode = false,
+    segmentModes: SegmentMode[] = [],
     elevationPreference: 'any' | 'min' | 'max' = 'any',
     signal?: AbortSignal
 ): Promise<TrackPoint[]> {
-    const result = await computeRoute(points, profileKey, manualMode, elevationPreference, signal);
+    const result = await computeRoute(points, profileKey, segmentModes, elevationPreference, signal);
     return result.points;
 }
 

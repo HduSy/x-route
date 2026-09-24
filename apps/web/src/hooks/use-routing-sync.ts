@@ -17,7 +17,7 @@ export function useRoutingSync() {
     const active = useRoutingStore((s) => s.active);
     const anchors = useRoutingStore((s) => s.anchors);
     const profile = useRoutingStore((s) => s.profile);
-    const manualMode = useRoutingStore((s) => s.manualMode);
+    const segmentModes = useRoutingStore((s) => s.segmentModes);
     const resultPoints = useRoutingStore((s) => s.resultPoints);
     const showDistanceMarkers = useRoutingStore((s) => s.showDistanceMarkers);
     const showRoutePath = useRoutingStore((s) => s.showRoutePath);
@@ -94,7 +94,10 @@ export function useRoutingSync() {
         };
     }, []);
 
-    // Route computation on anchors/profile/manualMode change
+    // Route computation on anchors/profile/segment-mode change. manualMode is
+    // deliberately NOT a dependency: toggling it changes only how FUTURE
+    // segments are created (via the store's per-segment modes) and must never
+    // recompute — or even touch — the already-generated route.
     useEffect(() => {
         // Clear pending debounce timer
         if (debounceTimerRef.current) {
@@ -137,7 +140,7 @@ export function useRoutingSync() {
 
         // If all segments are already cached (e.g. Undo/Redo or revisit), debounce is 0ms (instant).
         // Otherwise, 50ms micro-debounce coalesces rapid clicks and drag events.
-        const allCached = areAllSegmentsCached(anchors, profile, manualMode, elevationPreference);
+        const allCached = areAllSegmentsCached(anchors, profile, segmentModes, elevationPreference);
         const debounceMs = allCached ? 0 : 50;
 
         debounceTimerRef.current = setTimeout(() => {
@@ -154,16 +157,23 @@ export function useRoutingSync() {
             const state = useRoutingStore.getState();
             state.setRouting(true);
 
-            computeRoute(anchors, profile, manualMode, elevationPreference, controller.signal)
+            computeRoute(anchors, profile, segmentModes, elevationPreference, controller.signal)
                 .then((res) => {
                     const state = useRoutingStore.getState();
-                    if (controller.signal.aborted || myRequest !== requestSeq || state.anchors !== anchors) return;
+                    if (
+                        controller.signal.aborted ||
+                        myRequest !== requestSeq ||
+                        state.anchors !== anchors ||
+                        state.segmentModes !== segmentModes
+                    )
+                        return;
                     state.setResult(res.points, res.error);
                 })
                 .catch((error: Error) => {
                     if (error.name === 'AbortError' || controller.signal.aborted) return;
                     const state = useRoutingStore.getState();
-                    if (myRequest !== requestSeq || state.anchors !== anchors) return;
+                    if (myRequest !== requestSeq || state.anchors !== anchors || state.segmentModes !== segmentModes)
+                        return;
                     console.warn('Routing error, falling back to straight-line segments:', error);
                     // Fallback to straight lines so the route line NEVER vanishes
                     const fallbackPoints = getManualRoute(anchors);
@@ -182,7 +192,7 @@ export function useRoutingSync() {
                 debounceTimerRef.current = null;
             }
         };
-    }, [anchors, profile, manualMode, elevationPreference]);
+    }, [anchors, profile, segmentModes, elevationPreference]);
 
     // When draw mode turns ON, ensure markers and route are synced to map layer
     useEffect(() => {
