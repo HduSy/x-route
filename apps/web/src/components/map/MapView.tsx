@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, Check, Compass, Focus, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
+import { AlertTriangle, Check, Compass, Focus, GitPullRequestArrow, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
 import { GPXFile, distance, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
@@ -28,31 +28,6 @@ function TrackPopupContent({ file }: { file: GPXFileType }) {
                 {global.distance.total.toFixed(1)} km · ↑{Math.round(global.elevation.gain)} m
             </div>
         </div>
-    );
-}
-
-/** U-turn / closed-loop icon in lucide's stroke style (this lucide-react
- *  build ships no UTurn glyph, so it is drawn by hand). */
-function UTurnIcon({ className }: { className?: string }) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-        >
-            {/* U-shaped route: down the left, through the bottom, up the right.
-                The path stops at the dot rims so the hollow centers stay clean. */}
-            <path d="M7 8.4v3.6a5 5 0 0 0 10 0v-3.6" />
-            {/* hollow endpoint dots, route/git-branch style */}
-            <circle cx="7" cy="6" r="2.4" />
-            <circle cx="17" cy="6" r="2.4" />
-        </svg>
     );
 }
 
@@ -664,7 +639,7 @@ export function MapView() {
                               : t.returnToStartDesc
                     }
                 >
-                    <UTurnIcon className="size-4" />
+                    <GitPullRequestArrow className="size-4" />
                 </button>
                 <div className="h-px w-full bg-border" />
                 <button
