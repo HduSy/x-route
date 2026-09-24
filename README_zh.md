@@ -3,7 +3,8 @@
 <div align="center">
 
 **专为骑行、跑步与户外运动打造的现代化、高性能、本地优先路线规划器。**  
-融合 Strava 典雅直观的交互美学与 BRouter 工业级路径与高程精度。
+融合 Strava 典雅直观的交互美学与 BRouter 工业级路径与高程精度。  
+*如果对你有帮助，点个 star ⭐ 就是对我最大的支持！*
 
 [English](README.md) | [简体中文](README_zh.md)
 

@@ -3,7 +3,8 @@
 <div align="center">
 
 **A modern, high-performance, offline-first route planner for cyclists and runners.**  
-Combining the sleek design and fluid UX of Strava with the industrial-grade routing and elevation precision of BRouter.
+Combining the sleek design and fluid UX of Strava with the industrial-grade routing and elevation precision of BRouter.  
+*If you find this project helpful, a star ⭐ means the world to me!*
 
 [English](README.md) | [简体中文](README_zh.md)
 
