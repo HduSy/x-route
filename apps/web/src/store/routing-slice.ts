@@ -1,10 +1,15 @@
 import { create } from 'zustand';
-import type { Coordinates, TrackPoint } from '@x-route/gpx';
+import { distance, type Coordinates, type TrackPoint } from '@x-route/gpx';
 import { routingSegmentCache, getSegmentKey, type SegmentMode } from '@/lib/routing';
 
 export interface RoutingAnchor extends Coordinates {}
 
 export type { SegmentMode };
+
+/** Minimum distance between start and current end for a round trip to make
+ *  sense: below this the route is already a (nearly) closed loop and
+ *  appending the return would only create duplicate points. */
+export const RETURN_TO_START_MIN_GAP_M = 50;
 
 export type UnitType = 'km' | 'mi';
 export type RoutingPreference = 'popular' | 'flat' | 'direct';
@@ -59,6 +64,7 @@ interface RoutingState {
     removeAnchor: (index: number) => void;
     removeAnchors: (indices: number[]) => void;
     reverseAnchors: () => void;
+    returnToStart: () => void;
     clear: (resetHistory?: boolean) => void;
     setResult: (points: TrackPoint[], error: string | null) => void;
     setRouting: (routing: boolean) => void;
@@ -243,6 +249,45 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
             past: [...past, { anchors, segmentModes: modes }],
             future: [],
         });
+    },
+
+    returnToStart: () => {
+        const { anchors, segmentModes, past } = get();
+        if (anchors.length < 2) return;
+        const first = anchors[0]!;
+        const last = anchors[anchors.length - 1]!;
+        if (distance(first, last) < RETURN_TO_START_MIN_GAP_M) return;
+        const modes = normalizedModes(anchors.length, segmentModes);
+
+        // Outbound stays untouched; the return trip re-visits every node in
+        // reverse order and ends back at the start, forming a closed loop.
+        // Each return segment reuses the mode of its outbound counterpart
+        // (road segments stay road, manual straight lines stay straight).
+        set({
+            active: true,
+            anchors: [...anchors, ...[...anchors].reverse().slice(1)],
+            segmentModes: [...modes, ...[...modes].reverse()],
+            past: [...past, { anchors, segmentModes: modes }],
+            future: [],
+        });
+
+        // Pre-fill the cache with the reversed geometry of cached road
+        // segments so the return trip retraces the exact same roads with zero
+        // network requests (a fresh reverse fetch could route differently
+        // around one-way streets). Segments not in cache compute normally.
+        const { profile, elevationPreference } = get();
+        for (let i = 0; i < anchors.length - 1; i++) {
+            if (modes[i] !== 'route') continue;
+            const outbound = routingSegmentCache.get(
+                getSegmentKey(anchors[i]!, anchors[i + 1]!, profile, elevationPreference)
+            );
+            if (outbound && outbound.length >= 2) {
+                routingSegmentCache.set(
+                    getSegmentKey(anchors[i + 1]!, anchors[i]!, profile, elevationPreference),
+                    [...outbound].reverse()
+                );
+            }
+        }
     },
 
     clear: (resetHistory = false) => {

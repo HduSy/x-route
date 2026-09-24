@@ -12,7 +12,14 @@ import {
     Spline,
     X,
 } from 'lucide-react';
-import { useRoutingStore, type UnitType, type ElevationPreference, type RoutingPreference } from '@/store/routing-slice';
+import { distance } from '@x-route/gpx';
+import {
+    useRoutingStore,
+    RETURN_TO_START_MIN_GAP_M,
+    type UnitType,
+    type ElevationPreference,
+    type RoutingPreference,
+} from '@/store/routing-slice';
 import { useT } from '@/store/i18n-slice';
 import { mapManager } from '@/lib/map/MapManager';
 import { cn } from '@/lib/utils';
@@ -22,6 +29,28 @@ interface SearchResult {
     display_name: string;
     lat: string;
     lon: string;
+}
+
+/** U-turn / closed-loop icon in lucide's stroke style (this lucide-react
+ *  build ships no UTurn glyph, so it is drawn by hand). */
+function UTurnIcon({ className }: { className?: string }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            {/* down the left, half-turn through the bottom, back up the right */}
+            <path d="M7 4v8a5 5 0 0 0 10 0V7" />
+            <path d="m14 10 3-3 3 3" />
+        </svg>
+    );
 }
 
 export function RouteBuilderSidebar() {
@@ -38,6 +67,8 @@ export function RouteBuilderSidebar() {
     const setElevationPreference = useRoutingStore((s) => s.setElevationPreference);
     const manualMode = useRoutingStore((s) => s.manualMode);
     const setManualMode = useRoutingStore((s) => s.setManualMode);
+    const anchors = useRoutingStore((s) => s.anchors);
+    const returnToStart = useRoutingStore((s) => s.returnToStart);
     const showDistanceMarkers = useRoutingStore((s) => s.showDistanceMarkers);
     const setShowDistanceMarkers = useRoutingStore((s) => s.setShowDistanceMarkers);
     const showRoutePath = useRoutingStore((s) => s.showRoutePath);
@@ -47,6 +78,12 @@ export function RouteBuilderSidebar() {
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
     const addAnchor = useRoutingStore((s) => s.addAnchor);
+
+    // Round trip only makes sense for an open route: ≥2 points and the end
+    // not already back at the start (<50 m would be a closed loop).
+    const canReturnToStart =
+        anchors.length >= 2 &&
+        distance(anchors[0]!, anchors[anchors.length - 1]!) >= RETURN_TO_START_MIN_GAP_M;
 
     // Geocoding search
     const [searchQuery, setSearchQuery] = useState('');
@@ -340,6 +377,39 @@ export function RouteBuilderSidebar() {
                                     manualMode ? 'translate-x-4' : 'translate-x-0'
                                 )}
                             />
+                        </button>
+                    </div>
+
+                    {/* Return to Start (out-and-back round trip) */}
+                    <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                        <div className="flex items-center gap-2.5">
+                            <UTurnIcon className="size-4 text-muted-foreground" />
+                            <div>
+                                <div className="text-xs font-semibold text-foreground">{t.returnToStart}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                    {t.returnToStartDesc}
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => returnToStart()}
+                            disabled={!canReturnToStart}
+                            title={
+                                anchors.length < 2
+                                    ? t.returnToStartNeedPoints
+                                    : !canReturnToStart
+                                      ? t.returnToStartAlreadyLoop
+                                      : t.returnToStartDesc
+                            }
+                            className={cn(
+                                'h-7 shrink-0 rounded-lg border px-2.5 text-[11px] font-semibold transition',
+                                canReturnToStart
+                                    ? 'cursor-pointer border-[#863BFF]/40 bg-[#F5F0FF] text-[#863BFF] hover:bg-[#863BFF] hover:text-white dark:bg-[#2C184D]'
+                                    : 'cursor-not-allowed border-border bg-muted text-muted-foreground opacity-60'
+                            )}
+                        >
+                            {t.returnToStartAction}
                         </button>
                     </div>
                 </div>
