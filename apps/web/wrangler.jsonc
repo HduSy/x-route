@@ -7,11 +7,16 @@
         "directory": "./dist",
         // SPA: unknown paths fall back to index.html
         "not_found_handling": "single-page-application",
-        // Worker first: /api/* relay handled by worker.ts, rest falls through to assets.
-        // /r/* is intercepted by the worker too: share keys get a KV existence
-        // check so dead links 302 to / instead of booting the SPA.
-        "run_worker_first": ["/api/*", "/r/*"],
+        // Route to the worker so GeoIP inspection, /api/*, and /r/* work;
+        // static assets and SPA fallbacks stream from env.ASSETS.fetch(request)
+        "run_worker_first": true,
         "binding": "ASSETS"
+    },
+    "vars": {
+        // Geo-routing switch: set to "true" once x-route.cn completes real-name verification,
+        // ICP filing, and server deployment.
+        "ENABLE_CN_REDIRECT": "false",
+        "CN_TARGET_DOMAIN": "x-route.cn"
     },
     "kv_namespaces": [
         {

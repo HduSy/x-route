@@ -145,9 +145,53 @@ async function handleShareLink(request: Request, url: URL, env: any): Promise<Re
     return env.ASSETS.fetch(request);
 }
 
+/**
+ * GeoIP redirection for Mainland China visitors.
+ * When enabled (ENABLE_CN_REDIRECT=true), requests originating from CN (China)
+ * accessing x-route.app will be 302-redirected to the CN target domain (default: x-route.cn).
+ */
+export function handleGeoRedirect(request: Request, url: URL, env: any): Response | null {
+    const isEnabled = env.ENABLE_CN_REDIRECT === 'true' || env.ENABLE_CN_REDIRECT === true;
+    if (!isEnabled) return null;
+
+    const targetDomain = env.CN_TARGET_DOMAIN || 'x-route.cn';
+
+    // Avoid self-redirect loops if request is already targeting the CN domain
+    if (url.hostname === targetDomain || url.hostname.endsWith(`.${targetDomain}`)) {
+        return null;
+    }
+
+    // Check Cloudflare GeoIP metadata
+    const country = (request as any).cf?.country;
+    if (country !== 'CN') return null;
+
+    // Do NOT redirect backend API requests to avoid CORS / cross-origin breakage
+    if (url.pathname.startsWith('/api/')) return null;
+
+    // Redirect document navigation, root, or share links
+    const accept = request.headers.get('accept') ?? '';
+    const isNavRequest =
+        request.method === 'GET' &&
+        (accept.includes('text/html') || url.pathname === '/' || url.pathname.startsWith('/r/'));
+
+    if (isNavRequest) {
+        const targetUrl = new URL(request.url);
+        targetUrl.hostname = targetDomain;
+        targetUrl.protocol = 'https:';
+        targetUrl.port = '';
+        return Response.redirect(targetUrl.toString(), 302);
+    }
+
+    return null;
+}
+
 export default {
     async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
         const url = new URL(request.url);
+
+        // Optional GeoIP redirection for mainland China visitors
+        const redirect = handleGeoRedirect(request, url, env);
+        if (redirect) return redirect;
 
         if (url.pathname.startsWith('/api/graphhopper')) {
             if (request.method === 'OPTIONS') {
