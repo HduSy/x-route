@@ -46,9 +46,11 @@ function UTurnIcon({ className }: { className?: string }) {
             className={className}
             aria-hidden="true"
         >
-            {/* down the left, half-turn through the bottom, back up the right */}
-            <path d="M7 4v8a5 5 0 0 0 10 0V7" />
-            <path d="m14 10 3-3 3 3" />
+            {/* U-shaped route: down the left, through the bottom, up the right */}
+            <path d="M7 6v6a5 5 0 0 0 10 0V6" />
+            {/* solid endpoint dots, route/git-branch style */}
+            <circle cx="7" cy="6" r="2" fill="currentColor" stroke="none" />
+            <circle cx="17" cy="6" r="2" fill="currentColor" stroke="none" />
         </svg>
     );
 }
