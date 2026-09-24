@@ -26,8 +26,26 @@ jobs:
 
       - run: pnpm --filter @x-route/web build
 
-      - run: npx wrangler pages deploy dist --project-name=x-route --branch=main
+      # Workers deploy: x-route.app + www + /api/graphhopper relay (main site)
+      # Note: dist/_redirects (Pages-only directive) is removed before packaging —
+      # Workers Assets would honor it and 301-loop every static file.
+      - name: Remove Pages-only _redirects
+        run: rm -f apps/web/dist/_redirects
+
+      - name: Deploy Worker (x-route.app)
         working-directory: apps/web
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Pages deploy: legacy x-route.pages.dev now 301s to x-route.app via _redirects
+      - name: Restore _redirects for Pages
+        run: cp apps/web/public/_redirects apps/web/dist/_redirects
+
+      - name: Deploy Pages (legacy redirect)
+        working-directory: apps/web
+        run: npx wrangler pages deploy dist --project-name=x-route --branch=main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
