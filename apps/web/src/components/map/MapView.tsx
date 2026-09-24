@@ -3,14 +3,14 @@ import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AlertTriangle, Check, Compass, Focus, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
-import { GPXFile, type GPXFileType } from '@x-route/gpx';
+import { GPXFile, distance, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
 import { gpxLayers } from '@/lib/map/gpx-layer';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { lassoModeStore } from '@/store/lasso-store';
 import { useSelectionStore } from '@/store/selection-slice';
-import { useRoutingStore } from '@/store/routing-slice';
+import { useRoutingStore, RETURN_TO_START_MIN_GAP_M } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
 import { deleteFile } from '@/lib/file-actions';
 import { useT } from '@/store/i18n-slice';
@@ -28,6 +28,28 @@ function TrackPopupContent({ file }: { file: GPXFileType }) {
                 {global.distance.total.toFixed(1)} km · ↑{Math.round(global.elevation.gain)} m
             </div>
         </div>
+    );
+}
+
+/** U-turn / closed-loop icon in lucide's stroke style (this lucide-react
+ *  build ships no UTurn glyph, so it is drawn by hand). */
+function UTurnIcon({ className }: { className?: string }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            {/* down the left, half-turn through the bottom, back up the right */}
+            <path d="M7 4v8a5 5 0 0 0 10 0V7" />
+            <path d="m14 10 3-3 3 3" />
+        </svg>
     );
 }
 
@@ -79,6 +101,14 @@ export function MapView() {
     const selectedFileId = useSelectionStore((state) => state.selectedFileId);
     const editingFileId = useRoutingStore((s) => s.editingFileId);
     const hasActiveRouteAnchors = useRoutingStore((s) => s.anchors.length >= 2);
+    const returnToStart = useRoutingStore((s) => s.returnToStart);
+    /** Round trip needs an open route: ≥2 anchors and the end not already
+     *  back at the start (<50 m would be a closed loop). */
+    const canReturnToStart = useRoutingStore(
+        (s) =>
+            s.anchors.length >= 2 &&
+            distance(s.anchors[0]!, s.anchors[s.anchors.length - 1]!) >= RETURN_TO_START_MIN_GAP_M
+    );
 
     const files = useLiveQuery(() => db.files.toArray());
     const fileMap = useMemo(() => {
@@ -610,6 +640,28 @@ export function MapView() {
                     }
                 >
                     <Spline className="size-4" />
+                </button>
+
+                {/* Return to start: complete the route as an out-and-back loop */}
+                <button
+                    onClick={() => returnToStart()}
+                    disabled={!canReturnToStart}
+                    aria-label={t.returnToStart}
+                    className={cn(
+                        'flex size-7 items-center justify-center rounded-md transition',
+                        canReturnToStart
+                            ? 'cursor-pointer text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF]'
+                            : 'cursor-not-allowed text-muted-foreground opacity-40'
+                    )}
+                    title={
+                        !hasActiveRouteAnchors
+                            ? t.returnToStartNeedPoints
+                            : !canReturnToStart
+                              ? t.returnToStartAlreadyLoop
+                              : t.returnToStartDesc
+                    }
+                >
+                    <UTurnIcon className="size-4" />
                 </button>
                 <div className="h-px w-full bg-border" />
                 <button
