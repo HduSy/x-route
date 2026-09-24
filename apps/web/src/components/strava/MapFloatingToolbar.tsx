@@ -4,7 +4,7 @@ import {
     ArrowLeftRight,
     Bookmark,
     BookmarkPlus,
-    BoxSelect,
+    SquareDashedMousePointer,
     Check,
     ChevronDown,
     Crosshair,
@@ -261,7 +261,7 @@ export function MapFloatingToolbar() {
                                 )}
                                 title={t.lassoMode}
                             >
-                                <BoxSelect className="size-3.5 sm:size-4" />
+                                <SquareDashedMousePointer className="size-3.5 sm:size-4" />
                             </button>
                         </>
                     )}

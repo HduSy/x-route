@@ -16,7 +16,7 @@ import {
     UploadCloud,
     X,
 } from 'lucide-react';
-import { db, type StoredGPXFile } from '@/lib/db';
+import { db } from '@/lib/db';
 import { deleteFile, exportFile, triggerFileInput } from '@/lib/file-actions';
 import { copyToClipboard, createShareLink } from '@/lib/share';
 import { toast } from '@/lib/toast';
@@ -82,17 +82,19 @@ export function MyRoutesDrawer() {
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; name: string } | null>(null);
     const [sharingId, setSharingId] = useState<string | null>(null);
 
-    const fileIds = useLiveQuery(() => db.fileids.toArray()) ?? [];
-    const files = useLiveQuery(() => db.files.toArray());
-
-    const fileMap = useMemo(() => {
+    const fileEntries = useLiveQuery(async () => {
+        const ids = (await db.fileids.toArray()) ?? [];
+        const fileList = await Promise.all(ids.map((id) => db.files.get(id)));
         const map = new Map<string, GPXFileType>();
-        for (const file of files ?? []) {
-            const id = (file as StoredGPXFile)._data?.id;
-            if (typeof id === 'string') map.set(id, file);
-        }
-        return map;
-    }, [files]);
+        ids.forEach((id, index) => {
+            const f = fileList[index];
+            if (f) map.set(id, f);
+        });
+        return { fileIds: ids, fileMap: map };
+    });
+
+    const fileIds = fileEntries?.fileIds ?? [];
+    const fileMap = fileEntries?.fileMap ?? new Map<string, GPXFileType>();
 
     // Filter file IDs by search query (direct property access without re-instantiating GPXFile)
     const filteredFileIds = useMemo(() => {
@@ -417,7 +419,10 @@ const RouteCard = memo(function RouteCard({
                 </div>
 
                 {/* Action buttons: export, then share */}
-                <div className="flex items-center gap-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+                >
                     <button
                         type="button"
                         onClick={(e) => {
@@ -433,10 +438,13 @@ const RouteCard = memo(function RouteCard({
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
+                            if (isSharing) return;
                             onShare(id);
                         }}
-                        disabled={isSharing}
-                        className="rounded-md p-1 text-muted-foreground transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer disabled:cursor-wait"
+                        className={cn(
+                            'rounded-md p-1 text-muted-foreground transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF]',
+                            isSharing ? 'pointer-events-none opacity-60' : 'cursor-pointer'
+                        )}
                         title={t.shareRoute}
                     >
                         {isSharing ? (
@@ -481,7 +489,10 @@ const RouteCard = memo(function RouteCard({
 
             {/* Bottom Status — text left, delete far right (away from the
              * export/share cluster to prevent accidental taps) */}
-            <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between">
+            <div
+                onClick={(e) => e.stopPropagation()}
+                className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between"
+            >
                 <span className="text-[10px] font-medium text-muted-foreground">
                     {isCurrentEditing ? (
                         <span className="inline-flex items-center gap-1.5 text-[#863BFF] font-semibold">

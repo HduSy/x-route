@@ -1,22 +1,39 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Bookmark, Check, Mountain, Route, X } from 'lucide-react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useT } from '@/store/i18n-slice';
 import { saveGPXFile, updateGPXFile } from '@/lib/file-actions';
-import { GPXFile, Track, TrackSegment, distance } from '@x-route/gpx';
+import { GPXFile, Track, TrackSegment, distance, type GPXFileType } from '@x-route/gpx';
 import { cn } from '@/lib/utils';
 import { computeElevationStats } from '@/lib/elevation';
 import { useSelectionStore } from '@/store/selection-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
+import { db } from '@/lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 export function SaveRouteModal() {
     const saveModalOpen = useRoutingStore((s) => s.saveModalOpen);
+    const editingFileId = useRoutingStore((s) => s.editingFileId);
+    const selectedFileId = useSelectionStore((s) => s.selectedFileId);
+    const targetFileId = editingFileId ?? selectedFileId;
+
+    const existingFile = useLiveQuery(
+        () => (targetFileId ? db.files.get(targetFileId) : undefined),
+        [targetFileId]
+    );
+
     if (!saveModalOpen) return null;
-    return <SaveRouteModalDialog />;
+    return <SaveRouteModalDialog existingFile={existingFile} targetFileId={targetFileId} />;
 }
 
-function SaveRouteModalDialog() {
+function SaveRouteModalDialog({
+    existingFile,
+    targetFileId,
+}: {
+    existingFile?: GPXFileType;
+    targetFileId?: string | null;
+}) {
     const { t } = useT();
 
     const setSaveModalOpen = useRoutingStore((s) => s.setSaveModalOpen);
@@ -30,10 +47,37 @@ function SaveRouteModalDialog() {
         day: 'numeric',
     })}`;
 
-    const [routeName, setRouteName] = useState(defaultName);
-    const [description, setDescription] = useState('');
+    const initialName =
+        existingFile?.metadata?.name?.trim() ||
+        existingFile?.trk?.[0]?.name?.trim() ||
+        defaultName;
+
+    const initialDesc =
+        existingFile?.metadata?.desc?.trim() ||
+        existingFile?.trk?.[0]?.desc?.trim() ||
+        '';
+
+    const [routeName, setRouteName] = useState(initialName);
+    const [description, setDescription] = useState(initialDesc);
     const [saving, setSaving] = useState(false);
     const [savedSuccess, setSavedSuccess] = useState(false);
+
+    useEffect(() => {
+        if (!existingFile) return;
+        const name =
+            existingFile.metadata?.name?.trim() ||
+            existingFile.trk?.[0]?.name?.trim();
+        if (name && routeName === defaultName) {
+            setRouteName(name);
+        }
+        const desc =
+            existingFile.metadata?.desc?.trim() ||
+            existingFile.trk?.[0]?.desc?.trim() ||
+            '';
+        if (desc && !description) {
+            setDescription(desc);
+        }
+    }, [existingFile, defaultName, routeName, description]);
 
     // Compute route quick summary
     const summary = useMemo(() => {
@@ -92,11 +136,17 @@ function SaveRouteModalDialog() {
                 },
             });
 
-            let targetFileId = editingFileId;
-            if (editingFileId) {
-                await updateGPXFile(editingFileId, file, false);
+            const effectiveFileId =
+                editingFileId ||
+                (targetFileId && useSelectionStore.getState().loadedFileIds.includes(targetFileId)
+                    ? targetFileId
+                    : null);
+
+            let savedFileId = effectiveFileId;
+            if (effectiveFileId) {
+                await updateGPXFile(effectiveFileId, file, false);
             } else {
-                targetFileId = await saveGPXFile(file, false);
+                savedFileId = await saveGPXFile(file, false);
             }
             setSavedSuccess(true);
             setTimeout(() => {
@@ -104,9 +154,9 @@ function SaveRouteModalDialog() {
                 setSaveModalOpen(false);
 
                 // 1. Activate the saved route as loaded on the map (via gpxLayers)
-                if (targetFileId) {
-                    useSelectionStore.getState().addLoadedFile(targetFileId);
-                    useSelectionStore.getState().selectFile(targetFileId);
+                if (savedFileId) {
+                    useSelectionStore.getState().addLoadedFile(savedFileId);
+                    useSelectionStore.getState().selectFile(savedFileId);
                 }
 
                 // 2. Clear editing planner so editor is in ready state for continuous creation
