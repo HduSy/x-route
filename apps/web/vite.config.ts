@@ -45,6 +45,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/brouter/, ''),
       },
+      // Route sharing lives in worker.ts — run `npx wrangler dev` (port 8787)
+      // alongside vite to use share links in dev.
+      '/api/share': {
+        target: 'http://127.0.0.1:8787',
+      },
     },
   },
 })

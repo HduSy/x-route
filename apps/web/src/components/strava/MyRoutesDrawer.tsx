@@ -7,15 +7,19 @@ import {
     Clock,
     Compass,
     Download,
+    Loader2,
     Mountain,
     Route,
     Search,
+    Share2,
     Trash2,
     UploadCloud,
     X,
 } from 'lucide-react';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { deleteFile, exportFile, triggerFileInput } from '@/lib/file-actions';
+import { copyToClipboard, createShareLink } from '@/lib/share';
+import { toast } from '@/lib/toast';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useSelectionStore } from '@/store/selection-slice';
@@ -76,6 +80,7 @@ export function MyRoutesDrawer() {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; name: string } | null>(null);
+    const [sharingId, setSharingId] = useState<string | null>(null);
 
     const fileIds = useLiveQuery(() => db.fileids.toArray()) ?? [];
     const files = useLiveQuery(() => db.files.toArray());
@@ -159,6 +164,23 @@ export function MyRoutesDrawer() {
     const handleExport = useCallback((id: string) => {
         void exportFile(id);
     }, []);
+
+    const handleShare = useCallback(
+        async (id: string) => {
+            if (sharingId !== null) return;
+            setSharingId(id);
+            try {
+                const link = await createShareLink(id);
+                await copyToClipboard(link);
+                toast(t.shareLinkCopied);
+            } catch {
+                toast(t.shareFailed, 'error');
+            } finally {
+                setSharingId(null);
+            }
+        },
+        [sharingId, t]
+    );
 
     const handleDeleteRequest = useCallback((id: string, name: string) => {
         setDeleteConfirmTarget({ id, name });
@@ -273,10 +295,12 @@ export function MyRoutesDrawer() {
                                     fileData={fileData}
                                     isLoaded={isLoaded}
                                     isCurrentEditing={isCurrentEditing}
+                                    isSharing={sharingId === id}
                                     t={t}
                                     onToggle={handleToggleRoute}
                                     onLoad={handleLoadRoute}
                                     onExport={handleExport}
+                                    onShare={handleShare}
                                     onDeleteRequest={handleDeleteRequest}
                                 />
                             );
@@ -336,10 +360,12 @@ interface RouteCardProps {
     fileData: GPXFileType;
     isLoaded: boolean;
     isCurrentEditing: boolean;
+    isSharing: boolean;
     t: ReturnType<typeof useT>['t'];
     onToggle: (id: string, isLoaded: boolean) => void;
     onLoad: (id: string) => void;
     onExport: (id: string) => void;
+    onShare: (id: string) => void;
     onDeleteRequest: (id: string, name: string) => void;
 }
 
@@ -348,10 +374,12 @@ const RouteCard = memo(function RouteCard({
     fileData,
     isLoaded,
     isCurrentEditing,
+    isSharing,
     t,
     onToggle,
     onLoad,
     onExport,
+    onShare,
     onDeleteRequest,
 }: RouteCardProps) {
     const { name, pointsCount, distKm, ascentM, estTime } = getRouteStats(fileData, t.untitled);
@@ -388,7 +416,7 @@ const RouteCard = memo(function RouteCard({
                     </div>
                 </div>
 
-                {/* Action buttons */}
+                {/* Action buttons: export, then share */}
                 <div className="flex items-center gap-0.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
                     <button
                         type="button"
@@ -405,12 +433,17 @@ const RouteCard = memo(function RouteCard({
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            onDeleteRequest(id, name);
+                            onShare(id);
                         }}
-                        className="rounded-md p-1 text-muted-foreground transition hover:bg-red-50 hover:text-destructive cursor-pointer"
-                        title={t.delete}
+                        disabled={isSharing}
+                        className="rounded-md p-1 text-muted-foreground transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF] cursor-pointer disabled:cursor-wait"
+                        title={t.shareRoute}
                     >
-                        <Trash2 className="size-3.5" />
+                        {isSharing ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                            <Share2 className="size-3.5" />
+                        )}
                     </button>
                 </div>
             </div>
@@ -446,8 +479,9 @@ const RouteCard = memo(function RouteCard({
                 </div>
             </div>
 
-            {/* Bottom Status */}
-            <div className="mt-2 pt-2 border-t border-border/60 flex items-center">
+            {/* Bottom Status — text left, delete far right (away from the
+             * export/share cluster to prevent accidental taps) */}
+            <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between">
                 <span className="text-[10px] font-medium text-muted-foreground">
                     {isCurrentEditing ? (
                         <span className="inline-flex items-center gap-1.5 text-[#863BFF] font-semibold">
@@ -470,6 +504,17 @@ const RouteCard = memo(function RouteCard({
                         <span>{t.readyToLoad}</span>
                     )}
                 </span>
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteRequest(id, name);
+                    }}
+                    className="rounded-md p-1 text-muted-foreground/70 transition hover:bg-red-50 hover:text-destructive cursor-pointer"
+                    title={t.delete}
+                >
+                    <Trash2 className="size-3.5" />
+                </button>
             </div>
         </div>
     );

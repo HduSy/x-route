@@ -9,7 +9,6 @@ import {
     MapPin,
     Mountain,
     Search,
-    Spline,
     X,
 } from 'lucide-react';
 import { useRoutingStore, type UnitType, type ElevationPreference, type RoutingPreference } from '@/store/routing-slice';
@@ -315,13 +314,10 @@ export function RouteBuilderSidebar() {
 
                     {/* Manual Mode Toggle Switch */}
                     <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                        <div className="flex items-center gap-2.5">
-                            <Spline className="size-4 text-muted-foreground" />
-                            <div>
-                                <div className="text-xs font-semibold text-foreground">{t.manualMode}</div>
-                                <div className="text-[10px] text-muted-foreground">
-                                    {t.manualModeDesc}
-                                </div>
+                        <div className="pr-2">
+                            <div className="text-xs font-semibold text-foreground">{t.manualMode}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                                {t.manualModeDesc}
                             </div>
                         </div>
                         <button

@@ -7,8 +7,18 @@
         "directory": "./dist",
         // SPA: unknown paths fall back to index.html
         "not_found_handling": "single-page-application",
-        // Worker first: /api/* relay handled by worker.ts, rest falls through to assets
-        "run_worker_first": ["/api/*"],
+        // Worker first: /api/* relay handled by worker.ts, rest falls through to assets.
+        // /r/* is intercepted by the worker too: share keys get a KV existence
+        // check so dead links 302 to / instead of booting the SPA.
+        "run_worker_first": ["/api/*", "/r/*"],
         "binding": "ASSETS"
-    }
+    },
+    "kv_namespaces": [
+        {
+            // Route sharing store: key = 6-char base62, value = gzip'd GPX bytes,
+            // TTL 1 day (links are a delivery channel, not permanent storage).
+            "binding": "ROUTE_SHARES",
+            "id": "f36453794f1d4b9bbe206eaf1fd79bf8"
+        }
+    ]
 }

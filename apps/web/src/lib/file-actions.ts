@@ -221,12 +221,17 @@ async function addFiles(files: GPXFile[]) {
         }
 
         // 3. Fit camera bounds to the route
-        const { global } = (firstFile as GPXFile).getStatistics();
-        if (global?.bounds) {
-            const sw = global.bounds.southWest;
-            const ne = global.bounds.northEast;
-            mapManager.fitBounds([[sw.lon, sw.lat], [ne.lon, ne.lat]], 80);
-        }
+        mapManager.onReady((map) => {
+            map.resize();
+            const { global } = (firstFile as GPXFile).getStatistics();
+            if (trkpts.length >= 2) {
+                mapManager.fitToPlannerRoute();
+            } else if (global?.bounds) {
+                const sw = global.bounds.southWest;
+                const ne = global.bounds.northEast;
+                mapManager.fitBounds([[sw.lon, sw.lat], [ne.lon, ne.lat]], 80);
+            }
+        });
     }
 }
 

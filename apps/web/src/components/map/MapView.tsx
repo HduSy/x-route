@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, Check, Compass, Focus, GitPullRequestArrow, Layers, Minus, Plus, Route, Spline } from 'lucide-react';
+import { AlertTriangle, Check, Compass, Focus, GitPullRequestArrow, Layers, Minus, Plus, Route, Waypoints } from 'lucide-react';
 import { GPXFile, distance, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
@@ -617,7 +617,7 @@ export function MapView() {
                             : t.manualModeInactive
                     }
                 >
-                    <Spline className="size-4" />
+                    <Waypoints className="size-4" />
                 </button>
 
                 {/* Return to start: complete the route as an out-and-back loop */}
