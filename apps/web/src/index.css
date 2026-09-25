@@ -301,3 +301,92 @@
   background-color: transparent;
   filter: invert(1);
 }
+
+/* Print optimization: clean A4 layout, hide interactive UI, expand canvas */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  /* Retain high-contrast route lines and vibrant brand colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force hide all print-hidden elements, map attribution, and interactive editor handles */
+  .print\:hidden,
+  .maplibregl-ctrl-attrib,
+  .maplibregl-compact,
+  .x-route-anchor-marker,
+  .x-route-drag-tip,
+  .x-route-ghost-marker,
+  .x-route-cursor-marker,
+  .x-route-user-location {
+    display: none !important;
+  }
+
+  /* Reset desktop sidebar offset for map scale control in print */
+  .sidebar-open .maplibregl-ctrl-bottom-left {
+    transform: none !important;
+  }
+
+  /* Expand body and map to entire page */
+  html,
+  body,
+  #root {
+    height: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  /* Map container fills full printable area */
+  .maplibregl-map {
+    width: 100% !important;
+    height: 100% !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  .maplibregl-canvas-container {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+  }
+
+  .maplibregl-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+  }
+
+  /* Clean up bottom stats bar on paper and prevent unwanted page breaks */
+  footer {
+    border-top: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Invert dark mode variables for print to save ink */
+  .dark {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --border: oklch(0.922 0 0);
+    --muted-foreground: oklch(0.4 0 0);
+  }
+}

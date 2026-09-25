@@ -15,8 +15,25 @@
 - **中国大陆访客 GeoIP 边缘智能分流系统**：
   - 在 Cloudflare Worker 边缘层实现按访客地理位置（`request.cf.country === 'CN'`）智能分流，支持无缝 302 重定向至国内域名 `x-route.cn`。
   - 具备严格的生产级防御机制：自动豁免 `/api/*` 接口与静态资源、防止同域名自循环跳转；配置 `ENABLE_CN_REDIRECT` 环境变量安全熔断开关（默认 `false`），在新域名实名核验与服务就绪前不影响线上正常访问。
+- **A4 浏览器打印排版优化（第一阶段）**：
+  - 触发打印时（`Cmd+P` / `Ctrl+P` / `window.print()`）自动通过 `@media print` 隐藏顶部导航栏、左右侧边抽屉、底部悬浮操作条及地图浮动交互按钮，提供纯净视口。
+  - MapLibre WebGL 渲染优化：开启 `canvasContextAttributes.preserveDrawingBuffer: true`，彻底根除打印预览时地图 Canvas 变黑/白屏的底层渲染缺陷。
+  - 新增 `usePrintHandler` 钩子：在 `beforeprint` 事件中自适应计算最佳视图边距（`fitActiveRoute`）并重算地图投影尺寸，确保路线在 A4 横版画幅中完整居中呈现且不被裁切；暗黑模式打印时自动智能转为省墨白底样式。
 
 ### 🐛 修复 (Bug Fixes)
+- **A4 打印时起点绿色圆点及终点图钉漂移脱离路线的问题**：
+  - 根因分析：路线折线与里程数字徽章均由 MapLibre 在 WebGL Canvas 内通过着色器直接栅格化绘制，因此无论缩放排版如何变动均保持 100% 绝对咬合；而起点绿色圆点与终点黑白棋盘格图钉此前为外部 HTML DOM Marker 元素（`new Marker()`），依赖浏览器在 `@media print` 阶段通过 CSS `transform: translate(...)` 计算像素投影。当浏览器排版引擎为 A4 横版生成物理打印视口及边距时，DOM 坐标更新机制未及时与 GPU 画布对齐，导致起终点 DOM 图钉出现明显的像素级偏移漂移。
+  - 彻底方案（纯 WebGL 端到端绘制）：
+    - 在 `routing-layer.ts` 中通过 Canvas 2D 动态生成与原 DOM 样式 1:1 像素级复刻的 2x 高清矢量徽章图片（起点 `x-route-start-badge` 经典 Strava 绿色实心带白边阴影圆点，终点 `x-route-finish-badge` 经典黑白方格旗圆点）。
+    - 引入专用的 WebGL 矢量图钉层 `x-route-endpoints-symbol`，直接以路线首末顶点坐标（`points[0]` 与 `points[n-1]`）为锚点在 GPU 渲染管线中同批次绘制，设置 `'icon-allow-overlap': true` 确保始终位于顶层且与路线零距离贴合，从数学与渲染底层彻底消除漂移可能性（0.0000px 偏移）。
+    - 在 `index.css` 的 `@media print` 中将所有交互式 HTML DOM Marker（`.x-route-anchor-marker`）全部隐藏，确保屏幕端保留完整鼠标拖拽手柄与微交互，纸质打印端则由 WebGL Canvas 独占纯净且绝对精准的起终点徽章呈现。
+- **A4 打印时地图容器高度坍缩为 0、仅残留海拔图的问题**：
+  - 根因分析：在打印模式下，`App.tsx` 外层使用了 `print:h-auto` 且子级包含无有效空格的 `print:h-[calc(100vh-65px)]` 语法导致高度规则被浏览器丢弃；内部 `<main>` 使用了 `print:relative` 导致原本依赖 flex 撑开的地图 DOM 容器计算高度瞬间坍缩为 `0px`，使得纸面上仅有具备固定高度的海拔图与状态栏可见。此外，MapLibre 的 `_resizeCanvas()` 在重置 buffer 尺寸时会清空 WebGL 缓冲区，而其默认通过 `requestAnimationFrame` 异步绘制的帧无法在浏览器同步截取打印快照前执行，导致地图内容偶发性白屏。
+  - 布局与渲染修复：将主容器调整为 `print:h-full` 与 `flex-1 min-h-0` 结合 `absolute inset-0` 的稳固层级，保证地图视口完美填满除底部状态栏以外的所有纸面空间；在 `@media print` 样式中显式约束 `.maplibregl-canvas-container` 与 `.maplibregl-canvas` 的绝对定位覆盖；并在 `beforeprint` 时追加 `map.redraw()` 强制执行同步绘制，确保 WebGL 画布在打印快照捕捉前已完全着色。
+- **A4 打印时路线与点位分离、编辑器句柄杂乱问题**：
+  - 根因分析：在打印模式下，`@media print` 对 `.maplibregl-canvas` 的强制拉伸与 `position: relative` 破坏了 MapLibre 原生的绝对像素坐标映射，导致 WebGL Canvas 图像拉伸重排而 DOM Marker 停留在旧屏幕坐标，形成「线在陆地、点漂在海上」的错位分离。
+  - 样式重构：移除了对 Canvas 容器的原生绝对定位覆盖，保持 MapLibre 内部 1:1 像素映射；同时在 `@media print` 下隐藏了仅用于在线交互拖拽的中间航点紫色句柄（`.x-route-anchor-via`）、幽灵吸附圆点、拖拽提示标签、GPS定位点以及海拔图表光标，使得纸质打印件仅保留精炼路线、起终点图钉与里程徽章。
+  - 打印调度优化：重构了 `usePrintHandler`，在 `beforeprint` 时先执行 `map.resize()` 刷新视口容器尺寸再调用 `fitActiveRoute` 居中路线，并在打印结束后自动恢复原先屏幕视口，确保无缝闭环。
 - **分享点击导致路线消失问题**：
   - 移除了分享按钮的 HTML `disabled` 属性（改为基于类名的不可点击态 `pointer-events-none`），彻底根除了浏览器在元素被 `disabled` 时将 click 事件穿透/冒泡到父级卡片 `onToggle` 从而导致路线被静默卸载（Unload）的问题。
   - 为路线卡片的「操作按钮区」和「底部状态栏」添加严格的点击事件冒泡阻断保护（`stopPropagation`），避免卡片局部交互误触发整张卡片的选中/取消选中。

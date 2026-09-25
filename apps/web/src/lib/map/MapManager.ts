@@ -13,6 +13,9 @@ import {
 // https://www.maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { useRoutingStore } from '@/store/routing-slice';
+import { useSelectionStore } from '@/store/selection-slice';
+import { db } from '@/lib/db';
+import { GPXFile, type GPXFileType } from '@x-route/gpx';
 
 setWorkerUrl(workerUrl);
 
@@ -212,6 +215,11 @@ class MapManager {
     private styleReloadCallbacks = new Set<() => void>();
     private userInteracted = false;
     private saveViewportTimer: ReturnType<typeof setTimeout> | null = null;
+    private activeFileGetter: ((fileId: string) => GPXFileType | null) | null = null;
+
+    registerActiveFileGetter(getter: (fileId: string) => GPXFileType | null) {
+        this.activeFileGetter = getter;
+    }
 
     hasSavedViewport(): boolean {
         return getSavedViewport() !== null;
@@ -242,6 +250,9 @@ class MapManager {
             minZoom: 2.0,
             maxZoom: 19.0,
             attributionControl: false,
+            canvasContextAttributes: {
+                preserveDrawingBuffer: true,
+            },
         });
         const attribControl = new CompactAttributionControl({ compact: true });
         map.addControl(attribControl);
@@ -491,7 +502,7 @@ class MapManager {
      *  result line first, anchor points as fallback. Single shared focus
      *  implementation — used by the toolbar focus button and by card loading
      *  (where resultPoints was just seeded from the file's own track). */
-    fitToPlannerRoute() {
+    fitToPlannerRoute(padding = 80, instant = false) {
         if (!this.map) return;
         const { resultPoints, anchors } = useRoutingStore.getState();
 
@@ -505,7 +516,7 @@ class MapManager {
                 if (lon > maxLon) maxLon = lon;
                 if (lat > maxLat) maxLat = lat;
             }
-            this.fitBounds([minLon, minLat, maxLon, maxLat], 80);
+            this.fitBounds([minLon, minLat, maxLon, maxLat], padding, instant);
         } else if (anchors.length > 0) {
             let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
             for (const a of anchors) {
@@ -515,9 +526,49 @@ class MapManager {
                 if (a.lat > maxLat) maxLat = a.lat;
             }
             if (minLon === maxLon && minLat === maxLat) {
-                this.map.flyTo({ center: [minLon, minLat], zoom: 15, duration: 600 });
+                this.map.flyTo({ center: [minLon, minLat], zoom: 15, duration: instant ? 0 : 600 });
             } else {
-                this.fitBounds([minLon, minLat, maxLon, maxLat], 80);
+                this.fitBounds([minLon, minLat, maxLon, maxLat], padding, instant);
+            }
+        }
+    }
+
+    private fitFileTrackPoints(data: GPXFileType, padding = 80, instant = false) {
+        const file = new GPXFile(data);
+        const trkpts = file.getTrackPoints();
+        if (trkpts.length >= 2) {
+            let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+            for (const pt of trkpts) {
+                const c = pt.getCoordinates();
+                if (c.lon < minLon) minLon = c.lon;
+                if (c.lat < minLat) minLat = c.lat;
+                if (c.lon > maxLon) maxLon = c.lon;
+                if (c.lat > maxLat) maxLat = c.lat;
+            }
+            this.fitBounds([minLon, minLat, maxLon, maxLat], padding, instant);
+        }
+    }
+
+    /** Fit camera to either planner route or currently selected saved file. */
+    async fitActiveRoute(padding = 80, instant = false) {
+        if (!this.map) return;
+        const { resultPoints, anchors } = useRoutingStore.getState();
+
+        if (resultPoints.length >= 2 || anchors.length > 0) {
+            this.fitToPlannerRoute(padding, instant);
+            return;
+        }
+
+        const selectedFileId = useSelectionStore.getState().selectedFileId;
+        if (selectedFileId) {
+            const memoryFile = this.activeFileGetter?.(selectedFileId);
+            if (memoryFile) {
+                this.fitFileTrackPoints(memoryFile, padding, instant);
+                return;
+            }
+            const data = await db.files.get(selectedFileId);
+            if (data) {
+                this.fitFileTrackPoints(data, padding, instant);
             }
         }
     }

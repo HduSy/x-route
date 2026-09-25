@@ -52,6 +52,10 @@ class GPXLayerController {
     private lastFiles: LayerFile[] = [];
     private lastSelected: string | null = null;
 
+    getFile(fileId: string): GPXFileType | null {
+        return this.lastFiles.find((f) => f.fileId === fileId)?.file ?? null;
+    }
+
     sync(files: LayerFile[], selectedFileId: string | null) {
         this.lastFiles = files;
         this.lastSelected = selectedFileId;
@@ -236,4 +240,5 @@ class GPXLayerController {
 }
 
 export const gpxLayers = new GPXLayerController();
+mapManager.registerActiveFileGetter((fileId) => gpxLayers.getFile(fileId));
 (globalThis as { __xroute_gpx?: GPXLayerController }).__xroute_gpx = gpxLayers;

@@ -580,7 +580,7 @@ export function MapView() {
             {/* Strava style Vertical Map Controls (Draw mode, Zoom in, Zoom out, Compass) */}
             <div
                 className={cn(
-                    'absolute top-13 sm:top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none transition-[left] duration-200 ease-in-out',
+                    'absolute top-13 sm:top-16 z-10 flex flex-col gap-1 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-sm select-none transition-[left] duration-200 ease-in-out print:hidden',
                     sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
                 )}
             >
@@ -679,7 +679,7 @@ export function MapView() {
             {/* Bottom-left Map Style & 3D Controls (Stacked neatly above the scale bar) */}
             <div
                 className={cn(
-                    'absolute bottom-8 sm:bottom-9 z-10 flex flex-col gap-1 select-none transition-[left] duration-200 ease-in-out',
+                    'absolute bottom-8 sm:bottom-9 z-10 flex flex-col gap-1 select-none transition-[left] duration-200 ease-in-out print:hidden',
                     sidebarCollapsed ? 'left-2 sm:left-3' : 'left-2 sm:left-[332px]'
                 )}
             >

@@ -120,6 +120,11 @@ const MILESTONES_LAYER_ID = 'x-route-milestones-symbol';
 const BADGE_IMAGE_ID = 'x-route-milestone-badge';
 const BADGE_IMAGE_WIDE_ID = 'x-route-milestone-badge-wide';
 
+const START_BADGE_IMAGE_ID = 'x-route-start-badge';
+const FINISH_BADGE_IMAGE_ID = 'x-route-finish-badge';
+const ENDPOINTS_SOURCE_ID = 'x-route-endpoints';
+const ENDPOINTS_LAYER_ID = 'x-route-endpoints-symbol';
+
 const RUBBER_BAND_SOURCE_ID = 'x-route-rubber-band';
 const RUBBER_BAND_LAYER_ID = 'x-route-rubber-band-line';
 
@@ -212,6 +217,90 @@ function ensureBadgeImages(map: MapLibreMap) {
             map.addImage(BADGE_IMAGE_WIDE_ID, imageData, { pixelRatio: 2 });
         }
     }
+
+    // 3. Start node badge (Strava energetic green circle with white border)
+    if (!map.hasImage(START_BADGE_IMAGE_ID)) {
+        const size = 48; // 24px CSS diameter @ 2x pixelRatio
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, size, size);
+            const center = size / 2;
+            const radius = 16;
+
+            // Soft drop shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 1.5;
+
+            // Strava energetic green disc fill
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00B548';
+            ctx.fill();
+
+            // Crisp white border
+            ctx.shadowColor = 'transparent';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.stroke();
+
+            const imageData = ctx.getImageData(0, 0, size, size);
+            map.addImage(START_BADGE_IMAGE_ID, imageData, { pixelRatio: 2 });
+        }
+    }
+
+    // 4. Finish node badge (Strava signature checkered circle with white border)
+    if (!map.hasImage(FINISH_BADGE_IMAGE_ID)) {
+        const size = 48; // 24px CSS diameter @ 2x pixelRatio
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, size, size);
+            const center = size / 2;
+            const radius = 16;
+
+            // Soft drop shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 1.5;
+
+            // Base white disc fill for drop shadow
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+
+            // Checkered finish pattern clipped to circle
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, 2 * Math.PI);
+            ctx.clip();
+
+            const checkSize = 5;
+            for (let x = 0; x < size; x += checkSize) {
+                for (let y = 0; y < size; y += checkSize) {
+                    const isDark = (Math.floor(x / checkSize) + Math.floor(y / checkSize)) % 2 === 0;
+                    ctx.fillStyle = isDark ? '#18181B' : '#FFFFFF';
+                    ctx.fillRect(x, y, checkSize, checkSize);
+                }
+            }
+            ctx.restore();
+
+            // Crisp white border
+            ctx.shadowColor = 'transparent';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.stroke();
+
+            const imageData = ctx.getImageData(0, 0, size, size);
+            map.addImage(FINISH_BADGE_IMAGE_ID, imageData, { pixelRatio: 2 });
+        }
+    }
 }
 
 function getPreferredFontStack(map: MapLibreMap): string[] {
@@ -296,6 +385,7 @@ export class RoutingLayerController {
     private showRoutePath = true;
     private units: UnitType = 'km';
     private isDrawMode = false;
+    private isPrintMode = false;
 
     private clickHandler:
         | ((e: { lngLat: { lng: number; lat: number } }) => void)
@@ -827,6 +917,7 @@ export class RoutingLayerController {
             this.wire(map);
             this.syncMarkers(map, anchors);
             this.ensureLayers(map);
+            this.updateEndpointMarkers();
         });
     }
 
@@ -1130,7 +1221,37 @@ export class RoutingLayerController {
             });
         }
 
+        // WebGL Start & Finish Endpoints (GeoJSON Vector Source + Symbol Layer with highest z-order)
+        if (!map.getSource(ENDPOINTS_SOURCE_ID)) {
+            map.addSource(ENDPOINTS_SOURCE_ID, {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] },
+            });
+        }
+
+        if (!map.getLayer(ENDPOINTS_LAYER_ID)) {
+            map.addLayer({
+                id: ENDPOINTS_LAYER_ID,
+                type: 'symbol',
+                source: ENDPOINTS_SOURCE_ID,
+                layout: {
+                    'icon-image': ['get', 'icon'],
+                    'icon-size': 1,
+                    'icon-anchor': 'center',
+                    'icon-pitch-alignment': 'viewport',
+                    'icon-rotation-alignment': 'viewport',
+                    'icon-allow-overlap': true,
+                    'icon-ignore-placement': true,
+                    'visibility': this.isPrintMode && this.showRoutePath ? 'visible' : 'none',
+                },
+                paint: {
+                    'icon-opacity': 1,
+                },
+            });
+        }
+
         this.updateDistanceMarkers();
+        this.updateEndpointMarkers();
     }
 
     setOptions(options: {
@@ -1167,8 +1288,16 @@ export class RoutingLayerController {
                     this.showDistanceMarkers && this.showRoutePath ? 'visible' : 'none'
                 );
             }
+            if (map.getLayer(ENDPOINTS_LAYER_ID)) {
+                map.setLayoutProperty(
+                    ENDPOINTS_LAYER_ID,
+                    'visibility',
+                    this.isPrintMode && this.showRoutePath ? 'visible' : 'none'
+                );
+            }
         });
         this.updateDistanceMarkers();
+        this.updateEndpointMarkers();
     }
 
     private updateDistanceMarkers() {
@@ -1295,6 +1424,99 @@ export class RoutingLayerController {
         });
     }
 
+    private updateEndpointMarkers() {
+        const map = mapManager.getMap();
+        if (!map) return;
+
+        const source = typeof map.getSource === 'function'
+            ? (map.getSource(ENDPOINTS_SOURCE_ID) as GeoJSONSource | undefined)
+            : undefined;
+        if (!source) return;
+
+        if (!this.showRoutePath) {
+            source.setData({ type: 'FeatureCollection', features: [] });
+            return;
+        }
+
+        const features: any[] = [];
+
+        if (this.currentPoints.length >= 2) {
+            const firstPt = this.currentPoints[0]!;
+            const lastPt = this.currentPoints[this.currentPoints.length - 1]!;
+
+            features.push({
+                type: 'Feature',
+                properties: {
+                    kind: 'start',
+                    icon: START_BADGE_IMAGE_ID,
+                },
+                geometry: {
+                    type: 'Point',
+                    coordinates: [firstPt.attributes.lon, firstPt.attributes.lat],
+                },
+            });
+
+            features.push({
+                type: 'Feature',
+                properties: {
+                    kind: 'end',
+                    icon: FINISH_BADGE_IMAGE_ID,
+                },
+                geometry: {
+                    type: 'Point',
+                    coordinates: [lastPt.attributes.lon, lastPt.attributes.lat],
+                },
+            });
+        } else if (this.currentAnchors.length > 0) {
+            const firstAnchor = this.currentAnchors[0]!;
+            features.push({
+                type: 'Feature',
+                properties: {
+                    kind: 'start',
+                    icon: START_BADGE_IMAGE_ID,
+                },
+                geometry: {
+                    type: 'Point',
+                    coordinates: [firstAnchor.lon, firstAnchor.lat],
+                },
+            });
+
+            if (this.currentAnchors.length > 1) {
+                const lastAnchor = this.currentAnchors[this.currentAnchors.length - 1]!;
+                features.push({
+                    type: 'Feature',
+                    properties: {
+                        kind: 'end',
+                        icon: FINISH_BADGE_IMAGE_ID,
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [lastAnchor.lon, lastAnchor.lat],
+                    },
+                });
+            }
+        }
+
+        source.setData({
+            type: 'FeatureCollection',
+            features,
+        });
+    }
+
+    setPrintMode(printing: boolean) {
+        this.isPrintMode = printing;
+        const map = mapManager.getMap();
+        if (!map) return;
+        this.updateEndpointMarkers();
+        if (typeof map.getLayer === 'function' && map.getLayer(ENDPOINTS_LAYER_ID)) {
+            map.setLayoutProperty(
+                ENDPOINTS_LAYER_ID,
+                'visibility',
+                this.isPrintMode && this.showRoutePath ? 'visible' : 'none'
+            );
+        }
+    }
+
     setResult(points: TrackPoint[]) {
         this.currentPoints = points;
         mapManager.onReady((map) => {
@@ -1309,6 +1531,7 @@ export class RoutingLayerController {
                     source.setData({ type: 'FeatureCollection', features: [] });
                     this.removeGhostMarker();
                     this.updateDistanceMarkers();
+                    this.updateEndpointMarkers();
                     return;
                 }
                 source.setData({
@@ -1328,6 +1551,7 @@ export class RoutingLayerController {
                     ],
                 });
                 this.updateDistanceMarkers();
+                this.updateEndpointMarkers();
                 this.alignMarkersToRoute();
                 return;
             }
@@ -1416,14 +1640,18 @@ export class RoutingLayerController {
             try {
                 if (map.getLayer(LINE_HIT_AREA_LAYER_ID)) map.removeLayer(LINE_HIT_AREA_LAYER_ID);
                 if (map.getLayer(RUBBER_BAND_LAYER_ID)) map.removeLayer(RUBBER_BAND_LAYER_ID);
+                if (map.getLayer(ENDPOINTS_LAYER_ID)) map.removeLayer(ENDPOINTS_LAYER_ID);
                 if (map.getLayer(MILESTONES_LAYER_ID)) map.removeLayer(MILESTONES_LAYER_ID);
                 if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
                 if (map.getLayer(LINE_CASING_LAYER_ID)) map.removeLayer(LINE_CASING_LAYER_ID);
                 if (map.getSource(RUBBER_BAND_SOURCE_ID)) map.removeSource(RUBBER_BAND_SOURCE_ID);
+                if (map.getSource(ENDPOINTS_SOURCE_ID)) map.removeSource(ENDPOINTS_SOURCE_ID);
                 if (map.getSource(MILESTONES_SOURCE_ID)) map.removeSource(MILESTONES_SOURCE_ID);
                 if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
                 if (map.hasImage(BADGE_IMAGE_ID)) map.removeImage(BADGE_IMAGE_ID);
                 if (map.hasImage(BADGE_IMAGE_WIDE_ID)) map.removeImage(BADGE_IMAGE_WIDE_ID);
+                if (map.hasImage(START_BADGE_IMAGE_ID)) map.removeImage(START_BADGE_IMAGE_ID);
+                if (map.hasImage(FINISH_BADGE_IMAGE_ID)) map.removeImage(FINISH_BADGE_IMAGE_ID);
             } catch {
                 // Ignore cleanup errors
             }
