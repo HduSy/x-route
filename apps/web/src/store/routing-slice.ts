@@ -12,7 +12,7 @@ export type { SegmentMode };
 export const RETURN_TO_START_MIN_GAP_M = 50;
 
 export type UnitType = 'km' | 'mi';
-export type RoutingPreference = 'popular' | 'flat' | 'direct';
+export type RoutingPreference = 'popular' | 'flat' | 'direct' | 'cycleway' | 'tertiary';
 export type ElevationPreference = 'any' | 'min' | 'max';
 
 /** Undo/redo entry: anchors and their per-segment modes restore together. */

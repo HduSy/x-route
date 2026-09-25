@@ -1,4 +1,5 @@
 import { TrackPoint, distance, type Coordinates } from '@x-route/gpx';
+import type { RoutingPreference } from '@/store/routing-slice';
 
 // Route planning service — mirrors gpx.studio's dual-engine setup (AD-5).
 // GraphHopper goes through the relay (strict CORS on the origin instance);
@@ -35,7 +36,11 @@ const graphhopperBlockPrivate: Record<string, { priority: { if: string; multiply
     foot: { priority: [{ if: 'foot_road_access == PRIVATE', multiply_by: '0.0' }] },
 };
 
-function buildGraphHopperCustomModel(profile: string, elevationPreference: 'any' | 'min' | 'max'): object {
+export function buildGraphHopperCustomModel(
+    profile: string,
+    elevationPreference: 'any' | 'min' | 'max' = 'any',
+    routingPreference: RoutingPreference = 'popular'
+): object {
     const base = graphhopperBlockPrivate[profile];
     const priorities: { if: string; multiply_by: string }[] = base?.priority ? [...base.priority] : [];
 
@@ -48,6 +53,24 @@ function buildGraphHopperCustomModel(profile: string, elevationPreference: 'any'
         priorities.push(
             { if: 'average_slope > 2 || average_slope < -2', multiply_by: '1.8' },
             { if: 'average_slope > 5 || average_slope < -5', multiply_by: '2.5' }
+        );
+    }
+
+    if (routingPreference === 'cycleway') {
+        // Heavily prioritize dedicated cycle paths and greenways (highway=cycleway)
+        priorities.push(
+            { if: 'road_class == MOTORWAY || road_class == TRUNK', multiply_by: '0.0' },
+            { if: 'road_class == PRIMARY', multiply_by: '0.05' },
+            { if: 'road_class == SECONDARY', multiply_by: '0.1' },
+            { if: 'road_class != CYCLEWAY', multiply_by: '0.4' }
+        );
+    } else if (routingPreference === 'tertiary') {
+        // Prioritize quiet rural and municipal tertiary roads (highway=tertiary)
+        priorities.push(
+            { if: 'road_class == MOTORWAY || road_class == TRUNK', multiply_by: '0.0' },
+            { if: 'road_class == PRIMARY', multiply_by: '0.05' },
+            { if: 'road_class == SECONDARY', multiply_by: '0.2' },
+            { if: 'road_class != TERTIARY', multiply_by: '0.6' }
         );
     }
 
@@ -118,9 +141,10 @@ export function getSegmentKey(
     from: Coordinates,
     to: Coordinates,
     profileKey: string,
-    elevationPreference: 'any' | 'min' | 'max' = 'any'
+    elevationPreference: 'any' | 'min' | 'max' = 'any',
+    routingPreference: RoutingPreference = 'popular'
 ): string {
-    return `${profileKey}:${elevationPreference}:${getCoordKey(from)}->${getCoordKey(to)}`;
+    return `${profileKey}:${elevationPreference}:${routingPreference}:${getCoordKey(from)}->${getCoordKey(to)}`;
 }
 
 /** Returns true if every road-following segment in `points` is already present
@@ -129,12 +153,13 @@ export function areAllSegmentsCached(
     points: Coordinates[],
     profileKey: string,
     segmentModes: SegmentMode[] = [],
-    elevationPreference: 'any' | 'min' | 'max' = 'any'
+    elevationPreference: 'any' | 'min' | 'max' = 'any',
+    routingPreference: RoutingPreference = 'popular'
 ): boolean {
-    if (points.length < 2) return true;
+    if (points.length < 2 || routingPreference === 'direct') return true;
     for (let i = 0; i < points.length - 1; i++) {
         if (segmentModes[i] === 'manual') continue;
-        const key = getSegmentKey(points[i]!, points[i + 1]!, profileKey, elevationPreference);
+        const key = getSegmentKey(points[i]!, points[i + 1]!, profileKey, elevationPreference, routingPreference);
         if (!routingSegmentCache.has(key)) {
             return false;
         }
@@ -207,6 +232,7 @@ async function fetchSegmentFromNetwork(
     to: Coordinates,
     profileKey: string,
     elevationPreference: 'any' | 'min' | 'max',
+    routingPreference: RoutingPreference = 'popular',
     signal?: AbortSignal
 ): Promise<TrackPoint[]> {
     const d = distance(from, to);
@@ -228,7 +254,7 @@ async function fetchSegmentFromNetwork(
 
     const profile = routingProfiles[profileKey] ?? routingProfiles.bike!;
     if (profile.engine === 'graphhopper') {
-        return await getGraphHopperRoute([from, to], profile.profile, elevationPreference, signal);
+        return await getGraphHopperRoute([from, to], profile.profile, elevationPreference, routingPreference, signal);
     } else {
         const bProfile = (profileKey === 'hike' && elevationPreference === 'min') ? 'hiking' : profile.profile;
         try {
@@ -236,7 +262,7 @@ async function fetchSegmentFromNetwork(
         } catch (bErr: any) {
             if (signal?.aborted || bErr.name === 'AbortError') throw bErr;
             if (profileKey === 'hike') {
-                return await getGraphHopperRoute([from, to], 'foot', elevationPreference, signal);
+                return await getGraphHopperRoute([from, to], 'foot', elevationPreference, routingPreference, signal);
             }
             throw bErr;
         }
@@ -248,9 +274,10 @@ async function fetchSegment(
     to: Coordinates,
     profileKey: string,
     elevationPreference: 'any' | 'min' | 'max',
+    routingPreference: RoutingPreference = 'popular',
     onWarning?: (msg: string) => void
 ): Promise<TrackPoint[]> {
-    const key = getSegmentKey(from, to, profileKey, elevationPreference);
+    const key = getSegmentKey(from, to, profileKey, elevationPreference, routingPreference);
 
     // 1. Memory cache hit
     const cached = routingSegmentCache.get(key);
@@ -268,7 +295,7 @@ async function fetchSegment(
     const controller = new AbortController();
     const promise = (async () => {
         try {
-            const points = await fetchSegmentFromNetwork(from, to, profileKey, elevationPreference, controller.signal);
+            const points = await fetchSegmentFromNetwork(from, to, profileKey, elevationPreference, routingPreference, controller.signal);
             routingSegmentCache.set(key, points);
             return points;
         } catch (err: any) {
@@ -331,10 +358,24 @@ export async function computeRoute(
     profileKey: string,
     segmentModes: SegmentMode[] = [],
     elevationPreference: 'any' | 'min' | 'max' = 'any',
-    signal?: AbortSignal
+    routingPreferenceOrSignal?: RoutingPreference | AbortSignal,
+    signalParam?: AbortSignal
 ): Promise<RouteResult> {
+    const isSignal = routingPreferenceOrSignal && typeof (routingPreferenceOrSignal as any).aborted === 'boolean';
+    const routingPreference: RoutingPreference = isSignal
+        ? 'popular'
+        : ((routingPreferenceOrSignal as RoutingPreference) ?? 'popular');
+    const signal: AbortSignal | undefined = isSignal
+        ? (routingPreferenceOrSignal as AbortSignal)
+        : signalParam;
+
     if (points.length < 2) {
         return { points: [], error: null };
+    }
+
+    if (routingPreference === 'direct') {
+        cancelUnneededSegments(new Set());
+        return { points: getManualRoute(points), error: null };
     }
 
     if (signal?.aborted) {
@@ -350,7 +391,7 @@ export async function computeRoute(
         const to = points[i + 1]!;
         const mode = segmentModes[i] ?? 'route';
         if (mode === 'route') {
-            neededKeys.add(getSegmentKey(from, to, profileKey, elevationPreference));
+            neededKeys.add(getSegmentKey(from, to, profileKey, elevationPreference, routingPreference));
         }
         segmentPairs.push({ from, to, mode });
     }
@@ -369,7 +410,7 @@ export async function computeRoute(
             if (signal?.aborted) {
                 throw new DOMException('Aborted', 'AbortError');
             }
-            return fetchSegment(from, to, profileKey, elevationPreference, (msg) => {
+            return fetchSegment(from, to, profileKey, elevationPreference, routingPreference, (msg) => {
                 warningMessage = msg;
             });
         },
@@ -412,9 +453,17 @@ export async function route(
     profileKey: string,
     segmentModes: SegmentMode[] = [],
     elevationPreference: 'any' | 'min' | 'max' = 'any',
-    signal?: AbortSignal
+    routingPreferenceOrSignal?: RoutingPreference | AbortSignal,
+    signalParam?: AbortSignal
 ): Promise<TrackPoint[]> {
-    const result = await computeRoute(points, profileKey, segmentModes, elevationPreference, signal);
+    const result = await computeRoute(
+        points,
+        profileKey,
+        segmentModes,
+        elevationPreference,
+        routingPreferenceOrSignal,
+        signalParam
+    );
     return result.points;
 }
 
@@ -422,6 +471,7 @@ async function getGraphHopperRoute(
     points: Coordinates[],
     profile: string,
     elevationPreference: 'any' | 'min' | 'max' = 'any',
+    routingPreference: RoutingPreference = 'popular',
     signal?: AbortSignal
 ): Promise<TrackPoint[]> {
     const response = await fetch('/api/graphhopper/route', {
@@ -432,7 +482,7 @@ async function getGraphHopperRoute(
             profile,
             elevation: true,
             points_encoded: false,
-            custom_model: buildGraphHopperCustomModel(profile, elevationPreference),
+            custom_model: buildGraphHopperCustomModel(profile, elevationPreference, routingPreference),
         }),
         signal,
     });

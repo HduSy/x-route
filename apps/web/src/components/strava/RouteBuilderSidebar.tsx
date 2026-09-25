@@ -272,7 +272,7 @@ export function RouteBuilderSidebar() {
                     {/* Optimization Route Mode */}
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-foreground">
-                            {routingPreference === 'popular' ? t.followPopular : t.directRoute}
+                            {t.routePreference}
                         </label>
                         <div className="relative">
                             <select
@@ -281,6 +281,8 @@ export function RouteBuilderSidebar() {
                                 className="w-full appearance-none rounded-lg border border-border bg-background py-2 pl-9 pr-8 text-xs font-medium text-foreground focus:border-[#863BFF] focus:ring-1 focus:ring-[#863BFF] outline-none cursor-pointer"
                             >
                                 <option value="popular">{t.followPopular}</option>
+                                <option value="cycleway">{t.cyclewayRoute}</option>
+                                <option value="tertiary">{t.tertiaryRoute}</option>
                                 <option value="direct">{t.directRoute}</option>
                             </select>
                             <Compass className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -291,11 +293,7 @@ export function RouteBuilderSidebar() {
                     {/* Elevation Preference */}
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-foreground">
-                            {elevationPreference === 'any'
-                                ? t.anyElevation
-                                : elevationPreference === 'min'
-                                ? t.minElevation
-                                : t.maxElevation}
+                            {t.elevationPreferenceTitle}
                         </label>
                         <div className="relative">
                             <select

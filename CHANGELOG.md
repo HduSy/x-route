@@ -7,6 +7,11 @@
 ## [Unreleased]
 
 ### ✨ 新增与优化 (Improvements)
+- **「优先自行车道」与「优先乡村与支路」路线规划偏好 (Cycle paths & Tertiary roads)**：
+  - 在路线编辑器侧边栏的路线偏好下拉菜单中拆分新增两个独立专选模式：
+    - **优先自行车道 (绿道/专用道) / Cycle paths (`highway=cycleway`)**：基于 GraphHopper Custom Model，严惩非自行车道（0.4）与机动车主干道（0.0 ~ 0.1），强力将路线导向独立绿道与专用非机动车道，适合休闲骑行与亲子慢游。
+    - **优先乡村与支路 (避开主干道) / Tertiary roads (`highway=tertiary`)**：重度惩罚 Motorway/Trunk（0.0）、Primary（0.05）与 Secondary（0.2）等繁忙主干道，专注于车流稀疏、路网连贯的乡村小道与城市三级支路，兼顾公路车高速骑行与人车分流安全。
+  - 分段缓存隔离与即时重算响应：在 `getSegmentKey` 中将不同的 `routingPreference` 单独编码，切换选项即刻触发针对性重算，各模式缓存互不污染，并与手动直线分段（`manual` mode）无缝兼容。
 - **编辑保存弹窗自动回填原路线信息**：
   - 选中已有路线进行编辑后打开保存弹窗时，系统通过 `useLiveQuery` 自动预读并回填原路线的标题（`name`）与描述信息（`desc`），彻底避免原自定义名称及备注被默认的 `Route <Date>` 覆盖重置。
   - 保存流程精准识别当前编辑/选中的已有路线，支持就地更新（in-place update），避免意外生成重复卡片。

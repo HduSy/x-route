@@ -7,6 +7,7 @@ import {
     routingSegmentCache,
     getManualRoute,
     computeRoute,
+    buildGraphHopperCustomModel,
 } from './routing';
 
 describe('per-segment modes (manual mode is incremental)', () => {
@@ -137,6 +138,77 @@ describe('getSegmentKey & areAllSegmentsCached', () => {
         ]);
 
         expect(areAllSegmentsCached([p0, p1, p2], 'bike')).toBe(true);
+    });
+
+    it('isolates cache keys between different routing preferences', () => {
+        const p0 = { lat: 39.9, lon: 116.4 };
+        const p1 = { lat: 39.91, lon: 116.41 };
+
+        const popularKey = getSegmentKey(p0, p1, 'bike', 'any', 'popular');
+        const cyclewayKey = getSegmentKey(p0, p1, 'bike', 'any', 'cycleway');
+        const tertiaryKey = getSegmentKey(p0, p1, 'bike', 'any', 'tertiary');
+        const directKey = getSegmentKey(p0, p1, 'bike', 'any', 'direct');
+
+        expect(popularKey).not.toBe(cyclewayKey);
+        expect(popularKey).not.toBe(tertiaryKey);
+        expect(cyclewayKey).not.toBe(tertiaryKey);
+        expect(cyclewayKey).not.toBe(directKey);
+
+        routingSegmentCache.set(popularKey, [
+            new TrackPoint({ attributes: p0, ele: 0, extensions: {} }),
+            new TrackPoint({ attributes: p1, ele: 0, extensions: {} }),
+        ]);
+
+        expect(areAllSegmentsCached([p0, p1], 'bike', [], 'any', 'popular')).toBe(true);
+        expect(areAllSegmentsCached([p0, p1], 'bike', [], 'any', 'cycleway')).toBe(false);
+        expect(areAllSegmentsCached([p0, p1], 'bike', [], 'any', 'tertiary')).toBe(false);
+        // Direct routing never requires network or segment caching
+        expect(areAllSegmentsCached([p0, p1], 'bike', [], 'any', 'direct')).toBe(true);
+    });
+});
+
+describe('buildGraphHopperCustomModel', () => {
+    it('returns default priority rules for standard bike popular route', () => {
+        const model = buildGraphHopperCustomModel('bike', 'any', 'popular') as any;
+        expect(model.priority).toHaveLength(1);
+        expect(model.priority[0].if).toBe('bike_road_access == PRIVATE');
+    });
+
+    it('injects cycleway priority rules when routingPreference is cycleway', () => {
+        const model = buildGraphHopperCustomModel('bike', 'any', 'cycleway') as any;
+        expect(model.priority).toBeDefined();
+
+        expect(model.priority).toEqual(
+            expect.arrayContaining([
+                { if: 'road_class == MOTORWAY || road_class == TRUNK', multiply_by: '0.0' },
+                { if: 'road_class == PRIMARY', multiply_by: '0.05' },
+                { if: 'road_class == SECONDARY', multiply_by: '0.1' },
+                { if: 'road_class != CYCLEWAY', multiply_by: '0.4' },
+            ])
+        );
+    });
+
+    it('injects tertiary priority rules when routingPreference is tertiary', () => {
+        const model = buildGraphHopperCustomModel('bike', 'any', 'tertiary') as any;
+        expect(model.priority).toBeDefined();
+
+        expect(model.priority).toEqual(
+            expect.arrayContaining([
+                { if: 'road_class == MOTORWAY || road_class == TRUNK', multiply_by: '0.0' },
+                { if: 'road_class == PRIMARY', multiply_by: '0.05' },
+                { if: 'road_class == SECONDARY', multiply_by: '0.2' },
+                { if: 'road_class != TERTIARY', multiply_by: '0.6' },
+            ])
+        );
+    });
+
+    it('combines elevation penalties with cycleway/tertiary routing penalties', () => {
+        const model = buildGraphHopperCustomModel('bike', 'min', 'cycleway') as any;
+        const expressions = model.priority.map((p: any) => p.if);
+
+        expect(expressions).toContain('average_slope > 4 || average_slope < -4');
+        expect(expressions).toContain('road_class == MOTORWAY || road_class == TRUNK');
+        expect(expressions).toContain('road_class != CYCLEWAY');
     });
 });
 
@@ -280,5 +352,95 @@ describe('computeRoute', () => {
         expect(res.points.length).toBeGreaterThanOrEqual(3);
         expect(res.points[0]!.getLatitude()).toBeCloseTo(p0.lat, 4);
         expect(res.points[res.points.length - 1]!.getLatitude()).toBeCloseTo(p2.lat, 4);
+    });
+
+    it('sends cycleway custom_model rules when routingPreference is cycleway', async () => {
+        const p0 = { lat: 39.9, lon: 116.4 };
+        const p1 = { lat: 39.91, lon: 116.41 };
+
+        let sentBody: any = null;
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+            sentBody = JSON.parse((init?.body as string) || '{}');
+            const [start, end] = sentBody.points;
+            return {
+                ok: true,
+                json: async () => ({
+                    paths: [
+                        {
+                            points: {
+                                coordinates: [
+                                    [start[0], start[1], 10],
+                                    [end[0], end[1], 15],
+                                ],
+                            },
+                        },
+                    ],
+                }),
+            } as Response;
+        });
+
+        await computeRoute([p0, p1], 'bike', ['route'], 'any', 'cycleway');
+
+        expect(sentBody).toBeDefined();
+        expect(sentBody.custom_model?.priority).toEqual(
+            expect.arrayContaining([
+                { if: 'road_class == MOTORWAY || road_class == TRUNK', multiply_by: '0.0' },
+                { if: 'road_class == PRIMARY', multiply_by: '0.05' },
+                { if: 'road_class == SECONDARY', multiply_by: '0.1' },
+                { if: 'road_class != CYCLEWAY', multiply_by: '0.4' },
+            ])
+        );
+    });
+
+    it('sends tertiary custom_model rules when routingPreference is tertiary', async () => {
+        const p0 = { lat: 39.9, lon: 116.4 };
+        const p1 = { lat: 39.91, lon: 116.41 };
+
+        let sentBody: any = null;
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+            sentBody = JSON.parse((init?.body as string) || '{}');
+            const [start, end] = sentBody.points;
+            return {
+                ok: true,
+                json: async () => ({
+                    paths: [
+                        {
+                            points: {
+                                coordinates: [
+                                    [start[0], start[1], 10],
+                                    [end[0], end[1], 15],
+                                ],
+                            },
+                        },
+                    ],
+                }),
+            } as Response;
+        });
+
+        await computeRoute([p0, p1], 'bike', ['route'], 'any', 'tertiary');
+
+        expect(sentBody).toBeDefined();
+        expect(sentBody.custom_model?.priority).toEqual(
+            expect.arrayContaining([
+                { if: 'road_class == MOTORWAY || road_class == TRUNK', multiply_by: '0.0' },
+                { if: 'road_class == PRIMARY', multiply_by: '0.05' },
+                { if: 'road_class == SECONDARY', multiply_by: '0.2' },
+                { if: 'road_class != TERTIARY', multiply_by: '0.6' },
+            ])
+        );
+    });
+
+    it('computes direct route instantly without making network calls', async () => {
+        const p0 = { lat: 39.9, lon: 116.4 };
+        const p1 = { lat: 39.91, lon: 116.41 };
+
+        const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+        const res = await computeRoute([p0, p1], 'bike', ['route'], 'any', 'direct');
+
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(res.points.length).toBeGreaterThanOrEqual(2);
+        expect(res.points[0]!.getLatitude()).toBeCloseTo(p0.lat, 4);
+        expect(res.points[res.points.length - 1]!.getLatitude()).toBeCloseTo(p1.lat, 4);
     });
 });

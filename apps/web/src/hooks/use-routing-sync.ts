@@ -23,6 +23,7 @@ export function useRoutingSync() {
     const showRoutePath = useRoutingStore((s) => s.showRoutePath);
     const units = useRoutingStore((s) => s.units);
     const elevationPreference = useRoutingStore((s) => s.elevationPreference);
+    const routingPreference = useRoutingStore((s) => s.routingPreference);
 
     const abortControllerRef = useRef<AbortController | null>(null);
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,7 +141,7 @@ export function useRoutingSync() {
 
         // If all segments are already cached (e.g. Undo/Redo or revisit), debounce is 0ms (instant).
         // Otherwise, 50ms micro-debounce coalesces rapid clicks and drag events.
-        const allCached = areAllSegmentsCached(anchors, profile, segmentModes, elevationPreference);
+        const allCached = areAllSegmentsCached(anchors, profile, segmentModes, elevationPreference, routingPreference);
         const debounceMs = allCached ? 0 : 50;
 
         debounceTimerRef.current = setTimeout(() => {
@@ -157,7 +158,7 @@ export function useRoutingSync() {
             const state = useRoutingStore.getState();
             state.setRouting(true);
 
-            computeRoute(anchors, profile, segmentModes, elevationPreference, controller.signal)
+            computeRoute(anchors, profile, segmentModes, elevationPreference, routingPreference, controller.signal)
                 .then((res) => {
                     const state = useRoutingStore.getState();
                     if (
@@ -192,7 +193,7 @@ export function useRoutingSync() {
                 debounceTimerRef.current = null;
             }
         };
-    }, [anchors, profile, segmentModes, elevationPreference]);
+    }, [anchors, profile, segmentModes, elevationPreference, routingPreference]);
 
     // When draw mode turns ON, ensure markers and route are synced to map layer
     useEffect(() => {
