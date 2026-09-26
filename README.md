@@ -28,18 +28,27 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
 ## ✨ Features
 
 ### 🚴‍♂️ Intelligent Route Planning
-- **Road Snapping & Routing Engine**: Powered by BRouter for bike- and foot-optimized routing with real highway and surface characteristics.
+- **Road Snapping & Routing Engine**: Powered by GraphHopper with custom model weighting and BRouter-grade elevation heuristics for cycling and pedestrian optimization.
 - **Multiple Activity Profiles**:
   - 🚴 **Road Bike (Road)**: Prioritizes smooth paved roads and cycling infrastructure.
   - 🚵 **Gravel Bike**: Balances unpaved gravel tracks and quiet secondary roads.
   - 🚵‍♂️ **Mountain Bike (MTB)**: Prioritizes singletracks, dirt paths, and technical terrain.
   - 🏃 **Run**: Foot paths, pedestrian walkways, and parks.
   - 🥾 **Hike**: Hiking trails and elevation-conscious mountain paths.
-- **Manual Mode (Off-Road / Free Drawing)**: Draw direct straight-line connections across areas without mapped OSM roads. Applies only to newly added segments — existing road-following segments are never recomputed.
-- **Intuitive Point Editing**:
-  - Click anywhere on the map to add waypoints.
+- **Advanced Routing & Elevation Preferences**:
+  - **Routing Preferences**: Popular (community favored paths), **Cycle paths** (prioritizes designated cycleways and greenways via `highway=cycleway`), **Tertiary roads** (favors quiet rural/secondary roads while penalizing busy motorways and trunk roads), and Direct (straight lines).
+  - **Elevation Preferences**: Any elevation, **Min elevation** (steep climb avoidance for effortless cruising), and **Max elevation** (hill climb challenge).
+- **Surface Type Breakdown (Strava Style)**:
+  - Real-time road surface extraction from OpenStreetMap `surface` and `road_class` attributes.
+  - Distance-weighted geodesic integration categorizing terrain into **Paved** (asphalt, concrete), **Unpaved** (gravel, dirt, ground), and **Unknown**.
+  - Multi-segment rounded capsule proportion bar in the bottom stats bar (`RouteStatsBar`), complete with matching toggle switches and breakdown cards in the sidebar.
+- **Manual Mode (Off-Road / Free Drawing)**:
+  - Draw direct straight-line connections across areas without mapped OSM roads. Applies only to newly added segments — existing road-following segments are never recomputed.
+  - **Mode-Aware Anchor Dragging**: Toggling manual mode off and dragging any waypoint treats it as a normal node, automatically re-routing adjacent segments along the road network.
+- **Natural Waypoint & Route Line Interactions**:
+  - Click anywhere on the map to add waypoints, **including directly on existing route lines** (enables seamless loop closures and out-and-back extensions).
+  - **3px Lazy Drag Activation**: Light click on route lines instantly adds the next waypoint without mid-route interruptions; press and drag (`≥ 3px`) activates rubber-band dragging to insert custom mid-route waypoints.
   - Drag existing waypoints, start, or finish markers to dynamically re-calculate segments.
-  - Drag route path midpoints to insert new waypoints.
   - **Lasso Box Selection**: Drag a selection box over the map to batch-delete multiple waypoints at once.
 - **Route Controls**: One-click route reversal, multi-step undo/redo, full clear, and quick camera re-centering.
 
@@ -88,6 +97,14 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
   - **Split**: Divide a track into two distinct sections at the midpoint.
   - **Loop**: Automatically connect the end point back to the start.
 - **Offline-First Route Storage**: Local IndexedDB database powered by Dexie.js. Your routes, names, descriptions, and trackpoints remain entirely on your computer.
+- **Zero-Login Route Sharing via Short-Links**:
+  - Generate lightweight short URLs powered by Cloudflare Workers and KV.
+  - Recipients can open and inspect complete route geometries and elevation profiles on any device with zero sign-up required.
+- **Professional A4 Browser Printing & Export (`Cmd+P` / `Ctrl+P`)**:
+  - Clean print layout auto-hiding all navigation bars, sidebars, and map controls.
+  - Automatic route bounds centering (`fitActiveRoute`) with margin optimization for A4 landscape paper.
+  - End-to-end pure WebGL canvas rendering for start/finish badges, eliminating DOM marker drift (0px displacement).
+  - Dark-mode smart ink-saver color inversion.
 - **GPX Toolkit (`@x-route/gpx`)**:
   - Import and export standard GPX 1.1 format with full elevation, timestamps, heart rate, cadence, power, temperature, and surface metadata.
   - Background Web Worker parsing guarantees zero UI freeze even when processing multi-megabyte GPX tracks.
@@ -170,7 +187,8 @@ x-route/
 | **Elevation Charts** | [Chart.js](https://www.chartjs.org/) (Monotone Splines & Custom Canvas Segments) |
 | **Local Database** | [Dexie.js](https://dexie.org/) (IndexedDB) |
 | **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) + [Immer](https://immerjs.github.io/immer/) |
-| **Routing Engine** | [BRouter](https://brouter.de/) API |
+| **Routing Engine** | [GraphHopper](https://www.graphhopper.com/) (Custom Models) + [BRouter](https://brouter.de/) Algorithms |
+| **Edge Infrastructure** | [Cloudflare Workers](https://workers.cloudflare.com/) & KV (GeoIP routing, API relay, short links) |
 | **Vector Tiles** | [OpenFreeMap](https://openfreemap.org/) / [OpenStreetMap](https://www.openstreetmap.org/) |
 
 ---
@@ -183,6 +201,7 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ## 🤝 Acknowledgments
 
+- [GraphHopper](https://github.com/graphhopper/graphhopper) — For its high-performance graph routing, rich surface/road attributes, and flexible Custom Models.
 - [BRouter & BRouter-Web](https://github.com/nrenner/brouter-web) — For their pioneering work on cycling routing algorithms, slope normalization, and elevation heuristics.
 - [MapLibre GL JS](https://maplibre.org/) — For fast, open-source vector map rendering.
 - [OpenFreeMap](https://openfreemap.org/) — For free, high-performance public vector map tiles.

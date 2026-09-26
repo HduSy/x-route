@@ -458,30 +458,33 @@ const RouteCard = memo(function RouteCard({
 
             {/* Metrics Grid */}
             <div className="mt-2.5 grid grid-cols-3 gap-1 rounded-lg bg-accent/40 p-2 text-center">
-                <div>
-                    <div className="flex items-center justify-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        <Route className="size-2.5 text-[#863BFF]" />
-                        <span>{t.distance}</span>
+                <div className="min-w-0">
+                    <div className="flex items-center justify-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                        <Route className="size-2.5 text-[#863BFF] shrink-0" />
+                        <span className="truncate">{t.distance}</span>
                     </div>
-                    <div className="text-xs font-black text-foreground mt-0.5">
+                    <div className="text-xs font-black text-foreground mt-0.5 whitespace-nowrap">
                         {distKm.toFixed(1)} km
                     </div>
                 </div>
-                <div className="border-x border-border/60">
-                    <div className="flex items-center justify-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        <Mountain className="size-2.5 text-[#863BFF]" />
-                        <span>{t.ascent}</span>
+                <div className="border-x border-border/60 min-w-0">
+                    <div className="flex items-center justify-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                        <Mountain className="size-2.5 text-[#863BFF] shrink-0" />
+                        <span className="truncate">{t.ascent}</span>
                     </div>
-                    <div className="text-xs font-black text-foreground mt-0.5">
+                    <div className="text-xs font-black text-foreground mt-0.5 whitespace-nowrap">
                         ↑{ascentM} m
                     </div>
                 </div>
-                <div>
-                    <div className="flex items-center justify-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        <Clock className="size-2.5 text-[#863BFF]" />
-                        <span>{t.estMovingTime}</span>
+                <div className="min-w-0">
+                    <div
+                        className="flex items-center justify-center gap-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap cursor-default"
+                        title={t.estMovingTime}
+                    >
+                        <Clock className="size-2.5 text-[#863BFF] shrink-0" />
+                        <span className="truncate">{t.estTime ?? 'Est. Time'}</span>
                     </div>
-                    <div className="text-xs font-black text-foreground mt-0.5">
+                    <div className="text-xs font-black text-foreground mt-0.5 whitespace-nowrap">
                         {estTime}
                     </div>
                 </div>

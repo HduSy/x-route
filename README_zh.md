@@ -28,18 +28,27 @@
 ## ✨ 核心特性
 
 ### 🚴‍♂️ 智能选路与路径规划
-- **智能吸附与路网引擎**：基于 BRouter 引擎，针对不同运动场景（路况、坡度、铺装类型）计算最优路线。
+- **智能吸附与路网引擎**：基于 GraphHopper 引擎结合 Custom Model 动态加权，融合 BRouter 工业级高程去噪与坡度算法，针对自行车与户外步道深度优化。
 - **多运动类型支持**：
   - 🚴 **公路车 (Road)**：优先选择铺装良好的公路、沥青路与自行车专属道。
   - 🚵 **砾石公路 (Gravel)**：兼顾非铺装砂石路段与车流稀少的乡间副路。
   - 🚵‍♂️ **山地越野 (MTB)**：优先单轨小径（Singletrack）、林道与越野地形。
   - 🏃 **跑步**：步行街、人行步道、公园绿道与河滨跑道。
   - 🥾 **徒步**：登山步道与山间小径。
-- **自由画线模式 (Manual Mode)**：支持在缺少 OSM 矢量路网或需要直线跨越的区域手动绘制直线航线。仅影响新增路段，已有的沿路轨迹不会被重算。
-- **直观便捷的节点编辑**：
-  - 地图任意位置点击即可添加途经点；
+- **多维规划偏好矩阵 (Preferences & Custom Models)**：
+  - **路线偏好**：优先热门路线 (`Popular`)、**优先自行车道/绿道 (`Cycle paths`，针对 `highway=cycleway` 强力导向)**、**优先乡村与支路 (`Tertiary roads`，重度避开繁忙主干道)**、直线直连 (`Direct`)；
+  - **高程偏好**：自由随行 (`Any`)、**避开爬坡 (`Min elevation`，平缓巡航)**、**爬坡挑战 (`Max elevation`，爬坡专项)**。
+- **路面材质占比条与路况统计（Surface Breakdown，对齐 Strava 风格）**：
+  - 路由引擎接入 OpenStreetMap `surface` 与 `road_class` 探针，通过测地线距离加权积分统计；
+  - 精准识别**铺装路面 (Paved，沥青/混凝土)**、**非铺装路面 (Unpaved，碎石/泥土/沙石)** 与**未知路面**；
+  - 底部状态栏嵌入 Strava 经典长条多色胶囊比例条（品牌紫 + 暖金琥珀 + 质感灰），侧边栏支持联动控制与卡片解构。
+- **自由画线模式 (Manual Mode)**：
+  - 支持在缺少 OSM 矢量路网或需要直线跨越的区域手动绘制直线航线。仅影响新增路段，已有的沿路轨迹不会被重算；
+  - **模式感知拖拽**：关闭手动模式后拖动任意节点，自动将相连段恢复为路网循迹，无需删除重建。
+- **直观自然的路线交互体系**：
+  - 地图任意位置点击即可添加途经点，**支持直接点在既有路线上**（完美支持原路折返与环线闭环）；
+  - **3px 黄金阈值懒激活机制**：路线上轻触单击（位移 `< 3px`）立即追加下一途经点；按住不松拖拽（位移 `≥ 3px`）才拉出橡皮筋插入局部中间点；
   - 拖拽已有节点、起点或终点实时重算路线；
-  - 拖拽路线上任意位置的中点即可快速插入新途经点；
   - **框选删除节点 (Lasso Mode)**：按住鼠标框选一片区域，一键批量删除区域内的途经点。
 - **全局控制工具**：一键反转路线起点终点、多级撤销 / 重做、清空当前路线、聚焦居中、GPS 当前位置定位。
 
@@ -78,7 +87,15 @@
   - **抽稀精简**：采用 Douglas-Peucker 算法精简轨迹点数量；
   - **折半拆分**：从中点将当前路线一分为二；
   - **闭环成环**：终点自动连回起点形成完整环线。
-- **本地个人路线库**：基于 IndexedDB（Dexie.js）持久化存储在本地设备，私密安全，随时载入与编辑。
+- **本地个人路线库**：基于 IndexedDB（Dexie.js）持久化存储在本地设备，私密安全，随时载入与就地编辑更新。
+- **零登录轻量短链分享 (Route Sharing via Short-Links)**：
+  - 基于 Cloudflare Workers 与 KV，一键生成轻量加密短链与分享卡片；
+  - 接收方免登录在手机或电脑浏览器中直接秒级打开，完整保留航线、途经点与海拔数据。
+- **A4 浏览器专业打印与排版 (`Cmd+P` / `Ctrl+P`)**：
+  - 纯净打印布局：自动隐匿导航栏、抽屉及浮动工具栏；
+  - 自动最优视野居中 (`fitActiveRoute`)，自适应适配 A4 横版画幅并保留舒适安全边距；
+  - WebGL 端到端起终点徽章渲染，从根本上杜绝 DOM 标记漂移（0 像素绝对贴合）；
+  - 暗色模式智能省墨反白。
 - **专业 GPX 套件 (`@x-route/gpx`)**：
   - 完美支持 GPX 1.1 协议的导入与导出，保留高程、时间戳、心率、踏频、功率、温度与铺装类型扩展；
   - Web Worker 后台异步解析，即使导入数万点大体积 GPX 文件，前端主线程依然 60fps 流畅不卡顿。
@@ -161,7 +178,8 @@ x-route/
 | **剖面图表** | [Chart.js](https://www.chartjs.org/) (Monotone 单调插值与自定义 Canvas 分段着色) |
 | **本地数据库** | [Dexie.js](https://dexie.org/) (IndexedDB) |
 | **状态管理** | [Zustand](https://zustand-demo.pmnd.rs/) + [Immer](https://immerjs.github.io/immer/) |
-| **选路引擎** | [BRouter](https://brouter.de/) API |
+| **选路引擎** | [GraphHopper](https://www.graphhopper.com/) (Custom Models) + [BRouter](https://brouter.de/) 算法 |
+| **边缘基础设施** | [Cloudflare Workers](https://workers.cloudflare.com/) & KV (GeoIP 智能分流、API 代理、短链存储) |
 | **地图瓦片源** | [OpenFreeMap](https://openfreemap.org/) / [OpenStreetMap](https://www.openstreetmap.org/) |
 
 ---
@@ -174,6 +192,7 @@ x-route/
 
 ## 🤝 致谢
 
+- [GraphHopper](https://github.com/graphhopper/graphhopper) — 提供高性能图路由引擎、丰富的路面属性探针与极具弹性的 Custom Models。
 - [BRouter & BRouter-Web](https://github.com/nrenner/brouter-web) — 在骑行路网算路、坡度切分归一化以及高程算法方面的开创性贡献。
 - [MapLibre GL JS](https://maplibre.org/) — 极速且活跃的开源矢量地图渲染库。
 - [OpenFreeMap](https://openfreemap.org/) — 提供高可用、免费公共矢量瓦片服务。

@@ -757,41 +757,41 @@ export function RouteStatsBar() {
                     </div>
 
                     {/* Distance */}
-                    <div>
-                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="shrink-0">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                             {t.distance}
                         </div>
-                        <div className="text-sm sm:text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground whitespace-nowrap">
                             {stats.distFormatted}
                         </div>
                     </div>
 
                     {/* Elevation Gain */}
-                    <div>
-                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="shrink-0">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                             {t.elevationGain}
                         </div>
-                        <div className="text-sm sm:text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground whitespace-nowrap">
                             {stats.ascentFormatted}
                         </div>
                     </div>
 
                     {/* Elevation Loss */}
-                    <div className="hidden sm:block">
-                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="hidden sm:block shrink-0">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                             {t.elevationLoss}
                         </div>
-                        <div className="text-sm sm:text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground whitespace-nowrap">
                             {stats.descentFormatted}
                         </div>
                     </div>
 
                     {/* Est. Moving Time */}
-                    <div className="hidden md:block">
-                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    <div className="hidden md:block shrink-0">
+                        <div className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                             {t.estMovingTime}
                         </div>
-                        <div className="text-sm sm:text-base font-black text-foreground">
+                        <div className="text-sm sm:text-base font-black text-foreground whitespace-nowrap">
                             {stats.timeFormatted}
                         </div>
                     </div>
