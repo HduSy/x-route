@@ -597,20 +597,14 @@ export class RoutingLayerController {
 
             mapManager.markInteracted();
 
-            // Freeze map panning completely - 100% immune to map drift
-            map.dragPan.disable();
-
-            this.isDraggingLine = true;
-            this.suppressClick = true;
-            this.dragInsertIndex = hit.insertIndex;
-            map.getCanvas().style.cursor = 'grabbing';
-
+            const DRAG_THRESHOLD = 3; // 3px matches MapLibre & Mapbox official dragThreshold standard
             const startClientX = e.clientX;
             const startClientY = e.clientY;
+            let isDragActive = false;
 
             const getRubberBandCoords = (lngLat: { lng: number; lat: number }) => {
                 const coords: [number, number][] = [];
-                const idx = this.dragInsertIndex;
+                const idx = hit.insertIndex;
                 if (idx > 0 && this.currentAnchors[idx - 1]) {
                     const prev = this.currentAnchors[idx - 1]!;
                     coords.push([prev.lon, prev.lat]);
@@ -651,12 +645,32 @@ export class RoutingLayerController {
             };
 
             const onWindowMove = (we: MouseEvent | PointerEvent) => {
-                if (!this.isDraggingLine) return;
+                const curRect = canvas.getBoundingClientRect();
+                const curLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
+                const moveDist = Math.hypot(we.clientX - startClientX, we.clientY - startClientY);
+
+                if (!isDragActive) {
+                    // Suppress hand jitter / micro-movements during a normal click
+                    if (moveDist < DRAG_THRESHOLD) {
+                        return;
+                    }
+                    // Exceeded threshold: lazily activate dragging state
+                    isDragActive = true;
+                    this.isDraggingLine = true;
+                    this.suppressClick = true;
+                    this.dragInsertIndex = hit.insertIndex;
+                    map.dragPan.disable();
+                    map.getCanvas().style.cursor = 'grabbing';
+                    this.ensureGhostMarker(map, hit.closestLngLat);
+                    if (this.ghostMarker) {
+                        this.showGhostTooltip(this.ghostMarker, 'drag');
+                    }
+                }
+
                 we.stopPropagation();
                 we.stopImmediatePropagation();
                 we.preventDefault();
-                const curRect = canvas.getBoundingClientRect();
-                const curLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
+
                 this.ghostMarker?.setLngLat([curLngLat.lng, curLngLat.lat]);
                 this.setRubberBand(getRubberBandCoords(curLngLat));
             };
@@ -664,7 +678,6 @@ export class RoutingLayerController {
             const onWindowUp = (we: MouseEvent | PointerEvent) => {
                 removeAllListeners();
 
-                if (!this.isDraggingLine) return;
                 we.stopPropagation();
                 we.stopImmediatePropagation();
                 we.preventDefault();
@@ -672,19 +685,15 @@ export class RoutingLayerController {
                 const curRect = canvas.getBoundingClientRect();
                 const finalLngLat = map.unproject([we.clientX - curRect.left, we.clientY - curRect.top]);
 
-                // Calculate move distance in pixels
-                const moveDist = Math.hypot(we.clientX - startClientX, we.clientY - startClientY);
-                this.justFinishedGhostDrag = true;
-
-                // CRITICAL: Cleanup and unfreeze map state FIRST before store state update
-                cleanupState();
-
-                if (moveDist >= 6) {
-                    // Dragged to a new location on the map: insert custom waypoint at released map location
+                if (isDragActive) {
+                    // Genuine drag operation: insert waypoint at released map location
+                    this.justFinishedGhostDrag = true;
+                    cleanupState();
                     this.onInsertAnchor?.(this.dragInsertIndex, { lon: finalLngLat.lng, lat: finalLngLat.lat });
                 } else {
-                    // Direct click/selection on route line: insert waypoint right at clicked line position
-                    this.onInsertAnchor?.(this.dragInsertIndex, { lon: hit.closestLngLat.lng, lat: hit.closestLngLat.lat });
+                    // Pure click on the route line: add next waypoint (extend route / close loop)
+                    cleanupState();
+                    this.onMapClick?.({ lon: finalLngLat.lng, lat: finalLngLat.lat });
                 }
             };
 
@@ -701,12 +710,6 @@ export class RoutingLayerController {
             };
 
             try {
-                this.ensureGhostMarker(map, hit.closestLngLat);
-                if (this.ghostMarker) {
-                    this.showGhostTooltip(this.ghostMarker, 'drag');
-                }
-                this.setRubberBand(getRubberBandCoords(hit.closestLngLat));
-
                 window.addEventListener('pointermove', onWindowMove, { capture: true });
                 window.addEventListener('mousemove', onWindowMove, { capture: true });
                 window.addEventListener('pointerup', onWindowUp, { capture: true });
