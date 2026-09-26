@@ -186,4 +186,44 @@ describe('Manual mode only affects newly created segments', () => {
         // p0→new and new→p1 are fresh (manual); p1→p2 survives as routed
         expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['manual', 'manual', 'route']);
     });
+
+    it('moving an anchor when Manual is OFF converts its adjacent segments to route (auto-follow roads)', async () => {
+        const store = useRoutingStore.getState();
+        store.addAnchor(p0);
+        store.addAnchor(p1);
+        store.addAnchor(p2);
+
+        // 1. Create a point while manual mode is ON (e.g. dragged mid-route point or free draw)
+        store.setManualMode(true);
+        store.insertAnchor(1, { lat: 39.905, lon: 116.405 });
+        expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['manual', 'manual', 'route']);
+
+        // 2. Turn manual mode OFF
+        store.setManualMode(false);
+        expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['manual', 'manual', 'route']);
+
+        // 3. Move the anchor again while manual mode is OFF -> must convert adjacent segments to 'route'
+        store.moveAnchor(1, { lat: 39.908, lon: 116.408 });
+        expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['route', 'route', 'route']);
+
+        // 4. Verify route calculation fetches roads for the converted segments
+        const res = await recomputeLikeHook();
+        expect(res).not.toBeNull();
+        expect(fetchSpy).toHaveBeenCalled();
+
+        // 5. Undo restores the manual modes, redo restores route modes
+        store.undo();
+        expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['manual', 'manual', 'route']);
+
+        store.redo();
+        expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['route', 'route', 'route']);
+
+        // 6. Moving start (index 0) or end (index 3) also ensures adjacent segment is route
+        useRoutingStore.setState({ segmentModes: ['manual', 'route', 'manual'] });
+        store.moveAnchor(0, { lat: 39.901, lon: 116.401 });
+        expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['route', 'route', 'manual']);
+
+        store.moveAnchor(3, { lat: 39.921, lon: 116.421 });
+        expect(useRoutingStore.getState().segmentModes).toEqual<SegmentMode[]>(['route', 'route', 'route']);
+    });
 });

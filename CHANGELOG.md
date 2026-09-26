@@ -7,6 +7,12 @@
 ## [Unreleased]
 
 ### ✨ 新增与优化 (Improvements)
+- **路面材质占比条与路况统计（Surface Breakdown，对齐 Strava 风格）**：
+  - 路由引擎层接入材质探针：在 GraphHopper 路径计算中请求 `details: ['surface', 'road_class']` 属性，精准识别铺装材质（`asphalt`, `concrete`, `paved` 等）与非铺装材质（`gravel`, `dirt`, `ground`, `compacted` 等），并在 OSM 材质缺省时基于高等级路网分类进行智能判定推导。
+  - 测地线距离加权测算：在 `surface.ts` 中以测地线距离为权重实时积分统计，确保呈现的百分比真实反映整段路线的物理里程占比。
+  - 视觉呈现完美契合 x-route 主题：
+    - **底部状态栏 (`RouteStatsBar`)**：紧随预估用时区，嵌入 Strava 经典的多段式圆角胶囊比例条（品牌紫 `#863BFF` 铺装路面 + 暖金琥珀 `#F59E0B` 砂石土路 + 质感灰未知路面），附带微型图例与悬停详细信息。
+    - **规划侧边栏 (`RouteBuilderSidebar`)**：在「地图显示选项」中接入专属显隐开关（`showSurfaceType`），并在路线激活时展开直观的路面材质解构卡片。
 - **「优先自行车道」与「优先乡村与支路」路线规划偏好 (Cycle paths & Tertiary roads)**：
   - 在路线编辑器侧边栏的路线偏好下拉菜单中拆分新增两个独立专选模式：
     - **优先自行车道 (绿道/专用道) / Cycle paths (`highway=cycleway`)**：基于 GraphHopper Custom Model，严惩非自行车道（0.4）与机动车主干道（0.0 ~ 0.1），强力将路线导向独立绿道与专用非机动车道，适合休闲骑行与亲子慢游。
@@ -26,6 +32,9 @@
   - 新增 `usePrintHandler` 钩子：在 `beforeprint` 事件中自适应计算最佳视图边距（`fitActiveRoute`）并重算地图投影尺寸，确保路线在 A4 横版画幅中完整居中呈现且不被裁切；暗黑模式打印时自动智能转为省墨白底样式。
 
 ### 🐛 修复 (Bug Fixes)
+- **手动模式关闭后再次拖拽节点无法自动循迹的问题**：
+  - 根因分析：此前在实现增量手动模式时，为避免已有分段被误重算，在 `moveAnchor` 中写死了原有分段模式（`segmentModes`）保持不变。导致用户在手动模式开启时通过线上拖拽创建的节点（两段为 `manual` 直线），在关闭手动模式后再次去拖动时，依然被锁定为直线段，无法向后端请求道路吸附与循迹。
+  - 彻底方案：在 `routing-slice.ts` 的 `moveAnchor` 中接入模式感知——当处于关闭状态（`manualMode === false`）下拖拽任意节点时，将其相连的前后分段模式无缝转换为 `'route'`，重新触发道路自动循迹；同时历史栈完整保留分段变更，支持无损 Undo/Redo。
 - **A4 打印时起点绿色圆点及终点图钉漂移脱离路线的问题**：
   - 根因分析：路线折线与里程数字徽章均由 MapLibre 在 WebGL Canvas 内通过着色器直接栅格化绘制，因此无论缩放排版如何变动均保持 100% 绝对咬合；而起点绿色圆点与终点黑白棋盘格图钉此前为外部 HTML DOM Marker 元素（`new Marker()`），依赖浏览器在 `@media print` 阶段通过 CSS `transform: translate(...)` 计算像素投影。当浏览器排版引擎为 A4 横版生成物理打印视口及边距时，DOM 坐标更新机制未及时与 GPU 画布对齐，导致起终点 DOM 图钉出现明显的像素级偏移漂移。
   - 彻底方案（纯 WebGL 端到端绘制）：

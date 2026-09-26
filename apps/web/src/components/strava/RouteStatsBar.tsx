@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 Chart.register(...registerables);
 
 import { computeElevationStats } from '@/lib/elevation';
+import { computeSurfaceStats } from '@/lib/surface';
 
 interface ProfilePoint {
     distanceKm: number;
@@ -234,6 +235,7 @@ export function RouteStatsBar() {
     const resultPoints = useRoutingStore((s) => s.resultPoints);
     const profile = useRoutingStore((s) => s.profile);
     const units = useRoutingStore((s) => s.units);
+    const showSurfaceType = useRoutingStore((s) => s.showSurfaceType);
     const elevationExpanded = useRoutingStore((s) => s.elevationExpanded);
     const toggleElevation = useRoutingStore((s) => s.toggleElevation);
     const selectedFileId = useSelectionStore((s) => s.selectedFileId);
@@ -401,6 +403,20 @@ export function RouteStatsBar() {
             timeFormatted: timeStr,
         };
     }, [pointsData, eleStats, profile, units]);
+
+    const surfaceStats = useMemo(() => {
+        if (resultPoints.length >= 2) {
+            return computeSurfaceStats(resultPoints, units);
+        }
+        if (selectedFile) {
+            const file = new GPXFile(selectedFile);
+            const trkpts = file.getTrackPoints();
+            if (trkpts.length >= 2) {
+                return computeSurfaceStats(trkpts, units);
+            }
+        }
+        return computeSurfaceStats([], units);
+    }, [resultPoints, selectedFile, units]);
 
     // Chart.js rendering
     useEffect(() => {
@@ -779,6 +795,63 @@ export function RouteStatsBar() {
                             {stats.timeFormatted}
                         </div>
                     </div>
+
+                    {/* Surface Type (Strava Signature Proportion Bar) */}
+                    {showSurfaceType && pointsData.length >= 2 && (
+                        <div className="hidden lg:flex flex-col justify-center min-w-[190px] xl:min-w-[280px] 2xl:min-w-[340px]">
+                            <div className="flex items-center justify-between gap-2 text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                                <span>{t.surfaceType}</span>
+                                <span className="font-bold text-foreground text-xs normal-case">
+                                    {surfaceStats.pavedPct >= surfaceStats.unpavedPct
+                                        ? `${surfaceStats.pavedPct}% ${t.paved}`
+                                        : `${surfaceStats.unpavedPct}% ${t.unpaved}`}
+                                </span>
+                            </div>
+                            {/* Segmented Proportion Bar */}
+                            <div
+                                className="group relative mt-1 flex h-2.5 w-48 xl:w-72 2xl:w-88 overflow-hidden rounded-full bg-muted/60 ring-1 ring-border/40"
+                                title={`${t.paved}: ${surfaceStats.pavedPct}% (${surfaceStats.pavedDistFormatted}) | ${t.unpaved}: ${surfaceStats.unpavedPct}% (${surfaceStats.unpavedDistFormatted})`}
+                            >
+                                {surfaceStats.pavedPct > 0 && (
+                                    <div
+                                        style={{ width: `${surfaceStats.pavedPct}%` }}
+                                        className="h-full bg-[#863BFF] transition-all duration-300"
+                                    />
+                                )}
+                                {surfaceStats.unpavedPct > 0 && (
+                                    <div
+                                        style={{ width: `${surfaceStats.unpavedPct}%` }}
+                                        className="h-full bg-amber-500 transition-all duration-300"
+                                    />
+                                )}
+                                {surfaceStats.unknownPct > 0 && (
+                                    <div
+                                        style={{ width: `${surfaceStats.unknownPct}%` }}
+                                        className="h-full bg-zinc-400 dark:bg-zinc-600 transition-all duration-300"
+                                    />
+                                )}
+                            </div>
+                            {/* Micro-legend */}
+                            <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground font-medium">
+                                <span className="flex items-center gap-1.5" title={`${t.paved}: ${surfaceStats.pavedDistFormatted}`}>
+                                    <span className="size-1.5 rounded-full bg-[#863BFF]" />
+                                    <span>{t.paved} {surfaceStats.pavedPct}%</span>
+                                </span>
+                                {surfaceStats.unpavedPct > 0 && (
+                                    <span className="flex items-center gap-1.5" title={`${t.unpaved}: ${surfaceStats.unpavedDistFormatted}`}>
+                                        <span className="size-1.5 rounded-full bg-amber-500" />
+                                        <span>{t.unpaved} {surfaceStats.unpavedPct}%</span>
+                                    </span>
+                                )}
+                                {surfaceStats.unknownPct > 0 && (
+                                    <span className="flex items-center gap-1.5" title={`${t.unknownSurface}: ${surfaceStats.unknownDistFormatted}`}>
+                                        <span className="size-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600" />
+                                        <span>{surfaceStats.unknownPct}%</span>
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right Toggle Elevation Button */}

@@ -1,5 +1,6 @@
 import { TrackPoint, distance, type Coordinates } from '@x-route/gpx';
 import type { RoutingPreference } from '@/store/routing-slice';
+import { classifySurface } from './surface';
 
 // Route planning service — mirrors gpx.studio's dual-engine setup (AD-5).
 // GraphHopper goes through the relay (strict CORS on the origin instance);
@@ -206,22 +207,22 @@ export function getManualRoute(points: Coordinates[]): TrackPoint[] {
                 const fraction = s / count;
                 const lat = prev.lat + (pt.lat - prev.lat) * fraction;
                 const lon = prev.lon + (pt.lon - prev.lon) * fraction;
-                routePoints.push(
-                    new TrackPoint({
-                        attributes: { lat, lon },
-                        ele: 0,
-                        extensions: {},
-                    })
-                );
-            }
-        } else {
-            routePoints.push(
-                new TrackPoint({
-                    attributes: { lat: pt.lat, lon: pt.lon },
+                const p = new TrackPoint({
+                    attributes: { lat, lon },
                     ele: 0,
                     extensions: {},
-                })
-            );
+                });
+                p._data = { surface: 'paved' };
+                routePoints.push(p);
+            }
+        } else {
+            const p = new TrackPoint({
+                attributes: { lat: pt.lat, lon: pt.lon },
+                ele: 0,
+                extensions: {},
+            });
+            p._data = { surface: 'paved' };
+            routePoints.push(p);
         }
     }
     return routePoints;
@@ -482,6 +483,7 @@ async function getGraphHopperRoute(
             profile,
             elevation: true,
             points_encoded: false,
+            details: ['surface', 'road_class'],
             custom_model: buildGraphHopperCustomModel(profile, elevationPreference, routingPreference),
         }),
         signal,
@@ -494,16 +496,36 @@ async function getGraphHopperRoute(
 
     const json = await response.json();
     const coordinates: number[][] = json.paths[0].points.coordinates;
+    const surfaceDetails: [number, number, string][] = json.paths[0]?.details?.surface || [];
+    const roadClassDetails: [number, number, string][] = json.paths[0]?.details?.road_class || [];
+
+    const surfaceMap = new Array<string | undefined>(coordinates.length);
+    for (const [fromIdx, toIdx, val] of surfaceDetails) {
+        for (let i = fromIdx; i < toIdx && i < coordinates.length; i++) {
+            surfaceMap[i] = val;
+        }
+    }
+
+    const roadClassMap = new Array<string | undefined>(coordinates.length);
+    for (const [fromIdx, toIdx, val] of roadClassDetails) {
+        for (let i = fromIdx; i < toIdx && i < coordinates.length; i++) {
+            roadClassMap[i] = val;
+        }
+    }
 
     const routePoints: TrackPoint[] = [];
     for (let i = 0; i < coordinates.length; i++) {
-        routePoints.push(
-            new TrackPoint({
-                attributes: { lat: coordinates[i]![1]!, lon: coordinates[i]![0]! },
-                ele: coordinates[i]![2] ?? (i > 0 ? routePoints[i - 1]!.ele : 0),
-                extensions: {},
-            })
-        );
+        const rawSurface = surfaceMap[i];
+        const roadClass = roadClassMap[i];
+        const surface = classifySurface(rawSurface, roadClass);
+
+        const pt = new TrackPoint({
+            attributes: { lat: coordinates[i]![1]!, lon: coordinates[i]![0]! },
+            ele: coordinates[i]![2] ?? (i > 0 ? routePoints[i - 1]!.ele : 0),
+            extensions: {},
+        });
+        pt._data = { surface, rawSurface, roadClass };
+        routePoints.push(pt);
     }
     return routePoints;
 }

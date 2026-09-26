@@ -185,12 +185,26 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
     },
 
     moveAnchor: (index, to) => {
-        const { anchors, past, segmentModes } = get();
+        const { anchors, past, segmentModes, manualMode } = get();
         const next = anchors.map((a, i) => (i === index ? { ...to } : a));
         const modes = normalizedModes(anchors.length, segmentModes);
-        // Modes are untouched: moving an endpoint refetches geometry for its
-        // two segments, but each keeps its generation mode.
-        set({ anchors: next, segmentModes: modes, past: [...past, { anchors, segmentModes: modes }], future: [] });
+        const nextModes = [...modes];
+        // When manual mode is OFF, any moved anchor is treated as a normal routed waypoint:
+        // its adjacent segments (even if created as manual straight lines) re-route along the road network.
+        if (!manualMode) {
+            if (index > 0 && index - 1 < nextModes.length) {
+                nextModes[index - 1] = 'route';
+            }
+            if (index < nextModes.length) {
+                nextModes[index] = 'route';
+            }
+        }
+        set({
+            anchors: next,
+            segmentModes: nextModes,
+            past: [...past, { anchors, segmentModes: modes }],
+            future: [],
+        });
     },
 
     removeAnchor: (index) => {
