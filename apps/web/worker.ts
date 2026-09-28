@@ -222,11 +222,9 @@ export default {
 
         // Public runtime config endpoint (exposes Cloudflare Dashboard env vars to client)
         if (url.pathname === '/api/config') {
-            const envKeys = Object.keys(env);
-            const foundKey = env.VITE_TIANDITU_KEY || env.TIANDITU_KEY || env.tiandituKey || '';
+            const foundKey = env.VITE_TIANDITU_KEY || env.TIANDITU_KEY || '';
             return new Response(
                 JSON.stringify({
-                    envKeys,
                     tiandituKey: foundKey,
                 }),
                 {
