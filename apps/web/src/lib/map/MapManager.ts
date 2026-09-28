@@ -78,10 +78,24 @@ export type BasemapKey =
 
 function getTiandituKey(): string {
     if (typeof window !== 'undefined') {
+        const injected = (window as any).__TIANDITU_KEY__;
+        if (injected) return String(injected).trim();
         const stored = localStorage.getItem('x-route-tianditu-key');
         if (stored) return stored.trim();
     }
     return (import.meta.env.VITE_TIANDITU_KEY || '').trim();
+}
+
+// Pre-fetch runtime configuration asynchronously if not pre-injected
+if (typeof window !== 'undefined' && !(window as any).__TIANDITU_KEY__) {
+    fetch('/api/config')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((cfg: { tiandituKey?: string } | null) => {
+            if (cfg?.tiandituKey) {
+                (window as any).__TIANDITU_KEY__ = cfg.tiandituKey;
+            }
+        })
+        .catch(() => {});
 }
 
 function createTiandituStyle(layer: 'vec' | 'img', labelLayer: 'cva' | 'cia'): StyleSpecification {

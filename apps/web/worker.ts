@@ -220,7 +220,33 @@ export default {
             return handleShareLink(request, url, env);
         }
 
+        // Public runtime config endpoint (exposes Cloudflare Dashboard env vars to client)
+        if (url.pathname === '/api/config') {
+            return new Response(
+                JSON.stringify({
+                    tiandituKey: env.VITE_TIANDITU_KEY || env.TIANDITU_KEY || '',
+                }),
+                {
+                    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+                }
+            );
+        }
+
         // @ts-ignore - assets binding provided by wrangler assets config
-        return env.ASSETS.fetch(request);
+        const response = await env.ASSETS.fetch(request);
+        const tiandituKey = env.VITE_TIANDITU_KEY || env.TIANDITU_KEY;
+        if (tiandituKey && response.headers.get('content-type')?.includes('text/html')) {
+            // @ts-ignore - HTMLRewriter provided by Cloudflare Workers runtime
+            return new HTMLRewriter()
+                .on('head', {
+                    element(head: any) {
+                        head.append(`<script>window.__TIANDITU_KEY__=${JSON.stringify(tiandituKey)};</script>`, {
+                            html: true,
+                        });
+                    },
+                })
+                .transform(response);
+        }
+        return response;
     },
 };
