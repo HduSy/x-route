@@ -14,6 +14,8 @@ import {
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useSelectionStore } from '@/store/selection-slice';
+import { useI18nStore, translations } from '@/store/i18n-slice';
+import { toast } from '@/lib/toast';
 import { db } from '@/lib/db';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 
@@ -67,16 +69,77 @@ export type BasemapKey =
     | 'liberty'
     | 'positron'
     | 'dark'
+    | 'tianditu'
+    | 'tiandituSatellite'
     | 'esriSatellite'
     | 'openTopoMap'
     | 'cyclOSM'
     | 'openStreetMap';
+
+function getTiandituKey(): string {
+    if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('x-route-tianditu-key');
+        if (stored) return stored.trim();
+    }
+    return (import.meta.env.VITE_TIANDITU_KEY || '').trim();
+}
+
+function createTiandituStyle(layer: 'vec' | 'img', labelLayer: 'cva' | 'cia'): StyleSpecification {
+    const key = getTiandituKey();
+    if (!key && typeof window !== 'undefined') {
+        console.warn(
+            '[x-route] Tianditu API key (tk) is missing. Set VITE_TIANDITU_KEY in .env.local or execute: localStorage.setItem("x-route-tianditu-key", "YOUR_KEY")'
+        );
+    }
+    const keyParam = key ? `&tk=${key}` : '';
+    const subdomains = ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'];
+    return {
+        version: 8,
+        sources: {
+            [`tianditu-${layer}`]: {
+                type: 'raster',
+                tiles: subdomains.map(
+                    (s) =>
+                        `https://${s}.tianditu.gov.cn/${layer}_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${layer}&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}${keyParam}`
+                ),
+                tileSize: 256,
+                maxzoom: 18,
+                attribution: '© 国家地理信息公共服务平台 天地图',
+            },
+            [`tianditu-${labelLayer}`]: {
+                type: 'raster',
+                tiles: subdomains.map(
+                    (s) =>
+                        `https://${s}.tianditu.gov.cn/${labelLayer}_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${labelLayer}&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}${keyParam}`
+                ),
+                tileSize: 256,
+                maxzoom: 18,
+            },
+        },
+        layers: [
+            { id: `tianditu-${layer}`, type: 'raster', source: `tianditu-${layer}` },
+            { id: `tianditu-${labelLayer}`, type: 'raster', source: `tianditu-${labelLayer}` },
+        ],
+    };
+}
 
 export const BASEMAPS: Record<BasemapKey, { label: string; style: string | StyleSpecification }> = {
     bright: { label: 'Bright', style: 'https://tiles.openfreemap.org/styles/bright' },
     liberty: { label: 'Liberty', style: 'https://tiles.openfreemap.org/styles/liberty' },
     positron: { label: 'Positron', style: 'https://tiles.openfreemap.org/styles/positron' },
     dark: { label: 'Dark', style: 'https://tiles.openfreemap.org/styles/dark' },
+    tianditu: {
+        label: 'Tianditu',
+        get style() {
+            return createTiandituStyle('vec', 'cva');
+        },
+    },
+    tiandituSatellite: {
+        label: 'Tianditu Satellite',
+        get style() {
+            return createTiandituStyle('img', 'cia');
+        },
+    },
     esriSatellite: {
         label: 'Satellite',
         style: {
@@ -154,6 +217,16 @@ export const BASEMAPS: Record<BasemapKey, { label: string; style: string | Style
 
 const BASEMAP_STORAGE_KEY = 'x-route-basemap';
 
+const OVERSEAS_BASEMAPS = new Set<BasemapKey>([
+    'bright',
+    'liberty',
+    'positron',
+    'dark',
+    'openTopoMap',
+    'cyclOSM',
+    'openStreetMap',
+]);
+
 function getSavedBasemap(): BasemapKey {
     try {
         const val = localStorage.getItem(BASEMAP_STORAGE_KEY);
@@ -216,6 +289,38 @@ class MapManager {
     private userInteracted = false;
     private saveViewportTimer: ReturnType<typeof setTimeout> | null = null;
     private activeFileGetter: ((fileId: string) => GPXFileType | null) | null = null;
+    private fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    private hasFallenBack = false;
+
+    private checkAndSetupFallbackWatchdog() {
+        if (this.fallbackTimer) {
+            clearTimeout(this.fallbackTimer);
+            this.fallbackTimer = null;
+        }
+
+        if (!OVERSEAS_BASEMAPS.has(this.basemap)) return;
+
+        const tiandituKey = getTiandituKey();
+        const fallbackTarget: BasemapKey = tiandituKey ? 'tianditu' : 'esriSatellite';
+
+        this.fallbackTimer = setTimeout(() => {
+            if (this.map && !this.map.isStyleLoaded() && !this.hasFallenBack) {
+                this.triggerFallback(fallbackTarget);
+            }
+        }, 3500);
+    }
+
+    private triggerFallback(target: BasemapKey) {
+        if (this.hasFallenBack || this.basemap === target) return;
+        this.hasFallenBack = true;
+        console.warn(`[x-route] Overseas basemap '${this.basemap}' unreachable/timeout. Falling back to '${target}'.`);
+        this.setBasemap(target);
+        try {
+            const lang = useI18nStore.getState().language;
+            const msg = translations[lang]?.mapFallbackTianditu || translations.zh.mapFallbackTianditu;
+            toast(msg, 'error');
+        } catch {}
+    }
 
     registerActiveFileGetter(getter: (fileId: string) => GPXFileType | null) {
         this.activeFileGetter = getter;
@@ -307,6 +412,29 @@ class MapManager {
             }, 300);
         });
 
+        // Automatic fallback when overseas basemaps fail to load
+        map.on('error', () => {
+            if (
+                OVERSEAS_BASEMAPS.has(this.basemap) &&
+                !map.isStyleLoaded() &&
+                !this.hasFallenBack
+            ) {
+                const tiandituKey = getTiandituKey();
+                const fallbackTarget: BasemapKey = tiandituKey ? 'tianditu' : 'esriSatellite';
+                this.triggerFallback(fallbackTarget);
+            }
+        });
+
+        const cancelWatchdog = () => {
+            if (this.fallbackTimer) {
+                clearTimeout(this.fallbackTimer);
+                this.fallbackTimer = null;
+            }
+        };
+        map.once('style.load', cancelWatchdog);
+        map.once('load', cancelWatchdog);
+        this.checkAndSetupFallbackWatchdog();
+
         // Initial settlement kicks
         requestAnimationFrame(() => this.map?.resize());
         setTimeout(() => this.map?.resize(), 100);
@@ -315,6 +443,10 @@ class MapManager {
     }
 
     destroy() {
+        if (this.fallbackTimer) {
+            clearTimeout(this.fallbackTimer);
+            this.fallbackTimer = null;
+        }
         if (this.saveViewportTimer) {
             clearTimeout(this.saveViewportTimer);
             this.saveViewportTimer = null;
@@ -462,12 +594,22 @@ class MapManager {
         if (key === this.basemap) return;
         this.basemap = key;
         saveSavedBasemap(key);
+        if (this.fallbackTimer) {
+            clearTimeout(this.fallbackTimer);
+            this.fallbackTimer = null;
+        }
         if (this.map) {
+            this.hasFallenBack = false;
             this.map.setStyle(BASEMAPS[key].style as any);
+            this.checkAndSetupFallbackWatchdog();
             let fired = false;
             const fireReload = () => {
                 if (fired) return;
                 fired = true;
+                if (this.fallbackTimer) {
+                    clearTimeout(this.fallbackTimer);
+                    this.fallbackTimer = null;
+                }
                 this.styleReloadCallbacks.forEach((cb) => cb());
             };
             this.map.once('style.load', fireReload);

@@ -33,6 +33,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
     proxy: {
       // AD-5: local dev relay to bypass graphhopper.gpx.studio CORS restriction
       '/api/graphhopper': {
