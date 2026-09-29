@@ -14,8 +14,12 @@ export default function App() {
     useKeyboardShortcuts();
     usePrintHandler();
 
+    // h-dvh (dynamic viewport) tracks the mobile URL bar: with plain h-screen
+    // (100vh = large viewport) the bottom stats/elevation bar sat below the
+    // visible area while the URL bar was shown, and overflow-hidden made it
+    // unreachable. h-screen stays as the fallback for pre-dvh browsers.
     return (
-        <div className="flex h-screen w-screen flex-col overflow-hidden bg-background print:h-full print:w-full print:overflow-hidden print:bg-white">
+        <div className="flex h-screen supports-[height:100dvh]:h-dvh w-screen flex-col overflow-hidden bg-background print:h-full print:w-full print:overflow-hidden print:bg-white">
             {/* Strava Top Navigation Bar */}
             <div className="print:hidden">
                 <StravaNavbar />
