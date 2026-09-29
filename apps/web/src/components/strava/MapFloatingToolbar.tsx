@@ -24,6 +24,7 @@ import { routingLayer } from '@/lib/map/routing-layer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { reverseTrack, simplifyTrack, splitTrackAtMiddle, closeLoop } from '@/lib/file-actions';
+import { locateWithRetry } from '@/lib/geolocation';
 import { lassoModeStore } from '@/store/lasso-store';
 import { cn } from '@/lib/utils';
 
@@ -55,6 +56,9 @@ export function MapFloatingToolbar() {
 
     const fileCount = useLiveQuery(() => db.fileids.count()) ?? 0;
     const [isLocating, setIsLocating] = useState(false);
+    /** Supersede older locate chains: only the latest click may move the
+     *  spinner / camera once retries made chains long-lived. */
+    const locateSeqRef = useRef(0);
 
     const handleLocateMe = (isManual = false) => {
         if (!('geolocation' in navigator)) return;
@@ -81,56 +85,45 @@ export function MapFloatingToolbar() {
             }
         }
 
-        // Always request the freshest position from navigator.geolocation
+        // Always request the freshest position. locateWithRetry runs the
+        // high→low accuracy chain and rides out transient failures
+        // (Safari's kCLErrorLocationUnknown) with backoff — the spinner
+        // keeps spinning until it resolves or truly gives up.
         setIsLocating(true);
+        const seq = ++locateSeqRef.current;
+        const isStale = () => locateSeqRef.current !== seq;
 
-        const onPositionSuccess = (pos: GeolocationPosition) => {
-            const lon = pos.coords.longitude;
-            const lat = pos.coords.latitude;
-            const map = mapManager.getMap();
-            if (!map) {
-                setIsLocating(false);
-                return;
-            }
+        locateWithRetry()
+            .then((pos) => {
+                if (isStale()) return;
+                const lon = pos.coords.longitude;
+                const lat = pos.coords.latitude;
+                const map = mapManager.getMap();
+                if (!map) return;
 
-            mapManager.setUserLocation({ lon, lat });
+                mapManager.setUserLocation({ lon, lat });
 
-            // Only fly camera if explicitly clicked by user OR on a pristine first load (no user actions/route)
-            const shouldFlyNow = isManual || (
-                !mapManager.hasUserInteracted() &&
-                useRoutingStore.getState().anchors.length === 0
-            );
+                // Only fly camera if explicitly clicked by user OR on a pristine first load (no user actions/route)
+                const shouldFlyNow = isManual || (
+                    !mapManager.hasUserInteracted() &&
+                    useRoutingStore.getState().anchors.length === 0
+                );
 
-            if (shouldFlyNow) {
-                map.flyTo({
-                    center: [lon, lat],
-                    zoom: Math.max(map.getZoom(), 15),
-                    essential: true,
-                    duration: 1000,
-                });
-            }
-            setIsLocating(false);
-        };
-
-        const tryLowAccuracy = () => {
-            navigator.geolocation.getCurrentPosition(
-                onPositionSuccess,
-                (err) => {
-                    console.warn('Geolocation fallback error:', err);
-                    setIsLocating(false);
-                },
-                { enableHighAccuracy: false, timeout: 6000, maximumAge: 5000 }
-            );
-        };
-
-        navigator.geolocation.getCurrentPosition(
-            onPositionSuccess,
-            (err) => {
-                console.warn('Geolocation high accuracy error, trying fallback:', err);
-                tryLowAccuracy();
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 5000 }
-        );
+                if (shouldFlyNow) {
+                    map.flyTo({
+                        center: [lon, lat],
+                        zoom: Math.max(map.getZoom(), 15),
+                        essential: true,
+                        duration: 1000,
+                    });
+                }
+            })
+            .catch(() => {
+                // Give-up warning is emitted by locateWithRetry itself
+            })
+            .finally(() => {
+                if (!isStale()) setIsLocating(false);
+            });
     };
 
     // Auto-locate user on page load / refresh
