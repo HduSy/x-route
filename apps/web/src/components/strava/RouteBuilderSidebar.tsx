@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Bike,
     ChevronDown,
@@ -15,7 +15,6 @@ import { useRoutingStore, type UnitType, type ElevationPreference, type RoutingP
 import { useT } from '@/store/i18n-slice';
 import { mapManager } from '@/lib/map/MapManager';
 import { cn } from '@/lib/utils';
-import { computeSurfaceStats } from '@/lib/surface';
 
 interface SearchResult {
     place_id: number;
@@ -44,19 +43,11 @@ export function RouteBuilderSidebar() {
     const setShowRoutePath = useRoutingStore((s) => s.setShowRoutePath);
     const showSurfaceType = useRoutingStore((s) => s.showSurfaceType);
     const setShowSurfaceType = useRoutingStore((s) => s.setShowSurfaceType);
-    const resultPoints = useRoutingStore((s) => s.resultPoints);
     const units = useRoutingStore((s) => s.units);
     const setUnits = useRoutingStore((s) => s.setUnits);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
     const setSidebarCollapsed = useRoutingStore((s) => s.setSidebarCollapsed);
     const addAnchor = useRoutingStore((s) => s.addAnchor);
-
-    const surfaceStats = useMemo(() => {
-        if (resultPoints.length >= 2) {
-            return computeSurfaceStats(resultPoints, units);
-        }
-        return null;
-    }, [resultPoints, units]);
 
     // Geocoding search
     const [searchQuery, setSearchQuery] = useState('');
@@ -422,65 +413,6 @@ export function RouteBuilderSidebar() {
                             />
                         </button>
                     </div>
-
-                    {/* Surface Breakdown Mini Card (Strava Theme Aligned) */}
-                    {showSurfaceType && surfaceStats && resultPoints.length >= 2 && (
-                        <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5 space-y-2">
-                            <div className="flex items-center justify-between text-xs font-semibold text-foreground">
-                                <span>{t.surfaceBreakdown}</span>
-                                <span className="text-[11px] font-bold text-[#863BFF]">
-                                    {surfaceStats.pavedPct >= surfaceStats.unpavedPct
-                                        ? `${surfaceStats.pavedPct}% ${t.paved}`
-                                        : `${surfaceStats.unpavedPct}% ${t.unpaved}`}
-                                </span>
-                            </div>
-
-                            {/* Segmented Proportion Bar */}
-                            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted ring-1 ring-border/50">
-                                {surfaceStats.pavedPct > 0 && (
-                                    <div
-                                        style={{ width: `${surfaceStats.pavedPct}%` }}
-                                        className="h-full bg-[#863BFF] transition-all duration-300"
-                                        title={`${t.paved}: ${surfaceStats.pavedPct}% (${surfaceStats.pavedDistFormatted})`}
-                                    />
-                                )}
-                                {surfaceStats.unpavedPct > 0 && (
-                                    <div
-                                        style={{ width: `${surfaceStats.unpavedPct}%` }}
-                                        className="h-full bg-amber-500 transition-all duration-300"
-                                        title={`${t.unpaved}: ${surfaceStats.unpavedPct}% (${surfaceStats.unpavedDistFormatted})`}
-                                    />
-                                )}
-                                {surfaceStats.unknownPct > 0 && (
-                                    <div
-                                        style={{ width: `${surfaceStats.unknownPct}%` }}
-                                        className="h-full bg-zinc-400 dark:bg-zinc-600 transition-all duration-300"
-                                        title={`${t.unknownSurface}: ${surfaceStats.unknownPct}% (${surfaceStats.unknownDistFormatted})`}
-                                    />
-                                )}
-                            </div>
-
-                            {/* Legend Details */}
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground font-medium pt-0.5">
-                                <span className="flex items-center gap-1.5">
-                                    <span className="size-2 rounded-full bg-[#863BFF]" />
-                                    <span>{t.paved} {surfaceStats.pavedPct}% ({surfaceStats.pavedDistFormatted})</span>
-                                </span>
-                                {surfaceStats.unpavedPct > 0 && (
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="size-2 rounded-full bg-amber-500" />
-                                        <span>{t.unpaved} {surfaceStats.unpavedPct}% ({surfaceStats.unpavedDistFormatted})</span>
-                                    </span>
-                                )}
-                                {surfaceStats.unknownPct > 0 && (
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="size-2 rounded-full bg-zinc-400 dark:bg-zinc-600" />
-                                        <span>{t.unknownSurface} {surfaceStats.unknownPct}%</span>
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    )}
 
                     {/* Distance Units Dropdown */}
                     <div className="flex items-center justify-between pt-1">
