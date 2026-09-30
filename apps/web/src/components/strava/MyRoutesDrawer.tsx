@@ -22,7 +22,7 @@ import { copyToClipboard, createShareLink } from '@/lib/share';
 import { toast } from '@/lib/toast';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
 import { useRoutingStore } from '@/store/routing-slice';
-import { useSelectionStore } from '@/store/selection-slice';
+import { useSelectionStore, nextCardCycleAction } from '@/store/selection-slice';
 import { useT } from '@/store/i18n-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
@@ -150,16 +150,40 @@ export function MyRoutesDrawer() {
         }
     };
 
+    /** Preview only: draw the route's track on the map (gpx layer line) and
+     *  focus it — the route editor and its anchors stay untouched. */
+    const handlePreviewRoute = (fileId: string) => {
+        const fileData = fileMap.get(fileId);
+        if (!fileData) return;
+        mapManager.markInteracted();
+        addLoadedFile(fileId);
+        const file = new GPXFile(fileData);
+        const { global } = file.getStatistics();
+        if (global?.bounds) {
+            const sw = global.bounds.southWest;
+            const ne = global.bounds.northEast;
+            mapManager.fitBounds([[sw.lon, sw.lat], [ne.lon, ne.lat]], 80);
+        }
+    };
+
     const handleDeleteRoute = async (fileId: string) => {
         handleUnloadRoute(fileId);
         await deleteFile(fileId);
     };
 
-    const handleToggleRoute = (fileId: string, currentlyLoaded: boolean) => {
-        if (currentlyLoaded) {
-            handleUnloadRoute(fileId);
-        } else {
-            handleLoadRoute(fileId);
+    /** Single click cycles the card through its three states:
+     *  unselected → preview → edit → unselected. */
+    const handleCardClick = (fileId: string) => {
+        switch (nextCardCycleAction(fileId, loadedFileIds, editingFileId)) {
+            case 'unload':
+                handleUnloadRoute(fileId);
+                break;
+            case 'edit':
+                handleLoadRoute(fileId);
+                break;
+            case 'preview':
+                handlePreviewRoute(fileId);
+                break;
         }
     };
 
@@ -299,8 +323,7 @@ export function MyRoutesDrawer() {
                                     isCurrentEditing={isCurrentEditing}
                                     isSharing={sharingId === id}
                                     t={t}
-                                    onToggle={handleToggleRoute}
-                                    onLoad={handleLoadRoute}
+                                    onCardClick={handleCardClick}
                                     onExport={handleExport}
                                     onShare={handleShare}
                                     onDeleteRequest={handleDeleteRequest}
@@ -364,8 +387,7 @@ interface RouteCardProps {
     isCurrentEditing: boolean;
     isSharing: boolean;
     t: ReturnType<typeof useT>['t'];
-    onToggle: (id: string, isLoaded: boolean) => void;
-    onLoad: (id: string) => void;
+    onCardClick: (id: string) => void;
     onExport: (id: string) => void;
     onShare: (id: string) => void;
     onDeleteRequest: (id: string, name: string) => void;
@@ -378,8 +400,7 @@ const RouteCard = memo(function RouteCard({
     isCurrentEditing,
     isSharing,
     t,
-    onToggle,
-    onLoad,
+    onCardClick,
     onExport,
     onShare,
     onDeleteRequest,
@@ -388,7 +409,7 @@ const RouteCard = memo(function RouteCard({
 
     return (
         <div
-            onClick={() => onToggle(id, isLoaded)}
+            onClick={() => onCardClick(id)}
             style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 118px' }}
             className={cn(
                 'group relative flex flex-col rounded-xl border p-3 shadow-2xs transition-all duration-150 cursor-pointer select-none',
@@ -503,14 +524,7 @@ const RouteCard = memo(function RouteCard({
                             {t.currentlyEditing}
                         </span>
                     ) : isLoaded ? (
-                        <span
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onLoad(id);
-                            }}
-                            className="inline-flex items-center gap-1 text-[#863BFF] font-semibold hover:underline cursor-pointer"
-                            title="点击切换为当前编辑"
-                        >
+                        <span className="inline-flex items-center gap-1 text-[#863BFF] font-semibold">
                             <Check className="size-3 text-[#863BFF]" />
                             {t.loaded}
                         </span>

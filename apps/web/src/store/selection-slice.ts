@@ -1,5 +1,24 @@
 import { create } from 'zustand';
 
+/** What a single click on a route card should do next (three-state cycle:
+ *  none → preview → edit → none). */
+export type CardCycleAction = 'preview' | 'edit' | 'unload';
+
+/** Decides the next state for a card click from the current selection state:
+ *  - card not loaded            → 'preview' (show its track on the map only)
+ *  - loaded but not the edited  → 'edit'    (load into the route editor)
+ *  - the route being edited     → 'unload'  (deselect, back to unselected)
+ */
+export function nextCardCycleAction(
+    fileId: string,
+    loadedFileIds: string[],
+    editingFileId: string | null
+): CardCycleAction {
+    if (editingFileId === fileId) return 'unload';
+    if (loadedFileIds.includes(fileId)) return 'edit';
+    return 'preview';
+}
+
 interface SelectionState {
     selectedFileId: string | null;
     loadedFileIds: string[];
