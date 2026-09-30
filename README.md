@@ -41,7 +41,7 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
 - **Surface Type Breakdown (Strava Style)**:
   - Real-time road surface extraction from OpenStreetMap `surface` and `road_class` attributes.
   - Distance-weighted geodesic integration categorizing terrain into **Paved** (asphalt, concrete), **Unpaved** (gravel, dirt, ground), and **Unknown**.
-  - Multi-segment rounded capsule proportion bar in the bottom stats bar (`RouteStatsBar`), complete with matching toggle switches and breakdown cards in the sidebar.
+  - Multi-segment rounded capsule proportion bar in the bottom stats bar (`RouteStatsBar`), with a matching visibility toggle in the sidebar's map display options.
 - **Manual Mode (Off-Road / Free Drawing)**:
   - Draw direct straight-line connections across areas without mapped OSM roads. Applies only to newly added segments — existing road-following segments are never recomputed.
   - **Mode-Aware Anchor Dragging**: Toggling manual mode off and dragging any waypoint treats it as a normal node, automatically re-routing adjacent segments along the road network.
@@ -97,6 +97,7 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
   - **Split**: Divide a track into two distinct sections at the midpoint.
   - **Loop**: Automatically connect the end point back to the start.
 - **Offline-First Route Storage**: Local IndexedDB database powered by Dexie.js. Your routes, names, descriptions, and trackpoints remain entirely on your computer.
+  - Route cards in the My Routes drawer cycle through three states on click: unselected → **preview** (track drawn on the map, editor untouched) → **edit** (anchors loaded into the editor) → unselected. Previewing one route never hijacks another route being edited.
 - **Zero-Login Route Sharing via Short-Links**:
   - Generate lightweight short URLs powered by Cloudflare Workers and KV.
   - Recipients can open and inspect complete route geometries and elevation profiles on any device with zero sign-up required.
