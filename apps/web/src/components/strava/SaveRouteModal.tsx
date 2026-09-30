@@ -6,7 +6,7 @@ import { saveGPXFile, updateGPXFile } from '@/lib/file-actions';
 import { GPXFile, Track, TrackSegment, distance, type GPXFileType } from '@x-route/gpx';
 import { cn } from '@/lib/utils';
 import { computeElevationStats } from '@/lib/elevation';
-import { useSelectionStore } from '@/store/selection-slice';
+import { useSelectionStore, resolveSaveTargetId } from '@/store/selection-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
 import { db } from '@/lib/db';
@@ -15,24 +15,22 @@ import { useLiveQuery } from 'dexie-react-hooks';
 export function SaveRouteModal() {
     const saveModalOpen = useRoutingStore((s) => s.saveModalOpen);
     const editingFileId = useRoutingStore((s) => s.editingFileId);
-    const selectedFileId = useSelectionStore((s) => s.selectedFileId);
-    const targetFileId = editingFileId ?? selectedFileId;
 
+    // Prefill (name/desc) applies only to the route actually being edited —
+    // creating a new route never pretends to edit the selected card.
     const existingFile = useLiveQuery(
-        () => (targetFileId ? db.files.get(targetFileId) : undefined),
-        [targetFileId]
+        () => (editingFileId ? db.files.get(editingFileId) : undefined),
+        [editingFileId]
     );
 
     if (!saveModalOpen) return null;
-    return <SaveRouteModalDialog existingFile={existingFile} targetFileId={targetFileId} />;
+    return <SaveRouteModalDialog existingFile={existingFile} />;
 }
 
 function SaveRouteModalDialog({
     existingFile,
-    targetFileId,
 }: {
     existingFile?: GPXFileType;
-    targetFileId?: string | null;
 }) {
     const { t } = useT();
 
@@ -136,11 +134,9 @@ function SaveRouteModalDialog({
                 },
             });
 
-            const effectiveFileId =
-                editingFileId ||
-                (targetFileId && useSelectionStore.getState().loadedFileIds.includes(targetFileId)
-                    ? targetFileId
-                    : null);
+            // Only the editing route is ever updated; otherwise a new file is
+            // created — never the selected/loaded card (silent-overwrite bug).
+            const effectiveFileId = resolveSaveTargetId(editingFileId);
 
             let savedFileId = effectiveFileId;
             if (effectiveFileId) {

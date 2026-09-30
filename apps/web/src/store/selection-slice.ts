@@ -4,6 +4,15 @@ import { create } from 'zustand';
  *  none → preview → edit → none). */
 export type CardCycleAction = 'preview' | 'edit' | 'unload';
 
+/** The stored file a save should update: ONLY the route currently in the
+ *  editor (editing state). A merely selected/loaded card is never written —
+ *  saving then always creates a new file. Regression guard: an earlier
+ *  version updated the loaded card that happened to be selected, silently
+ *  overwriting it whenever a new route was saved after it. */
+export function resolveSaveTargetId(editingFileId: string | null): string | null {
+    return editingFileId ?? null;
+}
+
 /** Decides the next state for a card click from the current selection state:
  *  - card not loaded            → 'preview' (show its track on the map only)
  *  - loaded but not the edited  → 'edit'    (load into the route editor)
