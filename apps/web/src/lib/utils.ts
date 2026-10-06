@@ -2,17 +2,38 @@ export { cn } from "cn";
 
 import { TrackPoint, type Coordinates, crossarcDistance, distance } from '@x-route/gpx';
 
+export interface PanelRect {
+    left: number;
+    width: number;
+}
+
 /**
- * On layouts below the sm: breakpoint (640px) the My Routes drawer is a
- * fixed overlay covering ~85vw — including the route builder sidebar it
- * expands above. Entering edit mode must close the drawer there, or the
- * freshly expanded planning panel stays hidden behind it.
+ * Pure geometry core: does the right-anchored drawer cover the planner's
+ * on-screen footprint? The planner aside is left-anchored (left-0 /
+ * sm:left-0), so its footprint is [0, width] even while it is translated
+ * off-canvas collapsed — collapsing only shifts it, the width stays. The
+ * drawer extends rightward from its left edge, so it covers the planner
+ * iff it starts before the planner's footprint ends (abutting is not
+ * covering). Follows whatever the CSS layout actually does — no pixel
+ * breakpoint to keep in sync.
+ */
+export function drawerOverlaysPanelRects(panelRect: PanelRect, drawerRect: PanelRect): boolean {
+    return drawerRect.left < panelRect.width;
+}
+
+/**
+ * On small layouts the My Routes drawer is a fixed overlay covering ~85vw —
+ * including the route builder sidebar it expands above. Entering edit mode
+ * must close the drawer there, or the freshly expanded planning panel stays
+ * hidden behind it. Measured live at call time (i.e. at the edit click), so
+ * there is no resize/mount bookkeeping to go stale.
  */
 export function drawerOverlaysSidebar(): boolean {
-    return (
-        typeof window !== 'undefined' &&
-        window.matchMedia('(max-width: 639px)').matches
-    );
+    if (typeof document === 'undefined') return false;
+    const panel = document.querySelector<HTMLElement>('[data-panel="planner"]');
+    const drawer = document.querySelector<HTMLElement>('[data-panel="my-routes"]');
+    if (!panel || !drawer) return false;
+    return drawerOverlaysPanelRects(panel.getBoundingClientRect(), drawer.getBoundingClientRect());
 }
 
 export interface ClosestPointDetails {

@@ -3,7 +3,7 @@ import { TrackPoint } from '@x-route/gpx';
 import { nextCardCycleAction } from './selection-slice';
 import { useSelectionStore } from './selection-slice';
 import { useRoutingStore } from './routing-slice';
-import { drawerOverlaysSidebar } from '@/lib/utils';
+import { drawerOverlaysSidebar, drawerOverlaysPanelRects } from '@/lib/utils';
 
 // Three-state card click cycle in MyRoutesDrawer:
 //   unselected → preview (track on map, editor untouched)
@@ -111,9 +111,9 @@ describe('card cycle state transitions (store integration)', () => {
     });
 });
 
-// Regression: on small screens (<sm: = 640px) the My Routes drawer is a
-// fixed overlay covering the route builder. Entering edit must close it —
-// expanding the panel alone leaves it hidden behind the open drawer.
+// Regression: on small layouts the My Routes drawer is a fixed overlay
+// covering the route builder. Entering edit must close it — expanding the
+// panel alone leaves it hidden behind the open drawer.
 describe('edit entry closes the drawer when it overlays the sidebar', () => {
     beforeEach(resetStores);
 
@@ -121,14 +121,11 @@ describe('edit entry closes the drawer when it overlays the sidebar', () => {
         vi.unstubAllGlobals();
     });
 
-    function stubViewport(matches: boolean) {
-        vi.stubGlobal('window', {
-            matchMedia: () => ({ matches, media: '', addListener: () => {}, removeListener: () => {} }),
-        });
-    }
-
     it('small screen: drawer closes so the expanded panel is visible', () => {
-        stubViewport(true);
+        stubPanels(
+            { left: -320, width: 320 }, // planner collapsed off-canvas (mobile draw flow)
+            { left: 70, width: 320 } // open drawer covers [70, 390) of a 390px viewport
+        );
         expect(drawerOverlaysSidebar()).toBe(true);
 
         // previewed card, drawer open, sidebar collapsed (mobile draw flow)
@@ -150,7 +147,10 @@ describe('edit entry closes the drawer when it overlays the sidebar', () => {
     });
 
     it('wide screen: drawer stays open (it does not cover the sidebar)', () => {
-        stubViewport(false);
+        stubPanels(
+            { left: 0, width: 320 }, // planner expanded
+            { left: 960, width: 320 } // drawer docked right on a 1280px viewport
+        );
         expect(drawerOverlaysSidebar()).toBe(false);
 
         useSelectionStore.getState().addLoadedFile('r1');
@@ -168,3 +168,43 @@ describe('edit entry closes the drawer when it overlays the sidebar', () => {
         expect(after.myRoutesOpen).toBe(true); // desktop keeps both panels
     });
 });
+
+describe('drawerOverlaysPanelRects (pure geometry)', () => {
+    it('drawer covering the planner footprint -> true', () => {
+        // planner [0,320]; drawer starts at 70 -> covers it
+        expect(drawerOverlaysPanelRects({ left: 0, width: 320 }, { left: 70, width: 320 })).toBe(true);
+    });
+
+    it('planner collapsed off-canvas still detects the overlay (width is the footprint)', () => {
+        // collapsed planner: translated left but same width — the panel we
+        // are about to expand WILL sit in [0, width]
+        expect(drawerOverlaysPanelRects({ left: -320, width: 320 }, { left: 70, width: 320 })).toBe(true);
+    });
+
+    it('docked side-by-side drawer -> false', () => {
+        expect(drawerOverlaysPanelRects({ left: 0, width: 320 }, { left: 960, width: 320 })).toBe(false);
+    });
+
+    it('panels exactly abutting -> false (touching is not covering)', () => {
+        expect(drawerOverlaysPanelRects({ left: 0, width: 320 }, { left: 320, width: 320 })).toBe(false);
+    });
+
+    it('already-closed drawer translated off-canvas -> false', () => {
+        expect(drawerOverlaysPanelRects({ left: 0, width: 320 }, { left: 390, width: 320 })).toBe(false);
+    });
+});
+
+// Test seam for drawerOverlaysSidebar(): fake the two panel asides.
+function stubPanels(panelRect: { left: number; width: number }, drawerRect: { left: number; width: number }) {
+    const fakeAside = (rect: { left: number; width: number }) => ({
+        getBoundingClientRect: () => ({ left: rect.left, width: rect.width, ...rect }),
+    });
+    vi.stubGlobal('document', {
+        querySelector: (sel: string) =>
+            sel === '[data-panel="planner"]'
+                ? fakeAside(panelRect)
+                : sel === '[data-panel="my-routes"]'
+                  ? fakeAside(drawerRect)
+                  : null,
+    });
+}

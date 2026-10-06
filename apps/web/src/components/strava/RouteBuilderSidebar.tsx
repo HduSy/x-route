@@ -121,6 +121,7 @@ export function RouteBuilderSidebar() {
             )}
 
             <aside
+                data-panel="planner"
                 className={cn(
                     'fixed inset-y-0 left-0 z-40 w-[85vw] max-w-xs sm:absolute sm:inset-y-0 sm:left-0 sm:z-20 sm:w-80 sm:min-w-80 sm:max-w-none flex h-full flex-col border-r border-border bg-background shadow-2xl sm:shadow-md select-none transition-transform duration-200 ease-in-out',
                     sidebarCollapsed ? '-translate-x-full pointer-events-none' : 'translate-x-0 pointer-events-auto'

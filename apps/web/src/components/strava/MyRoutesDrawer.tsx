@@ -227,6 +227,7 @@ export function MyRoutesDrawer() {
 
             {/* Right side panel — matches RouteBuilderSidebar's non-modal sidebar interaction */}
             <aside
+                data-panel="my-routes"
                 className={cn(
                     'fixed inset-y-0 right-0 z-40 w-[85vw] max-w-xs sm:absolute sm:inset-y-0 sm:right-0 sm:z-20 sm:w-80 sm:min-w-80 sm:max-w-none flex h-full flex-col border-l border-border bg-background shadow-2xl sm:shadow-md select-none transition-transform duration-200 ease-in-out',
                     myRoutesOpen ? 'translate-x-0 pointer-events-auto' : 'translate-x-full pointer-events-none'
