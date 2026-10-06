@@ -1,8 +1,9 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { TrackPoint } from '@x-route/gpx';
 import { nextCardCycleAction } from './selection-slice';
 import { useSelectionStore } from './selection-slice';
 import { useRoutingStore } from './routing-slice';
+import { drawerOverlaysSidebar } from '@/lib/utils';
 
 // Three-state card click cycle in MyRoutesDrawer:
 //   unselected → preview (track on map, editor untouched)
@@ -30,6 +31,8 @@ function resetStores() {
         past: [],
         future: [],
         skipNextRouteComputation: false,
+        myRoutesOpen: false,
+        sidebarCollapsed: false,
     });
 }
 
@@ -105,5 +108,63 @@ describe('card cycle state transitions (store integration)', () => {
         expect(routing.editingFileId).toBeNull();
         expect(routing.anchors).toEqual([]);
         expect(routing.resultPoints).toEqual([]);
+    });
+});
+
+// Regression: on small screens (<sm: = 640px) the My Routes drawer is a
+// fixed overlay covering the route builder. Entering edit must close it —
+// expanding the panel alone leaves it hidden behind the open drawer.
+describe('edit entry closes the drawer when it overlays the sidebar', () => {
+    beforeEach(resetStores);
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    function stubViewport(matches: boolean) {
+        vi.stubGlobal('window', {
+            matchMedia: () => ({ matches, media: '', addListener: () => {}, removeListener: () => {} }),
+        });
+    }
+
+    it('small screen: drawer closes so the expanded panel is visible', () => {
+        stubViewport(true);
+        expect(drawerOverlaysSidebar()).toBe(true);
+
+        // previewed card, drawer open, sidebar collapsed (mobile draw flow)
+        useSelectionStore.getState().addLoadedFile('r1');
+        useRoutingStore.setState({ myRoutesOpen: true, sidebarCollapsed: true });
+
+        // what handleLoadRoute performs on the edit click
+        const trkpts = pts(5);
+        const routing = useRoutingStore.getState();
+        routing.loadRouteFromPoints(trkpts.map((p) => p.getCoordinates()), trkpts);
+        routing.setEditingFileId('r1');
+        routing.setSidebarCollapsed(false);
+        if (drawerOverlaysSidebar()) routing.setMyRoutesOpen(false);
+
+        const after = useRoutingStore.getState();
+        expect(after.editingFileId).toBe('r1');
+        expect(after.sidebarCollapsed).toBe(false); // panel expanded…
+        expect(after.myRoutesOpen).toBe(false); // …and actually visible
+    });
+
+    it('wide screen: drawer stays open (it does not cover the sidebar)', () => {
+        stubViewport(false);
+        expect(drawerOverlaysSidebar()).toBe(false);
+
+        useSelectionStore.getState().addLoadedFile('r1');
+        useRoutingStore.setState({ myRoutesOpen: true, sidebarCollapsed: false });
+
+        const trkpts = pts(5);
+        const routing = useRoutingStore.getState();
+        routing.loadRouteFromPoints(trkpts.map((p) => p.getCoordinates()), trkpts);
+        routing.setEditingFileId('r1');
+        routing.setSidebarCollapsed(false);
+        if (drawerOverlaysSidebar()) routing.setMyRoutesOpen(false);
+
+        const after = useRoutingStore.getState();
+        expect(after.sidebarCollapsed).toBe(false);
+        expect(after.myRoutesOpen).toBe(true); // desktop keeps both panels
     });
 });

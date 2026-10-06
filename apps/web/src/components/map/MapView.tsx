@@ -14,7 +14,7 @@ import { useRoutingStore, RETURN_TO_START_MIN_GAP_M } from '@/store/routing-slic
 import { useRoutingSync } from '@/hooks/use-routing-sync';
 import { deleteFile } from '@/lib/file-actions';
 import { useT } from '@/store/i18n-slice';
-import { cn } from '@/lib/utils';
+import { cn, drawerOverlaysSidebar } from '@/lib/utils';
 
 // --- Track info popup bridged into MapLibre's DOM via createPortal (AD-6) ---
 
@@ -113,6 +113,11 @@ export function MapView() {
                 useRoutingStore.getState().loadRouteFromPoints(coords, trkpts);
                 useRoutingStore.getState().setEditingFileId(fileId);
                 useRoutingStore.getState().setSidebarCollapsed(false);
+                // Same as the drawer's edit entry: on small screens the open
+                // drawer would cover the panel we just expanded.
+                if (drawerOverlaysSidebar()) {
+                    useRoutingStore.getState().setMyRoutesOpen(false);
+                }
                 useSelectionStore.getState().addLoadedFile(fileId);
                 useSelectionStore.getState().selectFile(fileId);
             }

@@ -2,6 +2,19 @@ export { cn } from "cn";
 
 import { TrackPoint, type Coordinates, crossarcDistance, distance } from '@x-route/gpx';
 
+/**
+ * On layouts below the sm: breakpoint (640px) the My Routes drawer is a
+ * fixed overlay covering ~85vw — including the route builder sidebar it
+ * expands above. Entering edit mode must close the drawer there, or the
+ * freshly expanded planning panel stays hidden behind it.
+ */
+export function drawerOverlaysSidebar(): boolean {
+    return (
+        typeof window !== 'undefined' &&
+        window.matchMedia('(max-width: 639px)').matches
+    );
+}
+
 export interface ClosestPointDetails {
     before: boolean;
     index: number;

@@ -26,7 +26,7 @@ import { useSelectionStore, nextCardCycleAction } from '@/store/selection-slice'
 import { useT } from '@/store/i18n-slice';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { mapManager } from '@/lib/map/MapManager';
-import { cn } from '@/lib/utils';
+import { cn, drawerOverlaysSidebar } from '@/lib/utils';
 
 interface CachedStats {
     name: string;
@@ -123,6 +123,9 @@ export function MyRoutesDrawer() {
             loadRouteFromPoints(coords, trkpts);
             setEditingFileId(fileId);
             setSidebarCollapsed(false);
+            // Small screens: the drawer overlays the just-expanded panel —
+            // close it so entering edit actually reveals the planner.
+            if (drawerOverlaysSidebar()) setMyRoutesOpen(false);
         }
         // Focus the camera on the selected route via the shared focus
         // capability — including when it is already the route being edited
