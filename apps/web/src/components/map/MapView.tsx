@@ -112,6 +112,7 @@ export function MapView() {
                 const coords = trkpts.map((pt) => pt.getCoordinates());
                 useRoutingStore.getState().loadRouteFromPoints(coords, trkpts);
                 useRoutingStore.getState().setEditingFileId(fileId);
+                useRoutingStore.getState().setSidebarCollapsed(false);
                 useSelectionStore.getState().addLoadedFile(fileId);
                 useSelectionStore.getState().selectFile(fileId);
             }
