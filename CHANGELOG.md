@@ -6,6 +6,21 @@
 
 ## [Unreleased]
 
+### 🚀 双域名地域分流上线（x-route.cn ICP 备案完成）
+- **双向 GeoIP 跳转**：
+  - 国内（CN）IP 访问 `x-route.app`（含 www）→ 302 至 `x-route.cn`，路径与短链完整保留（如 `/r/aB3xK9`）；
+  - 海外 IP 访问 `x-route.cn`（含 www）→ 302 回 `x-route.app`；两侧互送、绝不二次弹跳；GeoIP 未知时原地不动，误伤为零；
+  - 港澳台（HK/MO/TW）按海外处理；仅重定向文档导航请求，`/api/*` 与静态资源一律豁免，杜绝跨域与缓存投毒。
+- **修复 2026-10-09 部署配置回归**（`wrangler.jsonc` 误删两处关键配置）：
+  - 恢复 `ROUTE_SHARES` KV 绑定 —— 该回归曾导致线上分享接口 500（error 1101）、短链拉取全线不可用；
+  - 恢复 `run_worker_first: true` —— 该回归曾使 GeoIP 跳转、`/r/*` 死链 302 拦截与天地图 key 边缘注入（HTMLRewriter）全部静默失效；
+  - 配置内新增防回归注释，说明收窄 `run_worker_first` 的连带后果。
+- **`ENABLE_CN_REDIRECT` 正式置为 `true`**：备案（2026-10 阿里云）与域名接入（NS 已指向 Cloudflare）均已就绪，开关随版本化管理，紧急情况可一键回滚为 `"false"` 熔断。
+- **清除 Pages 遗留的全量 301 重定向文件（`public/_redirects` / `pages-redirects`）**：
+  - 该文件含 `/* → x-route.app 301`，是 Pages 时代为主域名规范化的临时手段；Workers Assets 同样会执行 `_redirects`，导致所有静态资源与 SPA 回退在双域名间互相 301（一度造成线上全站资源死循环，约 10 分钟内修复）；
+  - 删除源文件后构建产物不再包含 `_redirects`，`redeploy.sh` 中为剥离它而存在的 `rm` 步骤自此仅为双保险。
+- **修复 x-route.cn custom domain 孤儿 zone 绑定**：zone 曾删库重建（新 zone ID），Worker 自定义域仍指向已不存在的旧 zone，导致边缘证书永不签发、TLS 握手被重置；已通过 API 以显式 zone_id 重新挂载，证书即时签发（x-route.cn 与 www 均已生效）。
+
 ### ✨ 新增与优化 (Improvements)
 - **Safari/WebKit 定位冷启动退避重试（kCLErrorLocationUnknown 兼容）**：
   - 核心痛点解决：macOS/iOS Safari 中 CoreLocation 冷启动阶段的 `kCLErrorLocationUnknown` 以 `POSITION_UNAVAILABLE`（code 2）形态在毫秒级内同时击穿高精度与低精度两层请求，定位按钮表现为「转一下圈然后没有反应」。

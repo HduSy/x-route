@@ -146,43 +146,45 @@ async function handleShareLink(request: Request, url: URL, env: any): Promise<Re
 }
 
 /**
- * GeoIP redirection for Mainland China visitors.
- * When enabled (ENABLE_CN_REDIRECT=true), requests originating from CN (China)
- * accessing x-route.app will be 302-redirected to the CN target domain (default: x-route.cn).
+ * Bidirectional GeoIP redirection between the two domains.
+ * When enabled (ENABLE_CN_REDIRECT=true):
+ *  - CN visitors on x-route.app are 302-redirected to x-route.cn (ICP-filed)
+ *  - non-CN visitors on x-route.cn are 302-redirected back to x-route.app
+ * Each side only sends visitors across — nobody bounces twice.
  */
 export function handleGeoRedirect(request: Request, url: URL, env: any): Response | null {
     const isEnabled = env.ENABLE_CN_REDIRECT === 'true' || env.ENABLE_CN_REDIRECT === true;
     if (!isEnabled) return null;
 
-    const targetDomain = env.CN_TARGET_DOMAIN || 'x-route.cn';
+    const cnDomain = env.CN_TARGET_DOMAIN || 'x-route.cn';
+    const appDomain = env.APP_TARGET_DOMAIN || 'x-route.app';
+    const isCnHost = url.hostname === cnDomain || url.hostname.endsWith(`.${cnDomain}`);
+    const isAppHost = url.hostname === appDomain || url.hostname.endsWith(`.${appDomain}`);
 
-    // Avoid self-redirect loops if request is already targeting the CN domain
-    if (url.hostname === targetDomain || url.hostname.endsWith(`.${targetDomain}`)) {
-        return null;
-    }
-
-    // Check Cloudflare GeoIP metadata
+    // Cloudflare GeoIP metadata. Unknown country stays put — a failed geo
+    // lookup must never move a visitor, least of all a mainland one.
     const country = (request as any).cf?.country;
-    if (country !== 'CN') return null;
+    let targetDomain: string | null = null;
+    if (isAppHost && country === 'CN') targetDomain = cnDomain;
+    else if (isCnHost && country && country !== 'CN') targetDomain = appDomain;
+    if (!targetDomain) return null;
 
     // Do NOT redirect backend API requests to avoid CORS / cross-origin breakage
     if (url.pathname.startsWith('/api/')) return null;
 
-    // Redirect document navigation, root, or share links
+    // Redirect document navigation, root, or share links only
     const accept = request.headers.get('accept') ?? '';
     const isNavRequest =
         request.method === 'GET' &&
         (accept.includes('text/html') || url.pathname === '/' || url.pathname.startsWith('/r/'));
 
-    if (isNavRequest) {
-        const targetUrl = new URL(request.url);
-        targetUrl.hostname = targetDomain;
-        targetUrl.protocol = 'https:';
-        targetUrl.port = '';
-        return Response.redirect(targetUrl.toString(), 302);
-    }
+    if (!isNavRequest) return null;
 
-    return null;
+    const targetUrl = new URL(request.url);
+    targetUrl.hostname = targetDomain;
+    targetUrl.protocol = 'https:';
+    targetUrl.port = '';
+    return Response.redirect(targetUrl.toString(), 302);
 }
 
 export default {
