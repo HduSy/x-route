@@ -8,6 +8,9 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
+**🚀 在线使用：** [x-route.app](https://x-route.app) ｜ [x-route.cn](https://x-route.cn)（已 ICP 备案）  
+*边缘节点自动地域分流——国内访客进入 x-route.cn，海外访客进入 x-route.app。*
+
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.3-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)

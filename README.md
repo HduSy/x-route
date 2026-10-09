@@ -8,6 +8,9 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
 
 [English](README.md) | [简体中文](README_zh.md)
 
+**🚀 Online:** [x-route.app](https://x-route.app) | [x-route.cn](https://x-route.cn) (ICP-filed, mainland China)  
+*Geo-routed automatically at the edge — mainland China visitors land on x-route.cn, everyone else on x-route.app.*
+
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.3-646cff?logo=vite&logoColor=white)](https://vitejs.dev/)
