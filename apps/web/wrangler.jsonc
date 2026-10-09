@@ -7,23 +7,14 @@
         "directory": "./dist",
         // SPA: unknown paths fall back to index.html
         "not_found_handling": "single-page-application",
-        // Route to the worker so GeoIP inspection, /api/*, and /r/* work;
-        // static assets and SPA fallbacks stream from env.ASSETS.fetch(request)
-        "run_worker_first": true,
+        // Worker first: /api/* relay handled by worker.ts, rest falls through to assets
+        "run_worker_first": ["/api/*"],
         "binding": "ASSETS"
     },
-    "vars": {
-        // Geo-routing switch: set to "true" once x-route.cn completes real-name verification,
-        // ICP filing, and server deployment.
-        "ENABLE_CN_REDIRECT": "false",
-        "CN_TARGET_DOMAIN": "x-route.cn"
-    },
-    "kv_namespaces": [
-        {
-            // Route sharing store: key = 6-char base62, value = gzip'd GPX bytes,
-            // TTL 1 day (links are a delivery channel, not permanent storage).
-            "binding": "ROUTE_SHARES",
-            "id": "f36453794f1d4b9bbe206eaf1fd79bf8"
-        }
+    "routes": [
+        { "pattern": "x-route.app", "custom_domain": true },
+        { "pattern": "www.x-route.app", "custom_domain": true },
+        { "pattern": "x-route.cn", "custom_domain": true },
+        { "pattern": "www.x-route.cn", "custom_domain": true }
     ]
 }
