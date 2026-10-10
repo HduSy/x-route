@@ -1,6 +1,5 @@
 import { buildGPX, GPXFile, type GPXFileType } from '@x-route/gpx';
 import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
 import { db } from './db';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
@@ -46,7 +45,7 @@ function parseInWorker(fileName: string, xml: string): Promise<GPXFile> {
 export function triggerFileInput() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.gpx,.zip';
+    input.accept = '.gpx';
     input.multiple = true;
     input.className = 'hidden';
     input.onchange = () => {
@@ -96,21 +95,10 @@ export async function importFiles(list: File[]): Promise<GPXFile[]> {
     const parsed: GPXFile[] = [];
 
     for (const file of list) {
-        if (file.name.toLowerCase().endsWith('.zip')) {
-            const zip = await JSZip.loadAsync(file);
-            for (const entry of Object.values(zip.files)) {
-                if (entry.dir || !entry.name.toLowerCase().endsWith('.gpx')) continue;
-                const xml = await entry.async('text');
-                const gpx = await parseInWorker(entry.name, xml);
-                gpx._data.rawHash = await computeTextHash(xml);
-                parsed.push(gpx);
-            }
-        } else {
-            const xml = await file.text();
-            const gpx = await parseInWorker(file.name, xml);
-            gpx._data.rawHash = await computeTextHash(xml);
-            parsed.push(gpx);
-        }
+        const xml = await file.text();
+        const gpx = await parseInWorker(file.name, xml);
+        gpx._data.rawHash = await computeTextHash(xml);
+        parsed.push(gpx);
     }
 
     await addFiles(parsed);

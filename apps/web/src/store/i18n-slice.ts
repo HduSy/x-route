@@ -7,7 +7,7 @@ export const translations = {
     en: {
         appName: 'x-route',
         tagline: 'Route creation & planning',
-        importBtn: 'Import GPX / ZIP',
+        importBtn: 'Import GPX',
         plan: 'Plan',
         exitPlan: 'Exit Plan',
         togglePlan: 'Toggle route planning',
@@ -208,7 +208,7 @@ export const translations = {
     zh: {
         appName: 'x-route',
         tagline: '智能路线规划与轨迹编辑',
-        importBtn: '导入 GPX / ZIP',
+        importBtn: '导入 GPX',
         plan: '规划路线',
         exitPlan: '退出规划',
         togglePlan: '开启/关闭路线规划',

@@ -22,7 +22,6 @@
     "dexie-react-hooks": "^4.4.0",
     "file-saver": "^2.0.5",
     "immer": "^10.2.0",
-    "jszip": "^3.10.2",
     "lucide-react": "^1.47.0",
     "maplibre-gl": "^6.10.0",
     "radix-ui": "^1.6.7",
