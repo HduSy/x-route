@@ -751,66 +751,70 @@ export function MapView() {
                 ? createPortal(<TrackPopupContent file={popupFile} />, popupContainerRef.current)
                 : null}
 
-            {/* Lasso delete confirmation modal */}
-            {lassoConfirmIndices && (
-                <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-                    <div className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-white dark:bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95">
-                        <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                                <AlertTriangle className="size-5 text-destructive" />
+            {/* Lasso delete confirmation modal — portaled to <body>: MapView's
+                root (absolute z-20) is a stacking context that would trap the
+                z-[999] mask below the sidebars and the elevation footer. */}
+            {lassoConfirmIndices &&
+                createPortal(
+                    <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                        <div className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-white dark:bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                                    <AlertTriangle className="size-5 text-destructive" />
+                                </div>
+                                <div>
+                                    {anchorCount > 0 && lassoConfirmIndices.length >= anchorCount ? (
+                                        <>
+                                            <h3 className="text-sm font-bold text-foreground">
+                                                {t.confirmDeleteAllLassoTitle}
+                                            </h3>
+                                            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                                {t.confirmDeleteAllLassoBody}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h3 className="text-sm font-bold text-foreground">
+                                                {t.confirmDeleteLassoTitle.replace('{count}', String(lassoConfirmIndices.length))}
+                                            </h3>
+                                            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                                                {t.confirmDeleteLassoBody}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                            <div>
-                                {anchorCount > 0 && lassoConfirmIndices.length >= anchorCount ? (
-                                    <>
-                                        <h3 className="text-sm font-bold text-foreground">
-                                            {t.confirmDeleteAllLassoTitle}
-                                        </h3>
-                                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                                            {t.confirmDeleteAllLassoBody}
-                                        </p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <h3 className="text-sm font-bold text-foreground">
-                                            {t.confirmDeleteLassoTitle.replace('{count}', String(lassoConfirmIndices.length))}
-                                        </h3>
-                                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                                            {t.confirmDeleteLassoBody}
-                                        </p>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                        <div className="mt-5 flex justify-end gap-2">
-                            <button
-                                onClick={() => setLassoConfirmIndices(null)}
-                                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
-                            >
-                                {t.cancel}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    const { removeAnchors, clear, editingFileId } = useRoutingStore.getState();
-                                    const currentAnchors = useRoutingStore.getState().anchors;
-                                    if (lassoConfirmIndices.length >= currentAnchors.length) {
-                                        if (editingFileId) {
-                                            void deleteFile(editingFileId);
+                            <div className="mt-5 flex justify-end gap-2">
+                                <button
+                                    onClick={() => setLassoConfirmIndices(null)}
+                                    className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
+                                >
+                                    {t.cancel}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const { removeAnchors, clear, editingFileId } = useRoutingStore.getState();
+                                        const currentAnchors = useRoutingStore.getState().anchors;
+                                        if (lassoConfirmIndices.length >= currentAnchors.length) {
+                                            if (editingFileId) {
+                                                void deleteFile(editingFileId);
+                                            }
+                                            clear();
+                                            routingLayer.clear();
+                                        } else {
+                                            removeAnchors(lassoConfirmIndices);
                                         }
-                                        clear();
-                                        routingLayer.clear();
-                                    } else {
-                                        removeAnchors(lassoConfirmIndices);
-                                    }
-                                    setLassoConfirmIndices(null);
-                                }}
-                                className="rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-white hover:bg-red-600 transition cursor-pointer"
-                            >
-                                {t.delete}
-                            </button>
+                                        setLassoConfirmIndices(null);
+                                    }}
+                                    className="rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-white hover:bg-red-600 transition cursor-pointer"
+                                >
+                                    {t.delete}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </div>,
+                    document.body
+                )}
         </div>
     );
 }

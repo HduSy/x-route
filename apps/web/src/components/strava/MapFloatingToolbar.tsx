@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     AlertTriangle,
     ArrowLeftRight,
@@ -365,36 +366,40 @@ export function MapFloatingToolbar() {
                 </button>
             </div>
 
-            {/* Confirm clear dialog */}
-            {confirmOpen && (
-                <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-                    <div className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-white dark:bg-card p-6 shadow-2xl">
-                        <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                                <AlertTriangle className="size-5 text-destructive" />
+            {/* Confirm clear dialog — portaled to <body>: the toolbar root is a
+                z-10 stacking context, which would otherwise trap this z-[999]
+                mask below the sidebars and the elevation footer. */}
+            {confirmOpen &&
+                createPortal(
+                    <div className="pointer-events-auto fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                        <div className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-white dark:bg-card p-6 shadow-2xl">
+                            <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                                    <AlertTriangle className="size-5 text-destructive" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-foreground">{t.confirmClearTitle}</h3>
+                                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{t.confirmClearBody}</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-sm font-bold text-foreground">{t.confirmClearTitle}</h3>
-                                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{t.confirmClearBody}</p>
+                            <div className="mt-5 flex justify-end gap-2">
+                                <button
+                                    onClick={() => setConfirmOpen(false)}
+                                    className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
+                                >
+                                    {t.cancel}
+                                </button>
+                                <button
+                                    onClick={handleConfirmClear}
+                                    className="rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-white hover:bg-red-600 transition cursor-pointer"
+                                >
+                                    {t.confirm}
+                                </button>
                             </div>
                         </div>
-                        <div className="mt-5 flex justify-end gap-2">
-                            <button
-                                onClick={() => setConfirmOpen(false)}
-                                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
-                            >
-                                {t.cancel}
-                            </button>
-                            <button
-                                onClick={handleConfirmClear}
-                                className="rounded-lg bg-destructive px-4 py-2 text-xs font-bold text-white hover:bg-red-600 transition cursor-pointer"
-                            >
-                                {t.confirm}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                    </div>,
+                    document.body
+                )}
         </div>
     );
 }
