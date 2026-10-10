@@ -65,6 +65,7 @@ interface RoutingState {
     removeAnchors: (indices: number[]) => void;
     reverseAnchors: () => void;
     returnToStart: () => void;
+    closeLoopRoute: () => void;
     clear: (resetHistory?: boolean) => void;
     setResult: (points: TrackPoint[], error: string | null) => void;
     setRouting: (routing: boolean) => void;
@@ -302,6 +303,26 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
                 );
             }
         }
+    },
+
+    closeLoopRoute: () => {
+        const { anchors, segmentModes, past } = get();
+        if (anchors.length < 2) return;
+        const first = anchors[0]!;
+        if (distance(first, anchors[anchors.length - 1]!) < RETURN_TO_START_MIN_GAP_M) return;
+        const modes = normalizedModes(anchors.length, segmentModes);
+
+        // Unlike returnToStart (which replays every anchor in reverse to
+        // retrace the outbound roads), this appends the start as a fresh
+        // destination so the router finds a NEW way back — a closed loop
+        // that does not repeat the outbound path.
+        set({
+            active: true,
+            anchors: [...anchors, first],
+            segmentModes: [...modes, modes[modes.length - 1] ?? 'route'],
+            past: [...past, { anchors, segmentModes: modes }],
+            future: [],
+        });
     },
 
     clear: (resetHistory = false) => {

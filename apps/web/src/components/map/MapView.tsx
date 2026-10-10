@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Popup as MapLibrePopup, type MapMouseEvent } from 'maplibre-gl';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, Check, Compass, Focus, GitPullRequestArrow, Layers, Minus, Plus, Route, Waypoints } from 'lucide-react';
+import { AlertTriangle, Check, Compass, Focus, GitCompare, GitPullRequestArrow, Layers, Minus, Plus, Route, Waypoints } from 'lucide-react';
 import { GPXFile, distance, type GPXFileType } from '@x-route/gpx';
 import { db, type StoredGPXFile } from '@/lib/db';
 import { BASEMAPS, mapManager, type BasemapKey } from '@/lib/map/MapManager';
@@ -80,6 +80,7 @@ export function MapView() {
     const editingFileId = useRoutingStore((s) => s.editingFileId);
     const hasActiveRouteAnchors = useRoutingStore((s) => s.anchors.length >= 2);
     const returnToStart = useRoutingStore((s) => s.returnToStart);
+    const closeLoopRoute = useRoutingStore((s) => s.closeLoopRoute);
     /** Round trip needs an open route: ≥2 anchors and the end not already
      *  back at the start (<50 m would be a closed loop). */
     const canReturnToStart = useRoutingStore(
@@ -646,6 +647,29 @@ export function MapView() {
                     }
                 >
                     <GitPullRequestArrow className="size-4" />
+                </button>
+
+                {/* Close as loop: route a NEW path back to the start — unlike
+                    return-to-start, which retraces the outbound roads */}
+                <button
+                    onClick={() => closeLoopRoute()}
+                    disabled={!canReturnToStart}
+                    aria-label={t.closeLoopRoute}
+                    className={cn(
+                        'flex size-7 items-center justify-center rounded-md transition',
+                        canReturnToStart
+                            ? 'cursor-pointer text-muted-foreground hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:text-[#863BFF]'
+                            : 'cursor-not-allowed text-muted-foreground opacity-40'
+                    )}
+                    title={
+                        !hasActiveRouteAnchors
+                            ? t.returnToStartNeedPoints
+                            : !canReturnToStart
+                              ? t.returnToStartAlreadyLoop
+                              : t.closeLoopRouteDesc
+                    }
+                >
+                    <GitCompare className="size-4" />
                 </button>
                 <div className="h-px w-full bg-border" />
                 <button

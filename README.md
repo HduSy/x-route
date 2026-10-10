@@ -93,12 +93,10 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
 - **Persistent Route Retention**: Seamlessly switch basemaps on the fly without losing in-progress routes or active waypoints.
 - **View Controls**: Toggle 2D / 3D terrain tilt, compass bearing reset to North, and geolocation auto-focus.
 
-### 🧰 Track Tools & Offline-First Library
-- **Track Tools**:
-  - **Reverse**: Invert route start and finish.
-  - **Simplify**: Douglas-Peucker reduction for optimized track storage.
-  - **Split**: Divide a track into two distinct sections at the midpoint.
-  - **Loop**: Automatically connect the end point back to the start.
+### 🧰 Route Utilities & Offline-First Library
+- **Close-as-Loop & Return-to-Start**:
+  - **Close as Loop**: One click appends the start as a fresh destination so the routing engine computes a brand-new way back — a closed loop that never retraces the outbound leg.
+  - **Return to Start**: Replays the same roads in reverse for a classic out-and-back round trip. Both actions are undoable with `Ctrl+Z`.
 - **Offline-First Route Storage**: Local IndexedDB database powered by Dexie.js. Your routes, names, descriptions, and trackpoints remain entirely on your computer.
   - Route cards in the My Routes drawer cycle through three states on click: unselected → **preview** (track drawn on the map, editor untouched) → **edit** (anchors loaded into the editor) → unselected. Previewing one route never hijacks another route being edited.
 - **Zero-Login Route Sharing via Short-Links**:

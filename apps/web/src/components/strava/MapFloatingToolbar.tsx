@@ -6,14 +6,9 @@ import {
     Bookmark,
     BookmarkPlus,
     SquareDashedMousePointer,
-    Check,
-    ChevronDown,
     Crosshair,
-    Layers,
     Loader2,
     Redo2,
-    Scissors,
-    Sparkles,
     Trash2,
     Undo2,
 } from 'lucide-react';
@@ -24,7 +19,6 @@ import { mapManager } from '@/lib/map/MapManager';
 import { routingLayer } from '@/lib/map/routing-layer';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { reverseTrack, simplifyTrack, splitTrackAtMiddle, closeLoop } from '@/lib/file-actions';
 import { locateWithRetry } from '@/lib/geolocation';
 import { lassoModeStore } from '@/store/lasso-store';
 import { cn } from '@/lib/utils';
@@ -46,12 +40,7 @@ export function MapFloatingToolbar() {
     const setSaveModalOpen = useRoutingStore((s) => s.setSaveModalOpen);
     const setMyRoutesOpen = useRoutingStore((s) => s.setMyRoutesOpen);
     const sidebarCollapsed = useRoutingStore((s) => s.sidebarCollapsed);
-    // Track tools may only touch the route that is actually loaded into the
-    // editor — not merely loaded/selected tracks on the map.
-    const editingFileId = useRoutingStore((s) => s.editingFileId);
 
-    const [toolsOpen, setToolsOpen] = useState(false);
-    const [toolActionStatus, setToolActionStatus] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [lassoMode, setLassoMode] = useState(false);
 
@@ -176,16 +165,6 @@ export function MapFloatingToolbar() {
         }
     }, [active]);
 
-    const handleTrackAction = async (name: string, fn: () => Promise<void>) => {
-        try {
-            await fn();
-            setToolActionStatus(name);
-            setTimeout(() => setToolActionStatus(null), 1500);
-        } catch (e) {
-            console.error(e);
-        }
-    };
-
     return (
         <div
             className={cn(
@@ -258,72 +237,6 @@ export function MapFloatingToolbar() {
                                 <SquareDashedMousePointer className="size-3.5 sm:size-4" />
                             </button>
                         </>
-                    )}
-                </div>
-
-                {/* Track Tools Dropdown (Segments / Editing) placed to the left of Save Route */}
-                <div className="relative">
-                    <button
-                        onClick={() => setToolsOpen(!toolsOpen)}
-                        className="flex h-8 sm:h-9 items-center gap-1 sm:gap-1.5 rounded-lg border border-border bg-white dark:bg-card px-2 sm:px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] hover:border-[#863BFF] hover:text-[#863BFF] cursor-pointer"
-                        title={t.segments}
-                    >
-                        <Layers className="size-3.5 text-muted-foreground" />
-                        <span className="hidden md:inline">{t.segments}</span>
-                        <ChevronDown className="size-3 text-muted-foreground hidden md:inline" />
-                    </button>
-
-                    {toolsOpen && (
-                        <div className="absolute left-0 top-10 sm:top-11 z-50 min-w-48 rounded-lg border border-border bg-white dark:bg-card p-1 shadow-lg">
-                            <button
-                                disabled={!editingFileId}
-                                onClick={() =>
-                                    editingFileId &&
-                                    handleTrackAction('reversed', () => reverseTrack(editingFileId))
-                                }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                            >
-                                <ArrowLeftRight className="size-3.5 text-muted-foreground" />
-                                <span>{t.reverse}</span>
-                                {toolActionStatus === 'reversed' && <Check className="ml-auto size-3 text-green-600" />}
-                            </button>
-                            <button
-                                disabled={!editingFileId}
-                                onClick={() =>
-                                    editingFileId &&
-                                    handleTrackAction('simplified', () => simplifyTrack(editingFileId))
-                                }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                            >
-                                <Sparkles className="size-3.5 text-muted-foreground" />
-                                <span>{t.simplify}</span>
-                                {toolActionStatus === 'simplified' && <Check className="ml-auto size-3 text-green-600" />}
-                            </button>
-                            <button
-                                disabled={!editingFileId}
-                                onClick={() =>
-                                    editingFileId &&
-                                    handleTrackAction('split', () => splitTrackAtMiddle(editingFileId))
-                                }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                            >
-                                <Scissors className="size-3.5 text-muted-foreground" />
-                                <span>{t.split}</span>
-                                {toolActionStatus === 'split' && <Check className="ml-auto size-3 text-green-600" />}
-                            </button>
-                            <button
-                                disabled={!editingFileId}
-                                onClick={() =>
-                                    editingFileId &&
-                                    handleTrackAction('loop', () => closeLoop(editingFileId))
-                                }
-                                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition hover:bg-[#F5F0FF] dark:hover:bg-[#2C184D] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                            >
-                                <Check className="size-3.5 text-muted-foreground" />
-                                <span>{t.loop}</span>
-                                {toolActionStatus === 'loop' && <Check className="ml-auto size-3 text-green-600" />}
-                            </button>
-                        </div>
                     )}
                 </div>
 
