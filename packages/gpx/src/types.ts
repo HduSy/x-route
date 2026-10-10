@@ -86,6 +86,9 @@ export type TrackPointType = {
 export type TrackPointExtensions = {
     'gpxtpx:TrackPointExtension'?: TrackPointExtension;
     'gpxpx:PowerExtension'?: PowerExtension;
+    /** x-route road-surface classification carried through GPX export so a
+     *  re-import reproduces the planning-time proportion bar exactly. */
+    surface?: string;
 };
 
 export type TrackPointExtension = {

@@ -164,6 +164,9 @@ async function addFiles(files: GPXFile[]) {
         if (matchedId) {
             // Duplicate found! Reuse existing route ID without creating duplicate card
             targetFileIds.push(matchedId);
+            // Address the import at the existing record so downstream hooks
+            // (surface backfill kick) can find it.
+            file._data.id = matchedId;
             if (firstId === null) {
                 firstId = matchedId;
                 firstFile = file;
@@ -208,7 +211,14 @@ async function addFiles(files: GPXFile[]) {
         select.selectFile(firstId);
 
         // 2. Load the primary route into the routing planner (active editing with nodes)
-        const trkpts = (firstFile as GPXFile).getTrackPoints();
+        let seedFile = firstFile as GPXFile;
+        if (!filesToInsert.some(({ id }) => id === firstId)) {
+            // Dedup import: seed from the stored record so editor state (incl.
+            // per-point surface metadata) matches the saved route exactly.
+            const stored = await db.files.get(firstId);
+            if (stored) seedFile = new GPXFile(stored);
+        }
+        const trkpts = seedFile.getTrackPoints();
         if (trkpts.length >= 2) {
             const coords = trkpts.map((pt) => pt.getCoordinates());
             routing.loadRouteFromPoints(coords, trkpts);
@@ -238,6 +248,15 @@ export async function exportFile(fileId: string) {
     if (!data) return;
 
     const file = new GPXFile(data as GPXFileType);
+    // Stamp the per-point surface classification into <extensions> so a
+    // re-imported copy reproduces the planning-time proportion bar exactly
+    // (zero re-query) instead of snapping back to the road network.
+    for (const pt of file.getTrackPoints()) {
+        const surface = (pt as any)._data?.surface as string | undefined;
+        if (surface === 'paved' || surface === 'unpaved' || surface === 'unknown') {
+            pt.extensions = { ...pt.extensions, surface };
+        }
+    }
     const xml = buildGPX(file, []);
     const name = file.metadata?.name?.trim() || 'route';
     saveAs(new Blob([xml], { type: 'application/gpx+xml' }), `${name}.gpx`);

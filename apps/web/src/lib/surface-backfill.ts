@@ -212,8 +212,46 @@ async function runFileBackfill(fileId: string): Promise<void> {
     try {
         const stored = await db.files.get(fileId);
         if (!stored || stored._data?.surfaceBackfilled) return;
-        const trkpts = new GPXFile(stored).getTrackPoints();
+        const file = new GPXFile(stored);
+        const trkpts = file.getTrackPoints();
         if (trkpts.length < 2) return;
+
+        // Fast path 0: the file already carries classifications (saved from
+        // the planner, or a dedup import of it) — just flag it done and patch
+        // the editor seed; zero requests.
+        const alreadyClassified = trkpts.filter((pt) => (pt as any)._data?.surface).length;
+        if (alreadyClassified >= trkpts.length / 2) {
+            file._data.surfaceBackfilled = true;
+            await db.files.put(file, fileId);
+            useRoutingStore.getState().applyBackfilledSurfaces(
+                fileId,
+                trkpts.map((pt) => ((pt as any)._data?.surface as SurfaceCategory) ?? 'unknown')
+            );
+            return;
+        }
+
+        // Fast path: x-route exports carry the planning-time classification
+        // in <trkpt><extensions><surface>. Adopt it verbatim — zero network
+        // requests, exact parity with the proportions shown at planning time.
+        const fromExtensions = trkpts.map((pt) => {
+            const s = pt.extensions?.surface;
+            return s === 'paved' || s === 'unpaved' || s === 'unknown' ? s : null;
+        });
+        if (fromExtensions.some((s) => s !== null)) {
+            for (let i = 0; i < trkpts.length; i++) {
+                const s = fromExtensions[i];
+                if (!s) continue;
+                const pt = trkpts[i] as any;
+                pt._data = { ...(pt._data ?? {}), surface: s };
+            }
+            file._data.surfaceBackfilled = true;
+            await db.files.put(file, fileId);
+            useRoutingStore
+                .getState()
+                .applyBackfilledSurfaces(fileId, fromExtensions.map((s) => s ?? 'unknown'));
+            return;
+        }
+
         const flat = trkpts.map((p) => p.getCoordinates());
 
         const { surfaces, okSegments } = await backfillTrack(flat);

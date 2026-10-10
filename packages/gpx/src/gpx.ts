@@ -1441,6 +1441,9 @@ export class TrackPoint {
                     'gpxpx:PowerExtension': {},
                 },
             };
+            if (this.extensions.surface) {
+                trkpt.extensions.surface = this.extensions.surface;
+            }
             if (
                 this.extensions['gpxtpx:TrackPointExtension'] &&
                 this.extensions['gpxtpx:TrackPointExtension']['gpxtpx:atemp'] &&
