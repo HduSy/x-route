@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef } from 'react';
-import { Chart, registerables } from 'chart.js';
+import type { Chart, ChartConfiguration } from 'chart.js';
 import { Bike, ChevronDown, ChevronUp, Footprints } from 'lucide-react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useSelectionStore } from '@/store/selection-slice';
@@ -10,10 +10,19 @@ import { db } from '@/lib/db';
 import { mapManager } from '@/lib/map/MapManager';
 import { cn } from '@/lib/utils';
 
-Chart.register(...registerables);
-
 import { computeElevationStats } from '@/lib/elevation';
 import { computeSurfaceStats } from '@/lib/surface';
+
+/** chart.js (~200 KB) is dead weight on first paint — pull it in only when
+ *  the elevation drawer actually opens. Registration runs exactly once. */
+let chartJsPromise: Promise<typeof import('chart.js')> | null = null;
+function loadChartJs() {
+    chartJsPromise ??= import('chart.js').then((m) => {
+        m.Chart.register(...m.registerables);
+        return m;
+    });
+    return chartJsPromise;
+}
 
 interface ProfilePoint {
     distanceKm: number;
@@ -436,9 +445,6 @@ export function RouteStatsBar() {
             chartRef.current = null;
         }
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
         const step = Math.max(1, Math.floor(pointsData.length / 600));
         const sampled = pointsData.filter(
             (_, idx) => idx % step === 0 || idx === pointsData.length - 1
@@ -486,7 +492,7 @@ export function RouteStatsBar() {
             return;
         }
 
-        chartRef.current = new Chart(ctx, {
+        const config: ChartConfiguration = {
             type: 'line',
             data: {
                 datasets: [
@@ -685,9 +691,24 @@ export function RouteStatsBar() {
                     if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
                 },
             },
-        });
+        };
+
+        // First expand fetches the chart.js chunk; a quick collapse before it
+        // resolves must not leave a chart running on a dead canvas.
+        let cancelled = false;
+        loadChartJs()
+            .then(({ Chart }) => {
+                if (cancelled) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                chartRef.current = new Chart(ctx, config);
+            })
+            .catch(() => {
+                // chunk fetch failed (offline?) — drawer just stays blank
+            });
 
         return () => {
+            cancelled = true;
             mapManager.setCursor(null);
             if (tooltipRef.current) tooltipRef.current.style.opacity = '0';
             chartRef.current?.destroy();
