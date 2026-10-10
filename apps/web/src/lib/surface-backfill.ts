@@ -24,8 +24,14 @@ const WAYPOINT_SPACING_M = 1200; // target spacing between re-route waypoints
 const MAX_SEGMENTS = 40; // request cap per track (spacing stretches to fit)
 const REQUEST_TIMEOUT_MS = 12000;
 const CONCURRENCY = 3;
-const MIN_INTERVAL_M = 50; // skip snapping degenerate intervals
+const MIN_INTERVAL_M = 150; // skip snapping degenerate intervals
 const MAX_LENGTH_DEVIATION = 0.25; // |snapped - original| / original — beyond this the snap is untrustworthy
+// A deviating interval is split at its geometric midpoint and retried:
+// shorter intervals constrain the router to the roads the track actually
+// took (recovers e.g. planned detours the default profile snaps around).
+const MAX_SPLIT_DEPTH = 4;
+// Hard budget incl. splits — a fully off-road track would otherwise fan out.
+const REQUEST_BUDGET = 80;
 
 interface FlatPoint {
     lat: number;
@@ -136,30 +142,47 @@ async function backfillTrack(
     const wps = pickWaypointIndices(cum, WAYPOINT_SPACING_M, MAX_SEGMENTS);
     const surfaces: SurfaceCategory[] = new Array(flat.length).fill('unknown');
     let okSegments = 0;
+    let requestCount = 0;
 
-    // Small worker pool over the intervals; a failed interval only leaves
-    // its own slice unknown.
+    // Snaps one interval, painting [i0, i1). On length deviation, splits at
+    // the geometric midpoint and retries both halves (see MAX_SPLIT_DEPTH).
+    // A failed request only leaves its own slice unknown.
+    const snapInterval = async (i0: number, i1: number, depth: number): Promise<void> => {
+        const origLen = cum[i1]! - cum[i0]!;
+        if (origLen < MIN_INTERVAL_M) return;
+        if (requestCount >= REQUEST_BUDGET) return;
+        requestCount++;
+        const snapped = await fetchSnappedInterval(flat[i0]!, flat[i1]!);
+        if (!snapped) return;
+        // A responded-but-deviating interval counts as attempted: the
+        // track may be genuinely off-road, and flagging the file done
+        // avoids retrying hopeless snaps forever.
+        okSegments++;
+        if (Math.abs(snapped.lengthM - origLen) > MAX_LENGTH_DEVIATION * origLen) {
+            if (depth < MAX_SPLIT_DEPTH && i1 - i0 >= 2) {
+                const target = cum[i0]! + origLen / 2;
+                let mid = i0 + 1;
+                while (mid < i1 - 1 && cum[mid]! < target) mid++;
+                await Promise.all([
+                    snapInterval(i0, mid, depth + 1),
+                    snapInterval(mid, i1, depth + 1),
+                ]);
+            }
+            return;
+        }
+        for (let i = i0; i < i1; i++) {
+            if (surfaces[i] === 'unknown') surfaces[i] = nearestSurface(snapped, flat[i]!);
+        }
+    };
+
+    // Worker pool over the base intervals; recursive splits run inside the
+    // worker that discovered them (its own sub-requests may overlap in
+    // flight, bounded by the REQUEST_BUDGET).
     let next = 0;
     const worker = async () => {
         while (next < wps.length - 1) {
             const k = next++;
-            const i0 = wps[k]!;
-            const i1 = wps[k + 1]!;
-            const origLen = cum[i1]! - cum[i0]!;
-            if (origLen < MIN_INTERVAL_M) continue;
-            const snapped = await fetchSnappedInterval(flat[i0]!, flat[i1]!);
-            if (!snapped) continue;
-            // A responded-but-deviating interval counts as attempted: the
-            // track may be genuinely off-road, and flagging the file done
-            // avoids retrying hopeless snaps forever.
-            okSegments++;
-            if (Math.abs(snapped.lengthM - origLen) > MAX_LENGTH_DEVIATION * origLen) continue;
-            // The shared endpoint belongs to the next interval's start;
-            // only the final interval paints its closing point.
-            const end = k === wps.length - 2 ? i1 + 1 : i1;
-            for (let i = i0; i < end; i++) {
-                if (surfaces[i] === 'unknown') surfaces[i] = nearestSurface(snapped, flat[i]!);
-            }
+            await snapInterval(wps[k]!, wps[k + 1]!, 0);
         }
     };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, wps.length - 1) }, worker));
