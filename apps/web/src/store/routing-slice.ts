@@ -337,9 +337,13 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         if (editingFileId !== fileId || resultPoints.length !== surfaces.length) return;
         let touched = false;
         for (let i = 0; i < resultPoints.length; i++) {
-            if (surfaces[i] === 'unknown') continue;
+            const s = surfaces[i];
+            if (!s) continue;
+            // Paint 'unknown' too: a surface-LESS point makes the stats'
+            // p2??p1 chain borrow the previous point's class, inflating
+            // paved/unpaved across unknown stretches.
             const pt = resultPoints[i] as any;
-            pt._data = { ...(pt._data ?? {}), surface: surfaces[i] };
+            pt._data = { ...(pt._data ?? {}), surface: s };
             touched = true;
         }
         // New array identity refreshes the stats bar + map layer; no
@@ -449,3 +453,10 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
         }
     },
 }));
+
+// debug/testing hook (mirrors MapManager's __xroute_map; __xroute_routing
+// is already taken by the routing layer)
+if (typeof globalThis !== 'undefined') {
+    (globalThis as { __xroute_routing_store?: typeof useRoutingStore }).__xroute_routing_store =
+        useRoutingStore;
+}
