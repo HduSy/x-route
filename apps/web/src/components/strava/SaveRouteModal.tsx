@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Bookmark, Check, Mountain, Route, X } from 'lucide-react';
+import { Bookmark, Mountain, Route, X } from 'lucide-react';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useT } from '@/store/i18n-slice';
 import { saveGPXFile, updateGPXFile } from '@/lib/file-actions';
@@ -58,7 +58,6 @@ function SaveRouteModalDialog({
     const [routeName, setRouteName] = useState(initialName);
     const [description, setDescription] = useState(initialDesc);
     const [saving, setSaving] = useState(false);
-    const [savedSuccess, setSavedSuccess] = useState(false);
 
     useEffect(() => {
         if (!existingFile) return;
@@ -144,26 +143,24 @@ function SaveRouteModalDialog({
             } else {
                 savedFileId = await saveGPXFile(file, false);
             }
-            setSavedSuccess(true);
-            setTimeout(() => {
-                setSavedSuccess(false);
-                setSaveModalOpen(false);
+            // Close immediately — the My Routes drawer opening below (new
+            // route at the top of the list) is the success feedback.
+            setSaveModalOpen(false);
 
-                // 1. Activate the saved route as loaded on the map (via gpxLayers)
-                if (savedFileId) {
-                    useSelectionStore.getState().addLoadedFile(savedFileId);
-                    useSelectionStore.getState().selectFile(savedFileId);
-                }
+            // 1. Activate the saved route as loaded on the map (via gpxLayers)
+            if (savedFileId) {
+                useSelectionStore.getState().addLoadedFile(savedFileId);
+                useSelectionStore.getState().selectFile(savedFileId);
+            }
 
-                // 2. Clear editing planner so editor is in ready state for continuous creation
-                useRoutingStore.getState().clear(true);
-                routingLayer.clear();
-                useRoutingStore.getState().setEditingFileId(null);
-                mapManager.clearUserLocation();
+            // 2. Clear editing planner so editor is in ready state for continuous creation
+            useRoutingStore.getState().clear(true);
+            routingLayer.clear();
+            useRoutingStore.getState().setEditingFileId(null);
+            mapManager.clearUserLocation();
 
-                // 3. Open My Routes drawer
-                setMyRoutesOpen(true);
-            }, 800);
+            // 3. Open My Routes drawer
+            setMyRoutesOpen(true);
         } catch (err) {
             console.error('Failed to save route:', err);
         } finally {
@@ -263,22 +260,15 @@ function SaveRouteModalDialog({
                         </button>
                         <button
                             type="submit"
-                            disabled={saving || savedSuccess}
+                            disabled={saving}
                             className={cn(
                                 'flex items-center gap-1.5 rounded-xl px-5 py-2 text-xs font-bold text-white transition-all duration-150 shadow-sm',
-                                saving || savedSuccess
+                                saving
                                     ? 'bg-muted text-muted-foreground cursor-not-allowed shadow-none'
                                     : 'bg-[#863BFF] hover:bg-[#7424F8] hover:shadow-md active:scale-98 active:bg-[#6517EA] cursor-pointer'
                             )}
                         >
-                            {savedSuccess ? (
-                                <>
-                                    <Check className="size-4" />
-                                    <span>{t.saved}</span>
-                                </>
-                            ) : (
-                                <span>{saving ? t.loading : t.saveToMyRoutes}</span>
-                            )}
+                            <span>{saving ? t.loading : t.saveToMyRoutes}</span>
                         </button>
                     </div>
                 </form>
