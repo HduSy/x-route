@@ -15,6 +15,7 @@
   - 恢复 `ROUTE_SHARES` KV 绑定 —— 该回归曾导致线上分享接口 500（error 1101）、短链拉取全线不可用；
   - 恢复 `run_worker_first: true` —— 该回归曾使 GeoIP 跳转、`/r/*` 死链 302 拦截与天地图 key 边缘注入（HTMLRewriter）全部静默失效；
   - 配置内新增防回归注释，说明收窄 `run_worker_first` 的连带后果。
+- **`.cn` 域名默认中文界面**：首次访问按域名推导默认语言（`x-route.cn` 及其子域 → 中文，其余 → English），`<html lang>` 随之同步为 `zh-CN`/`en` 以支持读屏软件；用户手动切换过的语言偏好（localStorage 持久化）始终优先于域名默认值。
 - **`ENABLE_CN_REDIRECT` 正式置为 `true`**：备案（2026-10 阿里云）与域名接入（NS 已指向 Cloudflare）均已就绪，开关随版本化管理，紧急情况可一键回滚为 `"false"` 熔断。
 - **清除 Pages 遗留的全量 301 重定向文件（`public/_redirects` / `pages-redirects`）**：
   - 该文件含 `/* → x-route.app 301`，是 Pages 时代为主域名规范化的临时手段；Workers Assets 同样会执行 `_redirects`，导致所有静态资源与 SPA 回退在双域名间互相 301（一度造成线上全站资源死循环，约 10 分钟内修复）；

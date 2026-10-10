@@ -412,18 +412,38 @@ interface I18nState {
     toggleLanguage: () => void;
 }
 
+/** First-visit default language: the ICP-filed CN domain serves Chinese,
+ *  everywhere else English. A manually toggled choice persisted in
+ *  localStorage always wins (restored by the persist middleware). */
+export function defaultLanguageForHost(hostname: string | undefined): Language {
+    if (hostname === 'x-route.cn' || hostname?.endsWith('.x-route.cn')) return 'zh';
+    return 'en';
+}
+
+function syncHtmlLang(language: Language) {
+    if (typeof document !== 'undefined') {
+        document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+    }
+}
+
 export const useI18nStore = create<I18nState>()(
     persist(
         (set, get) => ({
-            // Default to English for first-time visitors; a manually toggled
-            // choice is still restored from localStorage by the persist middleware.
-            language: 'en',
+            // Domain-appropriate default for first-time visitors; a manually
+            // toggled choice is still restored from localStorage by persist.
+            language: defaultLanguageForHost(
+                typeof window !== 'undefined' ? window.location.hostname : undefined
+            ),
             setLanguage: (language) => set({ language }),
             toggleLanguage: () => set({ language: get().language === 'en' ? 'zh' : 'en' }),
         }),
         { name: 'x-route-language' }
     )
 );
+
+// Keep <html lang> in sync for screen readers on init and every change/rehydration.
+syncHtmlLang(useI18nStore.getState().language);
+useI18nStore.subscribe((s) => syncHtmlLang(s.language));
 
 export function useT() {
     const language = useI18nStore((s) => s.language);
