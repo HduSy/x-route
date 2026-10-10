@@ -45,6 +45,7 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
   - Real-time road surface extraction from OpenStreetMap `surface` and `road_class` attributes.
   - Distance-weighted geodesic integration categorizing terrain into **Paved** (asphalt, concrete), **Unpaved** (gravel, dirt, ground), and **Unknown**.
   - Multi-segment rounded capsule proportion bar in the bottom stats bar (`RouteStatsBar`), with a matching visibility toggle in the sidebar's map display options.
+  - **Imported GPX backfill**: the GPX standard carries no surface data, so imported tracks are snapped back to the road network segment-by-segment on import/preview to reconstruct surface proportions (persisted locally, one-time per route) — routes edited on top of an import keep accurate mixed proportions.
 - **Manual Mode (Off-Road / Free Drawing)**:
   - Draw direct straight-line connections across areas without mapped OSM roads. Applies only to newly added segments — existing road-following segments are never recomputed.
   - **Mode-Aware Anchor Dragging**: Toggling manual mode off and dragging any waypoint treats it as a normal node, automatically re-routing adjacent segments along the road network.

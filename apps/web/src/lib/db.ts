@@ -4,7 +4,9 @@ import type { GPXFileType } from '@x-route/gpx';
 
 /** Shape actually persisted: plain data plus the runtime `_data` bookkeeping
  *  field (survives structured clone; used for the file id). */
-export type StoredGPXFile = GPXFileType & { _data: { id?: string; rawHash?: string } };
+export type StoredGPXFile = GPXFileType & {
+    _data: { id?: string; rawHash?: string; surfaceBackfilled?: boolean };
+};
 
 enableMapSet();
 enablePatches();

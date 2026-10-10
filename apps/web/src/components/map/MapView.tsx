@@ -13,6 +13,7 @@ import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore, RETURN_TO_START_MIN_GAP_M } from '@/store/routing-slice';
 import { useRoutingSync } from '@/hooks/use-routing-sync';
 import { deleteFile } from '@/lib/file-actions';
+import { ensureSurfaceBackfill } from '@/lib/surface-backfill';
 import { useT } from '@/store/i18n-slice';
 import { cn, drawerOverlaysSidebar } from '@/lib/utils';
 
@@ -105,6 +106,8 @@ export function MapView() {
 
     useEffect(() => {
         gpxLayers.onFileClick = (fileId) => {
+            // Ensure surface data for the track being pulled into the editor.
+            void ensureSurfaceBackfill(fileId);
             const fileData = fileMapRef.current.get(fileId);
             if (!fileData) return;
             const file = new GPXFile(fileData);

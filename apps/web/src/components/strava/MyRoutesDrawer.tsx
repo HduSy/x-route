@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { deleteFile, exportFile, triggerFileInput } from '@/lib/file-actions';
+import { ensureSurfaceBackfill } from '@/lib/surface-backfill';
 import { copyToClipboard, createShareLink } from '@/lib/share';
 import { toast } from '@/lib/toast';
 import { GPXFile, type GPXFileType } from '@x-route/gpx';
@@ -177,6 +178,9 @@ export function MyRoutesDrawer() {
     /** Single click cycles the card through its three states:
      *  unselected → preview → edit → unselected. */
     const handleCardClick = (fileId: string) => {
+        // Ensure surface data exists (no-op once backfilled) so preview and
+        // edit both feed accurate proportions to the stats bar.
+        void ensureSurfaceBackfill(fileId);
         switch (nextCardCycleAction(fileId, loadedFileIds, editingFileId)) {
             case 'unload':
                 handleUnloadRoute(fileId);

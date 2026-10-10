@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { distance, type Coordinates, type TrackPoint } from '@x-route/gpx';
 import { routingSegmentCache, getSegmentKey, type SegmentMode } from '@/lib/routing';
+import type { SurfaceCategory } from '@/lib/surface';
 
 export interface RoutingAnchor extends Coordinates {}
 
@@ -66,6 +67,9 @@ interface RoutingState {
     reverseAnchors: () => void;
     returnToStart: () => void;
     closeLoopRoute: () => void;
+    /** Merge backfilled surface data into the current resultPoints (surface
+     *  backfill completed after an imported file was seeded into the editor). */
+    applyBackfilledSurfaces: (fileId: string, surfaces: SurfaceCategory[]) => void;
     clear: (resetHistory?: boolean) => void;
     setResult: (points: TrackPoint[], error: string | null) => void;
     setRouting: (routing: boolean) => void;
@@ -323,6 +327,24 @@ export const useRoutingStore = create<RoutingState>()((set, get) => ({
             past: [...past, { anchors, segmentModes: modes }],
             future: [],
         });
+    },
+
+    applyBackfilledSurfaces: (fileId, surfaces) => {
+        const { editingFileId, resultPoints } = get();
+        // Only when the editor still shows this file's untouched seed — any
+        // structural edit replaces the points (with engine-classified ones)
+        // and must not be overwritten.
+        if (editingFileId !== fileId || resultPoints.length !== surfaces.length) return;
+        let touched = false;
+        for (let i = 0; i < resultPoints.length; i++) {
+            if (surfaces[i] === 'unknown') continue;
+            const pt = resultPoints[i] as any;
+            pt._data = { ...(pt._data ?? {}), surface: surfaces[i] };
+            touched = true;
+        }
+        // New array identity refreshes the stats bar + map layer; no
+        // re-routing is triggered (resultPoints is an output, not an input).
+        if (touched) set({ resultPoints: [...resultPoints] });
     },
 
     clear: (resetHistory = false) => {

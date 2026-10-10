@@ -4,6 +4,7 @@ import { db } from './db';
 import { useSelectionStore } from '@/store/selection-slice';
 import { useRoutingStore } from '@/store/routing-slice';
 import { mapManager } from '@/lib/map/MapManager';
+import { ensureSurfaceBackfill } from '@/lib/surface-backfill';
 import type { ParseResponse } from '@/workers/gpx.worker';
 
 // --- GPX parse worker (keeps large XML parsing off the main thread) ---
@@ -102,6 +103,13 @@ export async function importFiles(list: File[]): Promise<GPXFile[]> {
     }
 
     await addFiles(parsed);
+
+    // Fire-and-forget surface backfill so imported tracks get proportion
+    // data (persists to Dexie; idempotent per file).
+    for (const gpx of parsed) {
+        const id = gpx._data?.id;
+        if (id) void ensureSurfaceBackfill(id);
+    }
     return parsed;
 }
 
