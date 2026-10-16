@@ -42,11 +42,10 @@ async function handleGraphHopper(request: Request): Promise<Response> {
     });
 }
 
-// --- Route sharing (KV: key = 6-char base62, value = gzip'd GPX, TTL 1 day) ---
+// --- Route sharing (KV: key = 6-char base62, value = gzip'd GPX, no expiry) ---
 
 const KEY_RE = /^[0-9A-Za-z]{6}$/;
 const KEY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-const SHARE_TTL_SECONDS = 86400; // 1 day — links are a delivery channel, not storage
 const MAX_COMPRESSED_BYTES = 2 * 1024 * 1024; // reject > 2 MB gzip payloads
 const MAX_DECOMPRESSED_BYTES = 10 * 1024 * 1024; // gzip bombs must die here, not in the client's DOMParser
 
@@ -117,7 +116,8 @@ async function handleCreateShare(request: Request, env: any): Promise<Response> 
     for (let attempt = 0; attempt < 5; attempt++) {
         const key = generateShareKey();
         if ((await env.ROUTE_SHARES.get(key)) !== null) continue;
-        await env.ROUTE_SHARES.put(key, body, { expirationTtl: SHARE_TTL_SECONDS });
+        // no expirationTtl — share links are permanent (KV entries never expire)
+        await env.ROUTE_SHARES.put(key, body);
         return json({ key }, 201);
     }
     return json({ message: 'could not allocate a free key' }, 503);
