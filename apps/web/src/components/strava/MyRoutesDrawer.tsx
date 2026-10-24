@@ -18,10 +18,11 @@ import {
 } from 'lucide-react';
 import { db } from '@/lib/db';
 import { deleteFile, exportFile, triggerFileInput } from '@/lib/file-actions';
+import { computeElevationStats } from '@/lib/elevation';
 import { ensureSurfaceBackfill } from '@/lib/surface-backfill';
 import { copyToClipboard, createShareLink } from '@/lib/share';
 import { toast } from '@/lib/toast';
-import { GPXFile, type GPXFileType } from '@x-route/gpx';
+import { distance, GPXFile, type GPXFileType } from '@x-route/gpx';
 import { useRoutingStore } from '@/store/routing-slice';
 import { useSelectionStore, nextCardCycleAction } from '@/store/selection-slice';
 import { useT } from '@/store/i18n-slice';
@@ -52,11 +53,29 @@ function getRouteStats(fileData: GPXFileType, untitledText: string): CachedStats
             ? `${Math.floor(estMin / 60)}h ${estMin % 60}m`
             : `${estMin}m`;
 
+    // Same pipeline as RouteStatsBar (computeElevationStats) so the card and
+    // the bottom stats bar agree on ascent for the same file.
+    let ascentM = 0;
+    const trkpts = file.getTrackPoints();
+    if (trkpts.length >= 2) {
+        const elevationPoints: { ele: number; distanceKm: number }[] = [];
+        let distKm = 0;
+        let prev = trkpts[0]!.getCoordinates();
+        elevationPoints.push({ ele: trkpts[0]!.ele ?? 0, distanceKm: 0 });
+        for (let i = 1; i < trkpts.length; i++) {
+            const cur = trkpts[i]!.getCoordinates();
+            distKm += distance(prev, cur) / 1000;
+            elevationPoints.push({ ele: trkpts[i]!.ele ?? 0, distanceKm: distKm });
+            prev = cur;
+        }
+        ascentM = computeElevationStats(elevationPoints).ascent;
+    }
+
     const stats: CachedStats = {
         name,
         pointsCount: global.length,
         distKm: global.distance.total,
-        ascentM: Math.round(global.elevation.gain),
+        ascentM,
         estTime,
     };
     gpxStatsCache.set(fileData, stats);
