@@ -1,16 +1,18 @@
 import { buildGPX, GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db } from './db';
 import { importFiles } from './file-actions';
-import { computeRouteHash } from './route-hash';
 
 // --- Route sharing ---
-// Share links look like https://x-route.app/r/aB3xK9p — the worker checks the
-// key against KV (302 home when dead), then the SPA boots, reads the key off
-// its pathname, and runs the shared GPX through the exact same pipeline as a
+// Share links look like https://x-route.app/r/3f2a9c0d1b4e5f60 — the key is
+// the route's canonical content hash, computed by the worker from the posted
+// GPX (same route → same link, write-once). Legacy 6-char random keys from
+// before content addressing still resolve. The worker checks the key against
+// KV (302 home when dead), then the SPA boots, reads the key off its
+// pathname, and runs the shared GPX through the exact same pipeline as a
 // local file import (dedup, card, planner load, camera fit included).
 
 /** Share short-link path shape served by the worker. */
-export const SHARE_PATH_RE = /^\/r\/([0-9A-Za-z]{6})\/?$/;
+export const SHARE_PATH_RE = /^\/r\/([0-9a-f]{16}|[0-9A-Za-z]{6})\/?$/;
 
 async function gzipText(text: string): Promise<Uint8Array<ArrayBuffer>> {
     const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -23,21 +25,17 @@ async function gunzipToText(bytes: ArrayBuffer): Promise<string> {
 }
 
 /** Serialize a saved route to GPX, publish it, and return the share URL.
- *  Sends a canonical content hash so the worker can hand back the existing
- *  key when this exact route was already shared (no duplicate KV entries). */
+ *  The worker derives the content-addressed key itself, so re-sharing the
+ *  same route (even one imported from a share link) returns the same URL. */
 export async function createShareLink(fileId: string): Promise<string> {
     const data = await db.files.get(fileId);
     if (!data) throw new Error('route not found');
-    const file = new GPXFile(data as GPXFileType);
-    const xml = buildGPX(file, []);
+    const xml = buildGPX(new GPXFile(data as GPXFileType), []);
     const payload = await gzipText(xml);
 
     const res = await fetch('/api/share', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/gzip',
-            'X-Share-Hash': await computeRouteHash(file),
-        },
+        headers: { 'Content-Type': 'application/gzip' },
         body: payload,
     });
     if (!res.ok) throw new Error(`share request failed (${res.status})`);

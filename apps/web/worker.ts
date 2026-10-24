@@ -6,6 +6,8 @@
 // backed by the ROUTE_SHARES KV namespace. Everything else falls through to
 // the static assets (SPA).
 
+import { deriveShareKey } from './src/lib/share-key';
+
 const UPSTREAM = 'https://graphhopper.gpx.studio';
 
 const CORS_HEADERS: Record<string, string> = {
@@ -42,18 +44,15 @@ async function handleGraphHopper(request: Request): Promise<Response> {
     });
 }
 
-// --- Route sharing (KV: key = 6-char base62, value = gzip'd GPX, no expiry) ---
-// Dedup: `h:<sha256>` keys index a route's canonical content hash (name +
-// track points, sent by the client as X-Share-Hash) to its share key, so
-// sharing the same content twice — including re-sharing a route imported
-// from a share link — returns the existing key instead of writing duplicates.
-// The `h:` prefix can never collide with 6-char base62 content keys, and GET
-// paths guard on KEY_RE so index entries are never served.
+// --- Route sharing (KV, content-addressed, write-once, no expiry) ---
+// key = first 16 hex chars of the route's canonical SHA-256 (name + track
+// points), derived HERE from the posted GPX — never from client input. The
+// same route content (including a route re-imported from a share link, after
+// the lossless parse/buildGPX round-trip) therefore always resolves to the
+// same permanent link. Entries are write-once: an existing key is returned
+// as-is and never overwritten. Legacy random 6-char keys keep resolving.
 
-const KEY_RE = /^[0-9A-Za-z]{6}$/;
-const HASH_HEADER_RE = /^[0-9a-f]{64}$/;
-const HASH_INDEX_PREFIX = 'h:';
-const KEY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const KEY_RE = /^[0-9a-f]{16}$|^[0-9A-Za-z]{6}$/;
 const MAX_COMPRESSED_BYTES = 2 * 1024 * 1024; // reject > 2 MB gzip payloads
 const MAX_DECOMPRESSED_BYTES = 10 * 1024 * 1024; // gzip bombs must die here, not in the client's DOMParser
 
@@ -64,89 +63,59 @@ function json(message: unknown, status: number): Response {
     });
 }
 
-/** Random 6-char base62 key with rejection sampling (256 % 62 != 0). */
-function generateShareKey(): string {
-    let key = '';
-    while (key.length < 6) {
-        const rand = crypto.getRandomValues(new Uint8Array(8));
-        for (const b of rand) {
-            if (b < 248) {
-                // 248 = 62 * 4 — bytes above it would bias the alphabet
-                key += KEY_ALPHABET[b % 62];
-                if (key.length === 6) break;
-            }
-        }
-    }
-    return key;
-}
-
-/** Validate a gzip'd GPX payload: magic bytes, both size caps, and an XML/GPX
- *  prefix peek — keeps the namespace from doubling as free anonymous blob hosting. */
-async function validateGzipGPX(bytes: ArrayBuffer): Promise<string | null> {
-    if (bytes.byteLength < 64) return 'payload too small';
-    if (bytes.byteLength > MAX_COMPRESSED_BYTES) return 'payload too large';
+/** Validate a gzip'd GPX payload and return its decompressed XML: magic
+ *  bytes, both size caps, and an XML/GPX prefix peek — keeps the namespace
+ *  from doubling as free anonymous blob hosting. */
+async function validateGzipGPX(bytes: ArrayBuffer): Promise<{ error: string } | { xml: string }> {
+    if (bytes.byteLength < 64) return { error: 'payload too small' };
+    if (bytes.byteLength > MAX_COMPRESSED_BYTES) return { error: 'payload too large' };
     const u8 = new Uint8Array(bytes);
-    if (u8[0] !== 0x1f || u8[1] !== 0x8b) return 'payload is not gzip';
+    if (u8[0] !== 0x1f || u8[1] !== 0x8b) return { error: 'payload is not gzip' };
 
     try {
         const stream = new Response(bytes).body!.pipeThrough(new DecompressionStream('gzip'));
         const reader = stream.getReader();
+        const decoder = new TextDecoder();
+        const chunks: string[] = [];
         let total = 0;
-        let head = '';
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             total += value.byteLength;
             if (total > MAX_DECOMPRESSED_BYTES) {
                 await reader.cancel();
-                return 'decompressed payload too large';
+                return { error: 'decompressed payload too large' };
             }
-            if (head.length < 512) {
-                head += new TextDecoder().decode(value.slice(0, 512 - head.length));
-            }
+            chunks.push(decoder.decode(value, { stream: true }));
         }
-        const trimmed = head.replace(/^[\uFEFF\s]+/, '');
-        if (!trimmed.startsWith('<?xml') && !trimmed.startsWith('<gpx')) return 'payload is not GPX';
-        return null;
+        chunks.push(decoder.decode());
+        const xml = chunks.join('');
+        const trimmed = xml.slice(0, 512).replace(/^[﻿\s]+/, '');
+        if (!trimmed.startsWith('<?xml') && !trimmed.startsWith('<gpx')) {
+            return { error: 'payload is not GPX' };
+        }
+        return { xml };
     } catch {
-        return 'corrupt gzip payload';
+        return { error: 'corrupt gzip payload' };
     }
 }
 
 async function handleCreateShare(request: Request, env: any): Promise<Response> {
     const body = await request.arrayBuffer();
-    const error = await validateGzipGPX(body);
-    if (error) return json({ message: error }, 400);
+    const result = await validateGzipGPX(body);
+    if ('error' in result) return json({ message: result.error }, 400);
 
-    // Content-addressed dedup: if this exact route content (canonical hash
-    // from the client) was already shared, hand back the existing key without
-    // writing anything. A missing/invalid header falls through to the legacy
-    // random-key path.
-    const header = request.headers.get('X-Share-Hash') ?? '';
-    const hash = HASH_HEADER_RE.test(header) ? header : null;
-    if (hash) {
-        const existing = await env.ROUTE_SHARES.get(`${HASH_INDEX_PREFIX}${hash}`);
-        if (existing) return json({ key: existing }, 200);
-    }
+    const key = await deriveShareKey(result.xml);
 
-    // get-then-put has a microscopic TOCTOU window (two workers minting the
-    // same key in the same instant); the odds are astronomically against it
-    // and the worst case is one share overwriting another. Accepted.
-    for (let attempt = 0; attempt < 5; attempt++) {
-        const key = generateShareKey();
-        if ((await env.ROUTE_SHARES.get(key)) !== null) continue;
-        // no expirationTtl — share links are permanent (KV entries never expire)
-        await env.ROUTE_SHARES.put(key, body);
-        if (hash) {
-            // Content first, index second. Two concurrent first-shares of the
-            // same content can both miss the dedup check above and mint
-            // different keys; the last index write wins and the losing entry
-            // stays reachable via its returned key. Accepted.
-            await env.ROUTE_SHARES.put(`${HASH_INDEX_PREFIX}${hash}`, key);
-        }
-        return json({ key }, 201);
-    }
-    return json({ message: 'could not allocate a free key' }, 503);
+    // Write-once: an existing key means this exact content was already shared
+    // (dedup hit, zero writes) or — at ~3e-8 odds per million distinct routes —
+    // a 64-bit prefix collision; either way the existing entry wins untouched,
+    // which also makes targeted overwrites of live links impossible.
+    if ((await env.ROUTE_SHARES.get(key)) !== null) return json({ key }, 200);
+
+    // no expirationTtl — share links are permanent (KV entries never expire)
+    await env.ROUTE_SHARES.put(key, body);
+    return json({ key }, 201);
 }
 
 async function handleGetShare(key: string, env: any): Promise<Response> {
@@ -160,7 +129,7 @@ async function handleGetShare(key: string, env: any): Promise<Response> {
 
 /** /r/:key — share short link. A live key serves the SPA at its pretty URL
  *  (assets SPA fallback); anything else 302s home so dead links never boot
- *  the app. Nothing legitimate lives under /r/ besides 6-char keys. */
+ *  the app. Keys are 16-hex content hashes, plus legacy 6-char base62. */
 async function handleShareLink(request: Request, url: URL, env: any): Promise<Response> {
     const key = url.pathname.slice(3).replace(/\/+$/, '');
     const exists = KEY_RE.test(key) ? await env.ROUTE_SHARES.get(key) : null;
