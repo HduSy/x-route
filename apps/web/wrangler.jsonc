@@ -23,8 +23,9 @@
     },
     "kv_namespaces": [
         {
-            // Route sharing store: key = 6-char base62, value = gzip'd GPX bytes,
-            // TTL 1 day (links are a delivery channel, not permanent storage).
+            // Route sharing store: 6-char base62 key = gzip'd GPX bytes (no TTL,
+            // links never expire); "h:<sha256>" key = share key (content dedup
+            // index — same route content always resolves to the same link).
             "binding": "ROUTE_SHARES",
             "id": "f36453794f1d4b9bbe206eaf1fd79bf8"
         }

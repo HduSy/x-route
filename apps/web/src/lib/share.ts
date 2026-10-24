@@ -1,6 +1,7 @@
 import { buildGPX, GPXFile, type GPXFileType } from '@x-route/gpx';
 import { db } from './db';
 import { importFiles } from './file-actions';
+import { computeRouteHash } from './route-hash';
 
 // --- Route sharing ---
 // Share links look like https://x-route.app/r/aB3xK9p — the worker checks the
@@ -21,16 +22,22 @@ async function gunzipToText(bytes: ArrayBuffer): Promise<string> {
     return await new Response(stream).text();
 }
 
-/** Serialize a saved route to GPX, publish it, and return the share URL. */
+/** Serialize a saved route to GPX, publish it, and return the share URL.
+ *  Sends a canonical content hash so the worker can hand back the existing
+ *  key when this exact route was already shared (no duplicate KV entries). */
 export async function createShareLink(fileId: string): Promise<string> {
     const data = await db.files.get(fileId);
     if (!data) throw new Error('route not found');
-    const xml = buildGPX(new GPXFile(data as GPXFileType), []);
+    const file = new GPXFile(data as GPXFileType);
+    const xml = buildGPX(file, []);
     const payload = await gzipText(xml);
 
     const res = await fetch('/api/share', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/gzip' },
+        headers: {
+            'Content-Type': 'application/gzip',
+            'X-Share-Hash': await computeRouteHash(file),
+        },
         body: payload,
     });
     if (!res.ok) throw new Error(`share request failed (${res.status})`);

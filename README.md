@@ -103,6 +103,7 @@ Combining the sleek design and fluid UX of Strava with the industrial-grade rout
 - **Zero-Login Route Sharing via Short-Links**:
   - Generate lightweight short URLs powered by Cloudflare Workers and KV.
   - Recipients can open and inspect complete route geometries and elevation profiles on any device with zero sign-up required.
+  - Content-addressed dedup: the same route (including one re-imported from a share link) always resolves to the same short link via a canonical content hash — no duplicate KV entries.
 - **Professional A4 Browser Printing & Export (`Cmd+P` / `Ctrl+P`)**:
   - Clean print layout auto-hiding all navigation bars, sidebars, and map controls.
   - Automatic route bounds centering (`fitActiveRoute`) with margin optimization for A4 landscape paper.

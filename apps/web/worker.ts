@@ -43,8 +43,16 @@ async function handleGraphHopper(request: Request): Promise<Response> {
 }
 
 // --- Route sharing (KV: key = 6-char base62, value = gzip'd GPX, no expiry) ---
+// Dedup: `h:<sha256>` keys index a route's canonical content hash (name +
+// track points, sent by the client as X-Share-Hash) to its share key, so
+// sharing the same content twice — including re-sharing a route imported
+// from a share link — returns the existing key instead of writing duplicates.
+// The `h:` prefix can never collide with 6-char base62 content keys, and GET
+// paths guard on KEY_RE so index entries are never served.
 
 const KEY_RE = /^[0-9A-Za-z]{6}$/;
+const HASH_HEADER_RE = /^[0-9a-f]{64}$/;
+const HASH_INDEX_PREFIX = 'h:';
 const KEY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const MAX_COMPRESSED_BYTES = 2 * 1024 * 1024; // reject > 2 MB gzip payloads
 const MAX_DECOMPRESSED_BYTES = 10 * 1024 * 1024; // gzip bombs must die here, not in the client's DOMParser
@@ -110,6 +118,17 @@ async function handleCreateShare(request: Request, env: any): Promise<Response> 
     const error = await validateGzipGPX(body);
     if (error) return json({ message: error }, 400);
 
+    // Content-addressed dedup: if this exact route content (canonical hash
+    // from the client) was already shared, hand back the existing key without
+    // writing anything. A missing/invalid header falls through to the legacy
+    // random-key path.
+    const header = request.headers.get('X-Share-Hash') ?? '';
+    const hash = HASH_HEADER_RE.test(header) ? header : null;
+    if (hash) {
+        const existing = await env.ROUTE_SHARES.get(`${HASH_INDEX_PREFIX}${hash}`);
+        if (existing) return json({ key: existing }, 200);
+    }
+
     // get-then-put has a microscopic TOCTOU window (two workers minting the
     // same key in the same instant); the odds are astronomically against it
     // and the worst case is one share overwriting another. Accepted.
@@ -118,6 +137,13 @@ async function handleCreateShare(request: Request, env: any): Promise<Response> 
         if ((await env.ROUTE_SHARES.get(key)) !== null) continue;
         // no expirationTtl — share links are permanent (KV entries never expire)
         await env.ROUTE_SHARES.put(key, body);
+        if (hash) {
+            // Content first, index second. Two concurrent first-shares of the
+            // same content can both miss the dedup check above and mint
+            // different keys; the last index write wins and the losing entry
+            // stays reachable via its returned key. Accepted.
+            await env.ROUTE_SHARES.put(`${HASH_INDEX_PREFIX}${hash}`, key);
+        }
         return json({ key }, 201);
     }
     return json({ message: 'could not allocate a free key' }, 503);
